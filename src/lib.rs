@@ -3,6 +3,8 @@ pub use canonical_form::{
     CanonicalForm, CanonicalizeError, ConstraintViolation, Reason, ValidationError,
 };
 
+pub mod codegen;
+
 mod well_known_types;
 pub use well_known_types::Binary;
 #[cfg(feature = "bytes")]
@@ -15,6 +17,7 @@ pub mod reexport {
     pub use async_trait;
     #[cfg(feature = "integer-restrictions")]
     pub use bounded_integer;
+    pub use derive_more;
     pub use heck;
     pub use http_api_problem;
     #[cfg(feature = "string-pattern")]
