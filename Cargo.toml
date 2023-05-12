@@ -2,6 +2,7 @@
 name = "openapi-gen"
 version = "0.1.0"
 edition = "2021"
+default-run = "openapi-gen"
 
 [dependencies]
 anyhow = { version = "1.0.71", optional = true }
@@ -28,6 +29,10 @@ bytes = ["base64"]
 integer-restrictions = ["bounded-integer"]
 scripts = ["cli"]
 string-pattern = ["regress"]
+
+[[bin]]
+name = "openapi-gen"
+required-features = ["cli"]
 
 [[bin]]
 name = "parse"
