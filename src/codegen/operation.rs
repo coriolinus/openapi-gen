@@ -38,6 +38,12 @@ pub fn make_request_item(
         }
     };
 
+    let (option_open, option_close) = if !request_body.required {
+        (quote!(Option<), quote!(>))
+    } else {
+        Default::default()
+    };
+
     match request_body.content.len() {
         0 => quote!(pub type #item_name = ();),
         1 => {
@@ -45,7 +51,7 @@ pub fn make_request_item(
             let (mime_type, media_type) = request_body.content.first().unwrap();
             let media_type_ident =
                 make_ident(&media_type::get_ident(&prefix_ident, mime_type, media_type));
-            quote!(pub type #item_name = #media_type_ident;)
+            quote!(pub type #item_name = #option_open #media_type_ident #option_close;)
         }
         _ => {
             // define an enum over the various request types
@@ -54,9 +60,19 @@ pub fn make_request_item(
                     make_ident(&media_type::get_ident(&prefix_ident, mime_type, media_type));
                 quote!(#variant(#variant))
             });
-            quote! {
-                pub enum #item_name {
-                    #( #variants ),*
+            if request_body.required {
+                quote! {
+                    pub enum #item_name {
+                        #( #variants ),*
+                    }
+                }
+            } else {
+                let inner_name = make_ident(&format!("{item_name}Inner"));
+                quote! {
+                    pub enum #inner_name {
+                        #( #variants ),*
+                    }
+                    pub type #item_name = Option<#inner_name>;
                 }
             }
         }
