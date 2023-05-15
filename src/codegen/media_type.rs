@@ -62,7 +62,7 @@ pub fn distinct(map: &IndexMap<String, MediaType>) -> Cardinality {
                 .schema
                 .as_ref()
                 .map(|schemaref| schemaref.as_ref_str().is_none())
-                .unwrap_or_default()
+                .unwrap_or(true)
         })
         .take(2)
         .count();
