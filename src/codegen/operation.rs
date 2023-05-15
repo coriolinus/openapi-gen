@@ -37,6 +37,11 @@ macro_rules! unwrap_or_compile_error {
     };
 }
 
+/// Make the request item for this operation.
+///
+/// Depending on the specification for this operation's request, this will either be a
+/// type definition renaming some externally-provided type, or an enum describing various accepted
+/// types according to the `content-type` of the request body.
 pub fn make_request_item(spec: &OpenAPI, prefix_ident: &str, operation: &Operation) -> TokenStream {
     let item_name = make_ident(&format!("{}Request", prefix_ident,));
 
@@ -96,6 +101,7 @@ pub fn make_request_item(spec: &OpenAPI, prefix_ident: &str, operation: &Operati
     }
 }
 
+/// Convert a `StatusCode` enum into a `String` suitable for use as an ident for that code.
 fn status_name(code: openapiv3::StatusCode) -> String {
     match code {
         openapiv3::StatusCode::Code(n) => http::StatusCode::from_u16(n)
@@ -114,6 +120,13 @@ fn status_name(code: openapiv3::StatusCode) -> String {
     }
 }
 
+/// Make the response item for this operation.
+///
+/// This is always an enum, even if it has only one variant. This is always an enum, even if it has zero variants!
+/// Those are degenerate cases which do not receive special handling.
+///
+/// There is at least one variant for each defined HTTP status code which can be returned. If some status codes can
+/// generate a variety of content types, then appropriate variants will be generated for those as well.
 pub fn make_response_item(
     spec: &OpenAPI,
     prefix_ident: &str,
