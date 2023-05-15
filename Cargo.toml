@@ -12,7 +12,9 @@ bounded-integer = { version = "0.5.6", features = ["std", "types", "serde1", "nu
 clap = { version = "4.2.7", features = ["derive"], optional = true }
 derive_more = "0.99.17"
 heck = "0.4.1"
+http = "0.2.9"
 http-api-problem = "0.56.0"
+indexmap = "1.9.3"
 openapiv3 = { version = "2.2.1", package = "openapiv3-extended" }
 prettyplease = "0.2.4"
 proc-macro2 = "1.0.56"

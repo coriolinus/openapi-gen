@@ -1,7 +1,6 @@
-use std::collections::HashSet;
-
 use heck::AsUpperCamelCase;
 use openapiv3::{OpenAPI, Operation};
+use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::codegen::media_type;
@@ -16,26 +15,37 @@ pub fn get_ident(name: &str, url_fragment: &str, operation: &Operation) -> Strin
     format!("{}", AsUpperCamelCase(fragment))
 }
 
-pub fn make_request_item(
-    spec: &OpenAPI,
-    prefix_ident: &str,
-    operation: &Operation,
-) -> proc_macro2::TokenStream {
+/// Unwrap the contained expression or return a compile error.
+macro_rules! unwrap_or_compile_error {
+    ($e:expr, $m:expr) => {
+        match $e {
+            Ok(ok) => ok,
+            Err(err) => {
+                let err_msg = format!("{}: {}", $m, err);
+                return quote!(compile_error!(#err_msg));
+            }
+        }
+    };
+    (iter box $e:expr, $m:expr) => {
+        match $e {
+            Ok(ok) => ok,
+            Err(err) => {
+                let err_msg = format!("{}: {}", $m, err);
+                return Box::new(std::iter::once(quote!(compile_error!(#err_msg)))) as Box<dyn Iterator<Item = TokenStream>>;
+            }
+        }
+    };
+}
+
+pub fn make_request_item(spec: &OpenAPI, prefix_ident: &str, operation: &Operation) -> TokenStream {
     let item_name = make_ident(&format!("{}Request", prefix_ident,));
 
     let Some(request_body) = operation.request_body.as_ref() else {
         return quote!(pub type #item_name = (););
     };
 
-    let request_body = match request_body.resolve(spec) {
-        Ok(request_body) => request_body,
-        Err(err) => {
-            let err_msg = format!("failed to resolve request body: {err}");
-            return quote! {
-                compile_error!(#err_msg);
-            };
-        }
-    };
+    let request_body =
+        unwrap_or_compile_error!(request_body.resolve(spec), "failed to resolve request body");
 
     let (option_open, option_close) = if !request_body.required {
         (quote!(Option<), quote!(>))
@@ -43,48 +53,16 @@ pub fn make_request_item(
         Default::default()
     };
 
-    // we don't actually care how many different content types the body can accept; what we care about are distinct schemas
-    // unfortunately, the `Schema` type doesn't implement `Hash` or `Ord`, so we can't compare the actual structs in a set directly.
-    //
-    let n_distinct_schema_refs = request_body
-        .content
-        .values()
-        .filter_map(|media_type| {
-            media_type
-                .schema
-                .as_ref()
-                .and_then(|schemaref| schemaref.as_ref_str())
-        })
-        .collect::<HashSet<_>>()
-        .len();
-    let n_distinct_local_schemas = request_body
-        .content
-        .values()
-        .filter(|media_type| {
-            media_type
-                .schema
-                .as_ref()
-                .map(|schemaref| schemaref.as_ref_str().is_none())
-                .unwrap_or_default()
-        })
-        .count();
-    // What we actually want to do depends on both counts.
-    match (n_distinct_local_schemas, n_distinct_schema_refs) {
-        // if there are no schemas at all, the request type is the unit type
-        (0, 0) => quote!(pub type #item_name = ();),
-        // if there is one distinct ref and no local types, or no distinct refs adn one local type, then
-        // we can just defer directly to that type
-        (0, 1) | (1, 0) => {
-            // define a typedef for the contained request type
-            let (mime_type, media_type) = request_body.content.first().unwrap();
+    match media_type::distinct(&request_body.content) {
+        media_type::Cardinality::Zero => quote!(pub type #item_name = ();),
+        media_type::Cardinality::One(mime_type, media_type) => {
             let media_type_ident =
                 make_ident(&media_type::get_ident(prefix_ident, mime_type, media_type));
             quote!(pub type #item_name = #option_open #media_type_ident #option_close;)
         }
-        // in all other cases we have to be explicit about what we mean, because we can't tell if two schemas are the same
-        _ => {
+        media_type::Cardinality::Several(iter) => {
             // define an enum over the various request types
-            let variants = request_body.content.iter().map(|(mime_type, media_type)| {
+            let variants = iter.map(|(mime_type, media_type)| {
                 let variant_inner = media_type::get_ident(prefix_ident, mime_type, media_type);
                 let variant_name = format!("{variant_inner}{}", AsUpperCamelCase(mime_type));
                 let variant_inner = make_ident(&variant_inner);
@@ -115,5 +93,88 @@ pub fn make_request_item(
                 }
             }
         }
+    }
+}
+
+fn status_name(code: openapiv3::StatusCode) -> String {
+    match code {
+        openapiv3::StatusCode::Code(n) => http::StatusCode::from_u16(n)
+            .ok()
+            .and_then(|status| status.canonical_reason())
+            .map(|reason| format!("{}", AsUpperCamelCase(reason)))
+            .unwrap_or_else(|| format!("Code{n}")),
+        openapiv3::StatusCode::Range(r) => match r {
+            1 => "InformationalRange".into(),
+            2 => "SuccessRange".into(),
+            3 => "RedirectionRange".into(),
+            4 => "ClientErrorRange".into(),
+            5 => "ServerErrorRange".into(),
+            _ => format!("Range{r}xx"),
+        },
+    }
+}
+
+pub fn make_response_item(
+    spec: &OpenAPI,
+    prefix_ident: &str,
+    operation: &Operation,
+) -> TokenStream {
+    let ident = make_ident(&format!("{prefix_ident}Response"));
+
+    let response_iter = operation
+        .responses
+        .responses
+        .iter()
+        .map(|(status, response)| (status_name(status.clone()), response));
+    let default_iter = operation
+        .responses
+        .default
+        .as_ref()
+        .map(|response| (String::from("Default"), response));
+    let variants = response_iter
+        .chain(default_iter)
+        .flat_map(|(status_name, response)| {
+            let response = unwrap_or_compile_error!(iter box
+                response.resolve(spec),
+                "failed to resolve response definition"
+            );
+
+            let doc = &response.description;
+
+            // based on the cardinality of the response content, we adjust the variants we emit.
+            match media_type::distinct(&response.content) {
+                // If there is no response content, then there is a single variant with no suffix,
+                // and no attached data.
+                media_type::Cardinality::Zero => {
+                    let variant_name = make_ident(&status_name);
+                    Box::new(std::iter::once(quote!(#[doc = #doc] #variant_name)))
+                        as Box<dyn Iterator<Item = TokenStream>>
+                }
+                // If there is one type of content, then there is a single variant with no suffix,
+                // and appropriate attached data.
+                media_type::Cardinality::One(mime_type, media_type) => {
+                    let variant_name = make_ident(&status_name);
+                    let variant_inner =
+                        make_ident(&media_type::get_ident(prefix_ident, mime_type, media_type));
+                    Box::new(std::iter::once(
+                        quote!(#[doc = #doc] #variant_name(#variant_inner)),
+                    ))
+                }
+                // If there is a variety of content, then each content type gets its own variant with
+                // a suffix based on the media type of the content.
+                media_type::Cardinality::Several(iter) => {
+                    Box::new(iter.map(move |(mime_type, media_type)| {
+                        let variant_name =
+                            make_ident(&format!("{status_name}{}", AsUpperCamelCase(mime_type)));
+                        let variant_inner =
+                            make_ident(&media_type::get_ident(prefix_ident, mime_type, media_type));
+                        quote!(#[doc = #doc] #variant_name(#variant_inner))
+                    }))
+                }
+            }
+        });
+
+    quote! {
+        pub enum #ident {#( #variants ),*}
     }
 }
