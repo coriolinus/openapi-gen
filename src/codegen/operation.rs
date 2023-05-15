@@ -1,9 +1,11 @@
+use std::collections::HashSet;
+
 use heck::AsUpperCamelCase;
 use openapiv3::{OpenAPI, Operation};
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::codegen::media_type;
+use crate::codegen::{media_type, schema};
 
 use super::make_ident;
 
@@ -39,9 +41,21 @@ macro_rules! unwrap_or_compile_error {
 
 /// Make the request item for this operation.
 ///
-/// Depending on the specification for this operation's request, this will either be a
-/// type definition renaming some externally-provided type, or an enum describing various accepted
-/// types according to the `content-type` of the request body.
+/// Depending on the specification for this operation's request, this will
+/// either be a type definition renaming some externally-provided type, or an
+/// enum describing various accepted types according to the `content-type` of
+/// the request body.
+///
+/// Note that the OpenAPI spec mandates:
+///
+/// > The `requestBody` is only supported in HTTP methods where the HTTP 1.1
+/// > specification RFC7231 has explicitly defined semantics for request bodies.
+/// > In other cases where the HTTP spec is vague, `requestBody` SHALL be
+/// > ignored by consumers.
+///
+/// This function does not know what HTTP method is being used, and cannot obey
+/// that mandate internally. It is the caller's responsibility to ensure that
+/// this mandate is upheld.
 pub fn make_request_item(spec: &OpenAPI, prefix_ident: &str, operation: &Operation) -> TokenStream {
     let item_name = make_ident(&format!("{}Request", prefix_ident,));
 
@@ -190,4 +204,151 @@ pub fn make_response_item(
     quote! {
         pub enum #ident {#( #variants ),*}
     }
+}
+
+// mod generated {
+//     mod out_of_band {
+//         pub type FreeformRequest = ();
+//         pub type TemplateRequest = ();
+//         pub type RenderError = ();
+//         pub type Problem = ();
+//         pub type Error = ();
+//         pub type SlackIdentifier = ();
+//         pub type Identifier = ();
+//         pub type PostKudo = ();
+//     }
+//     mod in_band {
+//         pub type RenderFreeformApplicationPdf = ();
+//         pub type RenderTemplateApplicationPdf = ();
+//     }
+
+//     use out_of_band::{
+//         Error, FreeformRequest, Identifier, PostKudo, Problem, RenderError, SlackIdentifier,
+//         TemplateRequest,
+//     };
+
+//     use in_band::{RenderFreeformApplicationPdf, RenderTemplateApplicationPdf};
+
+//     pub type RenderFreeformRequest = FreeformRequest;
+//     pub enum RenderFreeformResponse {
+//         #[doc = "rendered PDF document"]
+//         Ok(RenderFreeformApplicationPdf),
+//         #[doc = "it was not possible to produce a PDF given this request"]
+//         BadRequest(RenderError),
+//         #[doc = "upstream service was not available; try again later"]
+//         ServiceUnavailable(Problem),
+//         #[doc = "an error occurred; see status code and problem object for more information"]
+//         Default(Problem),
+//     }
+//     pub type RenderTemplateRequest = TemplateRequest;
+//     pub enum RenderTemplateResponse {
+//         #[doc = "rendered PDF document"]
+//         Ok(RenderTemplateApplicationPdf),
+//         #[doc = "it was not possible to produce a PDF given this request"]
+//         BadRequest(Error),
+//         #[doc = "upstream service was not available; try again later"]
+//         ServiceUnavailable(Problem),
+//         #[doc = "an error occurred; see status code and problem object for more information"]
+//         Default(Problem),
+//     }
+
+//     pub type GetKudosRequest = ();
+//     pub enum GetKudosResponse {
+//         #[doc = "kudo"]
+//         Ok,
+//         #[doc = "an error occurred; see status code and problem object for more information"]
+//         Default(Problem),
+//     }
+//     #[doc = "a request that can accept different data according to content type"]
+//     pub enum PutKudosRequest {
+//         IdentifierApplicationJson(Identifier),
+//         PostKudoMultipartFormData(PostKudo),
+//     }
+//     pub enum PutKudosResponse {
+//         #[doc = "kudo"]
+//         Created,
+//     }
+//     pub type PostKudosRequest = PostKudo;
+//     pub enum PostKudosResponse {
+//         #[doc = "accepted kudo"]
+//         Created,
+//         #[doc = "an error occurred; see status code and problem object for more information"]
+//         Default(Problem),
+//     }
+//     pub type PatchKudosRequest = PostKudo;
+//     pub enum PatchKudosResponse {
+//         #[doc = "kudo"]
+//         Created,
+//     }
+// }
+
+fn make_inline_request_item_definitions(
+    spec: &OpenAPI,
+    prefix_ident: &str,
+    operation: &Operation,
+) -> TokenStream {
+    let Some(ref request_body) = operation.request_body else {
+        return Default::default();
+    };
+    let request_body = unwrap_or_compile_error!(
+        request_body.resolve(spec),
+        "unable to resolve request body definition"
+    );
+
+    let mut already_generated = HashSet::new();
+
+    let definitions = request_body
+        .content
+        .iter()
+        .filter(|(_mime_type, media_type)| {
+            // a reference, by definition, is defined elsewhere
+            media_type::schema_ref(media_type).is_none()
+        })
+        .filter_map(|(mime_type, media_type)| {
+            let item_name = media_type::get_ident(prefix_ident, mime_type, media_type);
+
+            if !already_generated.insert(item_name.clone()) {
+                // `insert` returns `false` if the set already contained this value
+                // if the set already contains this value, don't regenerate
+                return None;
+            }
+
+            let item_ident = make_ident(&item_name);
+
+            Some(match media_type.schema.as_ref() {
+                Some(schema) => {
+                    let schema = schema.resolve(spec);
+                    schema::make_items_for_schema(&item_name, schema)
+                }
+                None => {
+                    // if we have a type which doesn't define a schema, then
+                    // the specification author believes that it is perfectly described
+                    // by its mime type. In the future we can maybe do something clever
+                    // by parsing the mime and switching on that, but for now, it's safe
+                    // enough to just declare a typedef to `Vec<u8>`.
+
+                    // there's no particular reason this typedef should be public; rustdoc
+                    // will unify it appropriately.
+                    quote!(type #item_ident = Vec<u8>;)
+                }
+            })
+        });
+
+    quote! {
+        #(
+            #definitions
+        )*
+    }
+}
+
+/// Make definitions for items defined inline within an operation.
+///
+/// Typically, operation definitions will just reference schemas defined elsewhere in the schema. However,
+/// OpenAPI provides for the possibility of defining schemas inline, so we need to handle that case here.
+pub fn make_inline_item_definitions(
+    spec: &OpenAPI,
+    prefix_ident: &str,
+    operation: &Operation,
+) -> TokenStream {
+    todo!()
 }

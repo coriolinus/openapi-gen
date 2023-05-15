@@ -34,6 +34,14 @@ pub enum Cardinality<'a> {
     Several(indexmap::map::Iter<'a, String, MediaType>),
 }
 
+/// Return the schema reference for this media type, if one exists
+pub fn schema_ref(media_type: &MediaType) -> Option<&str> {
+    media_type
+        .schema
+        .as_ref()
+        .and_then(|schemaref| schemaref.as_ref_str())
+}
+
 /// We often want to vary our behavior based on whether there are Zero, One, or
 /// Several distinct `MediaType`s defined in one place.
 ///
@@ -45,25 +53,15 @@ pub enum Cardinality<'a> {
 pub fn distinct(map: &IndexMap<String, MediaType>) -> Cardinality {
     let n_distinct_schema_refs = map
         .values()
-        .filter_map(|media_type| {
-            media_type
-                .schema
-                .as_ref()
-                .and_then(|schemaref| schemaref.as_ref_str())
-        })
+        .filter_map(schema_ref)
         .take(2)
         .collect::<HashSet<_>>()
         .len();
 
     let n_distinct_local_schemas = map
         .values()
-        .filter(|media_type| {
-            media_type
-                .schema
-                .as_ref()
-                .map(|schemaref| schemaref.as_ref_str().is_none())
-                .unwrap_or(true)
-        })
+        .map(schema_ref)
+        .filter(|schemaref| schemaref.is_none())
         .take(2)
         .count();
 

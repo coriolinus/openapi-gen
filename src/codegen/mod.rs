@@ -3,6 +3,7 @@ use syn::Ident;
 
 pub mod media_type;
 pub mod operation;
+pub mod schema;
 
 /// We always want call-site semantics for our identifiers, so
 /// they can be accessed from peer code.
