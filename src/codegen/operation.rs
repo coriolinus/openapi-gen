@@ -18,12 +18,9 @@ pub fn get_ident(name: &str, url_fragment: &str, operation: &Operation) -> Strin
 
 pub fn make_request_item(
     spec: &OpenAPI,
-    operation_name: &str,
-    operation_url_fragment: &str,
+    prefix_ident: &str,
     operation: &Operation,
 ) -> proc_macro2::TokenStream {
-    let prefix_ident = get_ident(operation_name, operation_url_fragment, operation);
-
     let item_name = make_ident(&format!("{}Request", prefix_ident,));
 
     let Some(request_body) = operation.request_body.as_ref() else {
@@ -81,14 +78,14 @@ pub fn make_request_item(
             // define a typedef for the contained request type
             let (mime_type, media_type) = request_body.content.first().unwrap();
             let media_type_ident =
-                make_ident(&media_type::get_ident(&prefix_ident, mime_type, media_type));
+                make_ident(&media_type::get_ident(prefix_ident, mime_type, media_type));
             quote!(pub type #item_name = #option_open #media_type_ident #option_close;)
         }
         // in all other cases we have to be explicit about what we mean, because we can't tell if two schemas are the same
         _ => {
             // define an enum over the various request types
             let variants = request_body.content.iter().map(|(mime_type, media_type)| {
-                let variant_inner = media_type::get_ident(&prefix_ident, mime_type, media_type);
+                let variant_inner = media_type::get_ident(prefix_ident, mime_type, media_type);
                 let variant_name = format!("{variant_inner}{}", AsUpperCamelCase(mime_type));
                 let variant_inner = make_ident(&variant_inner);
                 let variant_name = make_ident(&variant_name);

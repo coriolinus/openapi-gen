@@ -26,7 +26,8 @@ fn main() -> Result<()> {
         };
 
         for (operation_name, operation) in item.iter() {
-            let request_item = operation::make_request_item(&spec, operation_name, path, operation);
+            let prefix_ident = operation::get_ident(operation_name, path, operation);
+            let request_item = operation::make_request_item(&spec, &prefix_ident, operation);
 
             println!("{request_item}");
         }
