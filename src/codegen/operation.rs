@@ -242,7 +242,7 @@ fn make_inline_request_item_definitions(
             Some(match media_type.schema.as_ref() {
                 Some(schema) => {
                     let schema = schema.resolve(spec);
-                    schema::make_items_for_schema(&item_name, schema)
+                    schema::make_items_for_schema(spec, &item_name, schema)
                 }
                 None => {
                     // if we have a type which doesn't define a schema, then

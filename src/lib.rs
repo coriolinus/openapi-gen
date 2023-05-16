@@ -23,6 +23,7 @@ pub mod reexport {
     #[cfg(feature = "string-pattern")]
     pub use regress;
     pub use serde;
+    pub use serde_json;
     pub use time;
     #[cfg(feature = "uuid")]
     pub use uuid;
