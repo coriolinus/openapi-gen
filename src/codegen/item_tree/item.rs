@@ -1,6 +1,6 @@
 use openapiv3::{Schema, SchemaKind, Type};
 
-use super::{Scalar, Value};
+use super::{OneOfEnum, Scalar, Value};
 
 fn get_extension_value<'a>(schema: &'a Schema, key: &str) -> Option<&'a serde_json::Value> {
     schema.schema_data.extensions.get(key)
@@ -58,7 +58,9 @@ impl<'a> TryFrom<&'a Schema> for Item {
             SchemaKind::Type(Type::Integer(integer_type)) => integer_type.try_into()?,
             SchemaKind::Type(Type::Array(array_type)) => array_type.try_into()?,
             SchemaKind::Type(Type::Object(object_type)) => object_type.try_into()?,
-            SchemaKind::OneOf { one_of } => todo!(),
+            SchemaKind::OneOf { one_of } => {
+                OneOfEnum::try_from(&schema.schema_data, one_of)?.into()
+            }
             SchemaKind::AllOf { .. } | SchemaKind::AnyOf { .. } | SchemaKind::Not { .. } => {
                 return Err("`allOf`, `anyOf`, and `not` are not supported".into())
             }

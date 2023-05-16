@@ -25,3 +25,15 @@ pub use value::Value;
 
 mod item;
 pub use item::Item;
+
+use openapiv3::ReferenceOr;
+
+fn maybe_map_reference_or<T, O, E>(
+    reference: ReferenceOr<T>,
+    map: impl FnOnce(T) -> Result<O, E>,
+) -> Result<ReferenceOr<O>, E> {
+    match reference {
+        ReferenceOr::Reference { reference } => Ok(ReferenceOr::Reference { reference }),
+        ReferenceOr::Item(t) => Ok(ReferenceOr::Item(map(t)?)),
+    }
+}
