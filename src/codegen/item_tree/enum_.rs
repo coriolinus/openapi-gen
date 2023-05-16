@@ -10,5 +10,6 @@ pub struct StringEnum {
 /// OpenAPI's `oneOf` type
 #[derive(Debug, Clone)]
 pub struct OneOfEnum {
+    pub discriminant: Option<String>,
     pub variants: Vec<ReferenceOr<Item>>,
 }
