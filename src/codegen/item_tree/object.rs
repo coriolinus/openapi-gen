@@ -6,6 +6,8 @@ use openapiv3::ReferenceOr;
 pub struct ObjectMember {
     pub definition: Box<ReferenceOr<Item>>,
     pub required: bool,
+    pub read_only: bool,
+    pub write_only: bool,
 }
 
 /// An inline definition of an object

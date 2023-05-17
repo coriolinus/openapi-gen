@@ -182,6 +182,19 @@ impl TryFrom<&ObjectType> for Value {
                     .iter()
                     .map::<Result<_, String>, _>(|(name, schema_ref)| {
                         let required = object_type.required.contains(name);
+
+                        // TODO: should we resolve references here instead? But that kind of doesn't make sense.
+                        // For now, we're only permitting inline definitions to be read/write-only.
+                        let read_only = schema_ref
+                            .as_item()
+                            .map(|schema| schema.schema_data.read_only)
+                            .unwrap_or_default();
+
+                        let write_only = schema_ref
+                            .as_item()
+                            .map(|schema| schema.schema_data.write_only)
+                            .unwrap_or_default();
+
                         let definition =
                             Box::new(maybe_map_reference_or(schema_ref.as_ref(), |schema| {
                                 schema.try_into()
@@ -191,6 +204,8 @@ impl TryFrom<&ObjectType> for Value {
                             ObjectMember {
                                 required,
                                 definition,
+                                read_only,
+                                write_only,
                             },
                         ))
                     })
