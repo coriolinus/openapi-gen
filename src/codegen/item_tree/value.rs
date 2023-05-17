@@ -1,6 +1,6 @@
 use openapiv3::{
     ArrayType, IntegerFormat, IntegerType, NumberFormat, NumberType, ObjectType, ReferenceOr,
-    StringFormat, StringType, VariantOrUnknownOrEmpty,
+    SchemaData, StringFormat, StringType, VariantOrUnknownOrEmpty,
 };
 
 use super::{
@@ -25,53 +25,6 @@ pub enum Value {
 impl Default for Value {
     fn default() -> Self {
         Self::Scalar(Scalar::Any)
-    }
-}
-
-impl TryFrom<&StringType> for Value {
-    type Error = String;
-
-    fn try_from(string_type: &StringType) -> Result<Self, Self::Error> {
-        // TODO: handle `string_type.pattern`
-
-        if !matches!(&string_type.format, VariantOrUnknownOrEmpty::Empty)
-            && !string_type.enumeration.is_empty()
-        {
-            return Err("cannot specify both format and enum".into());
-        }
-        let value = match &string_type.format {
-            VariantOrUnknownOrEmpty::Item(format) => match format {
-                StringFormat::Binary => Value::Scalar(Scalar::Binary),
-                #[cfg(feature = "bytes")]
-                StringFormat::Byte => Value::Scalar(Scalar::Bytes),
-                #[cfg(not(feature = "bytes"))]
-                StringFormat::Byte => Value::Scalar(Scalar::String),
-                StringFormat::Date => Value::Scalar(Scalar::Date),
-                StringFormat::DateTime => Value::Scalar(Scalar::DateTime),
-                StringFormat::Password => Value::Scalar(Scalar::String),
-            },
-            VariantOrUnknownOrEmpty::Unknown(format) => match format.to_lowercase().as_str() {
-                #[cfg(feature = "bytes")]
-                "base64" => Value::Scalar(Scalar::Bytes),
-                "ip" => Value::Scalar(Scalar::IpAddr),
-                "ipv4" => Value::Scalar(Scalar::Ipv4Addr),
-                "ipv6" => Value::Scalar(Scalar::Ipv6Addr),
-                #[cfg(feature = "uuid")]
-                "uuid" => Value::Scalar(Scalar::Uuid),
-                // unknown string types are valid and devolve to `String`
-                _ => Value::Scalar(Scalar::String),
-            },
-            VariantOrUnknownOrEmpty::Empty => {
-                if string_type.enumeration.is_empty() {
-                    Value::Scalar(Scalar::String)
-                } else {
-                    Value::StringEnum(StringEnum {
-                        variants: string_type.enumeration.clone(),
-                    })
-                }
-            }
-        };
-        Ok(value)
     }
 }
 
@@ -213,5 +166,58 @@ impl TryFrom<&ObjectType> for Value {
                 Ok(Value::Object(Object { members }))
             }
         }
+    }
+}
+
+impl Value {
+    pub fn try_from_string_type(
+        string_type: &StringType,
+        schema_data: &SchemaData,
+    ) -> Result<Self, String> {
+        // TODO: handle `string_type.pattern`
+
+        if !matches!(&string_type.format, VariantOrUnknownOrEmpty::Empty)
+            && !string_type.enumeration.is_empty()
+        {
+            return Err("cannot specify both format and enum".into());
+        }
+        let value = match &string_type.format {
+            VariantOrUnknownOrEmpty::Item(format) => match format {
+                StringFormat::Binary => Value::Scalar(Scalar::Binary),
+                #[cfg(feature = "bytes")]
+                StringFormat::Byte => Value::Scalar(Scalar::Bytes),
+                #[cfg(not(feature = "bytes"))]
+                StringFormat::Byte => Value::Scalar(Scalar::String),
+                StringFormat::Date => Value::Scalar(Scalar::Date),
+                StringFormat::DateTime => Value::Scalar(Scalar::DateTime),
+                StringFormat::Password => Value::Scalar(Scalar::String),
+            },
+            VariantOrUnknownOrEmpty::Unknown(format) => match format.to_lowercase().as_str() {
+                #[cfg(feature = "bytes")]
+                "base64" => Value::Scalar(Scalar::Bytes),
+                "ip" => Value::Scalar(Scalar::IpAddr),
+                "ipv4" => Value::Scalar(Scalar::Ipv4Addr),
+                "ipv6" => Value::Scalar(Scalar::Ipv6Addr),
+                #[cfg(feature = "uuid")]
+                "uuid" => Value::Scalar(Scalar::Uuid),
+                // unknown string types are valid and devolve to `String`
+                _ => Value::Scalar(Scalar::String),
+            },
+            VariantOrUnknownOrEmpty::Empty => {
+                if string_type.enumeration.is_empty() {
+                    Value::Scalar(Scalar::String)
+                } else {
+                    Value::StringEnum(StringEnum {
+                        variants: string_type
+                            .enumeration
+                            .iter()
+                            .filter(|&e| !schema_data.nullable || e != "null")
+                            .cloned()
+                            .collect(),
+                    })
+                }
+            }
+        };
+        Ok(value)
     }
 }

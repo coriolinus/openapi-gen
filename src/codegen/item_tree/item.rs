@@ -55,7 +55,9 @@ impl<'a> TryFrom<&'a Schema> for Item {
         let value = match &schema.schema_kind {
             SchemaKind::Any(_) => Scalar::Any.into(),
             SchemaKind::Type(Type::Boolean {}) => Value::Scalar(Scalar::Bool),
-            SchemaKind::Type(Type::String(string_type)) => string_type.try_into()?,
+            SchemaKind::Type(Type::String(string_type)) => {
+                Value::try_from_string_type(string_type, &schema.schema_data)?
+            }
             SchemaKind::Type(Type::Number(number_type)) => number_type.try_into()?,
             SchemaKind::Type(Type::Integer(integer_type)) => integer_type.try_into()?,
             SchemaKind::Type(Type::Array(array_type)) => array_type.try_into()?,
