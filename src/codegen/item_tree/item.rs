@@ -17,6 +17,8 @@ fn get_extension_bool(schema: &Schema, key: &str) -> bool {
 /// This ultimately controls everything about how an item is emitted in Rust.
 #[derive(Default, Debug, Clone)]
 pub struct Item {
+    /// Documentation to be injected for this item.
+    pub docs: Option<String>,
     /// Name defined inline. Overrides the generated name.
     pub name: Option<String>,
     /// When true, construct a newtype instead of a typedef.
@@ -66,6 +68,19 @@ impl<'a> TryFrom<&'a Schema> for Item {
             }
         };
 
+        // Get documentation from the provided external documentation, or alternately from the description.
+        let docs = schema
+            .schema_data
+            .external_docs
+            .as_ref()
+            .map(|docs| reqwest::blocking::get(&docs.url))
+            .transpose()
+            .map_err(|err| err.to_string())?
+            .map(|response| response.text())
+            .transpose()
+            .map_err(|err| err.to_string())?
+            .or_else(|| schema.schema_data.description.clone());
+
         let name = get_extension_value(schema, "name")
             .and_then(serde_json::Value::as_str)
             .map(ToOwned::to_owned);
@@ -79,6 +94,7 @@ impl<'a> TryFrom<&'a Schema> for Item {
         let nullable = schema.schema_data.nullable;
 
         Ok(Self {
+            docs,
             name,
             newtype,
             newtype_from,
