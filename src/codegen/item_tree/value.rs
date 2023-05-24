@@ -1,10 +1,15 @@
+use std::borrow::Cow;
+
 use openapiv3::{
     ArrayType, IntegerFormat, IntegerType, NumberFormat, NumberType, ObjectType, ReferenceOr,
     SchemaData, StringFormat, StringType, VariantOrUnknownOrEmpty,
 };
+use proc_macro2::TokenStream;
+use quote::quote;
 
 use super::{
-    maybe_map_reference_or, List, Map, Object, ObjectMember, OneOfEnum, Scalar, Set, StringEnum,
+    maybe_map_reference_or, Item, List, Map, Object, ObjectMember, OneOfEnum, Scalar, Set,
+    StringEnum,
 };
 
 /// The fundamental value type.
@@ -219,5 +224,83 @@ impl Value {
             }
         };
         Ok(value)
+    }
+
+    /// Iterate over sub-items, not includeing `self`.
+    ///
+    /// This only includes inline definitions. It makes no attempt to resolve references.
+    pub fn sub_items<'a>(&'a self) -> Box<dyn 'a + Iterator<Item = (Cow<'a, str>, &'a Item)>> {
+        match self {
+            Value::Scalar(_) | Value::StringEnum(_) => Box::new(std::iter::empty()),
+            Value::List(list) => Box::new(
+                list.item
+                    .as_item()
+                    .map(|item| (Cow::from("Item"), item))
+                    .into_iter(),
+            ),
+            Value::Set(set) => Box::new(
+                set.item
+                    .as_item()
+                    .map(|item| (Cow::from("Item"), item))
+                    .into_iter(),
+            ),
+            Value::OneOfEnum(one_of) => Box::new(one_of.variants.iter().enumerate().filter_map(
+                |(idx, variant)| {
+                    variant
+                        .definition
+                        .as_item()
+                        .map(|item| (format!("Variant{idx}").into(), item))
+                },
+            )),
+            Value::Object(object) => {
+                Box::new(object.members.iter().filter_map(|(name, member)| {
+                    member
+                        .definition
+                        .as_item()
+                        .map(|item| (name.as_str().into(), item))
+                }))
+            }
+            Value::Map(map) => Box::new(
+                map.value_type
+                    .as_ref()
+                    .and_then(|item_ref| item_ref.as_item())
+                    .map(|item| (Cow::from("Item"), item))
+                    .into_iter(),
+            ),
+        }
+    }
+
+    /// What kind of item keyword does this value type use?
+    pub fn item_keyword(&self) -> TokenStream {
+        match self {
+            Value::Scalar(_) | Value::List(_) | Value::Set(_) | Value::Map(_) => quote!(type),
+            Value::StringEnum(_) | Value::OneOfEnum(_) => quote!(enum),
+            Value::Object(_) => quote!(struct),
+        }
+    }
+
+    /// `true` when this is a struct or enum.
+    pub fn is_struct_or_enum(&self) -> bool {
+        match self {
+            Value::Scalar(_) | Value::List(_) | Value::Set(_) | Value::Map(_) => false,
+            Value::StringEnum(_) | Value::OneOfEnum(_) | Value::Object(_) => true,
+        }
+    }
+
+    /// Emit the bare form of the item definition.
+    ///
+    /// This omits visibility, identifier, and any miscellaneous punctuation (`=`; `;`).
+    ///
+    /// This includes necessary punctuation such as `{` and `}` surrounding a struct definition.
+    pub fn emit_item_definition(&self, derived_name: &str) -> TokenStream {
+        match self {
+            Value::Scalar(scalar) => scalar.emit_type(),
+            Value::List(list) => list.emit_definition(derived_name),
+            Value::Set(set) => set.emit_definition(derived_name),
+            Value::Map(map) => map.emit_definition(derived_name),
+            Value::StringEnum(string_enum) => string_enum.emit_definition(derived_name),
+            Value::OneOfEnum(one_of_enum) => one_of_enum.emit_definition(derived_name),
+            Value::Object(object) => object.emit_definition(derived_name),
+        }
     }
 }

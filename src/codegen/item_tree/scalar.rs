@@ -77,6 +77,28 @@ impl Scalar {
         }
     }
 
+    pub fn impls_hash(self) -> bool {
+        match self {
+            Scalar::F64 | Scalar::F32 | Scalar::Any => false,
+            Scalar::I64
+            | Scalar::I32
+            | Scalar::String
+            | Scalar::Binary
+            | Scalar::Date
+            | Scalar::DateTime
+            | Scalar::IpAddr
+            | Scalar::Ipv4Addr
+            | Scalar::Ipv6Addr
+            | Scalar::Bool => true,
+            #[cfg(feature = "bytes")]
+            Scalar::Bytes => true,
+            #[cfg(feature = "uuid")]
+            Scalar::Uuid => true,
+            #[cfg(feature = "integer-restrictions")]
+            Scalar::BoundedI32(_, _) | Scalar::BoundedI64(_, _) => true,
+        }
+    }
+
     pub fn emit_type(self) -> TokenStream {
         match self {
             Scalar::Bool => quote!(bool),

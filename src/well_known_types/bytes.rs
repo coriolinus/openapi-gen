@@ -9,6 +9,7 @@ use crate::{CanonicalForm, Reason, ValidationError};
     Clone,
     PartialEq,
     Eq,
+    Hash,
     serde_with::SerializeDisplay,
     serde_with::DeserializeFromStr,
     derive_more::Constructor,

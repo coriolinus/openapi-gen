@@ -1,4 +1,9 @@
-use openapiv3::{Schema, SchemaKind, Type};
+use heck::AsUpperCamelCase;
+use openapiv3::{ReferenceOr, Schema, SchemaKind, Type};
+use proc_macro2::{Ident, TokenStream};
+use quote::quote;
+
+use crate::codegen::make_ident;
 
 use super::{OneOfEnum, Scalar, Value};
 
@@ -106,5 +111,146 @@ impl<'a> TryFrom<&'a Schema> for Item {
             nullable,
             value,
         })
+    }
+}
+
+impl Item {
+    /// `true` when the item is a typedef.
+    ///
+    /// This disables derives when the item is emitted.
+    fn is_typedef(&self) -> bool {
+        !self.newtype && matches!(&self.value, Value::Scalar(_))
+    }
+
+    /// Calculate the inner identifier for this item, without filtering by nullability.
+    fn inner_ident_unfiltered(&self, derived_name: &str) -> String {
+        format!(
+            "{}",
+            AsUpperCamelCase(self.name.as_deref().unwrap_or(derived_name))
+        )
+    }
+
+    /// Calculate the inner identifier for this item.
+    ///
+    /// This only exists if the item is nullable.
+    pub fn inner_ident(&self, derived_name: &str) -> Option<Ident> {
+        self.nullable
+            .then(|| make_ident(&self.inner_ident_unfiltered(derived_name)))
+    }
+
+    /// Calculate the referent identifier for this item.
+    ///
+    /// Rules:
+    ///
+    /// - If there's a defined `name`, we use that instead of the derived name.
+    /// - If the item is nullable, we use a `MaybeX` variant.
+    pub fn referent_ident(&self, derived_name: &str) -> Ident {
+        let inner = self.inner_ident_unfiltered(derived_name);
+        let referent = if self.nullable {
+            format!("Maybe{inner}")
+        } else {
+            inner
+        };
+        make_ident(&referent)
+    }
+
+    /// Is this item public?
+    ///
+    /// True if any:
+    ///
+    /// - is a struct or enum
+    /// - is a newtype
+    /// - has a `name`
+    pub fn is_pub(&self) -> bool {
+        self.newtype || self.value.is_struct_or_enum() || self.name.is_some()
+    }
+
+    /// Generate an item definition for this item.
+    ///
+    /// Uses a depth-first traversal to ensure inline-defined sub-item
+    /// definitions appear before containing item definitions. However, makes no
+    /// attempt to generate reference items.
+    ///
+    /// `derived_name` is the derived name for this item, based on its position
+    /// in the tree structure.
+    pub fn emit(&self, derived_name: &str) -> TokenStream {
+        let sub_item_defs = self.value.sub_items().map(|(name_fragment, item)| {
+            let derived_name = format!(
+                "{}{}",
+                AsUpperCamelCase(derived_name),
+                AsUpperCamelCase(name_fragment)
+            );
+            item.emit(&derived_name)
+        });
+
+        let docs = self
+            .docs
+            .as_ref()
+            .map(|docs| quote!(#[doc = #docs]))
+            .unwrap_or_default();
+
+        let wrapper_def = if let Some(inner_ident) = self.inner_ident(derived_name) {
+            let outer_ident = self.referent_ident(derived_name);
+            quote! {
+                type #outer_ident = Option<#inner_ident>;
+            }
+        } else {
+            Default::default()
+        };
+
+        let item_keyword = if self.newtype {
+            quote!(struct)
+        } else {
+            self.value.item_keyword()
+        };
+
+        let equals = if !self.newtype && !self.value.is_struct_or_enum() {
+            quote!(=)
+        } else {
+            Default::default()
+        };
+
+        let item_ident = if let Some(inner_ident) = self.inner_ident(derived_name) {
+            inner_ident
+        } else {
+            self.referent_ident(derived_name)
+        };
+
+        // TODO: derives
+        let derives = TokenStream::default();
+
+        let pub_ = if self.is_pub() {
+            quote!(pub)
+        } else {
+            Default::default()
+        };
+
+        let item_def = self.value.emit_item_definition(derived_name);
+
+        let semicolon = if self.newtype || !self.value.is_struct_or_enum() {
+            quote!(;)
+        } else {
+            Default::default()
+        };
+
+        quote! {
+            #( #sub_item_defs )*
+
+            #wrapper_def
+
+            #docs
+            #derives
+            #pub_ #item_keyword #item_ident #equals #item_def #semicolon
+        }
+    }
+
+    pub fn reference_referent_ident(item_ref: &ReferenceOr<Item>, derived_name: &str) -> Ident {
+        match item_ref {
+            ReferenceOr::Reference { reference } => {
+                let name = reference.rsplit('/').next().unwrap_or(reference.as_ref());
+                make_ident(name)
+            }
+            ReferenceOr::Item(item) => item.referent_ident(derived_name),
+        }
     }
 }

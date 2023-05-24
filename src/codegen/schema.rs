@@ -1,5 +1,8 @@
 use openapiv3::{OpenAPI, Schema};
 use proc_macro2::TokenStream;
+use quote::quote;
+
+use crate::codegen::item_tree::Item;
 
 /// Make an item for this schema.
 ///
@@ -9,5 +12,12 @@ use proc_macro2::TokenStream;
 ///
 /// This produces only items defined inline. References are assumed to be defined elsewhere.
 pub fn make_items_for_schema(spec: &OpenAPI, item_name: &str, schema: &Schema) -> TokenStream {
-    todo!()
+    let item = match Item::try_from(schema) {
+        Ok(item) => item,
+        Err(err) => {
+            let message = format!("failed to generate item from schema: {err}");
+            return quote!(compile_error!(#message));
+        }
+    };
+    item.emit(item_name)
 }

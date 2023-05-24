@@ -206,7 +206,7 @@ pub fn make_response_item(
     }
 }
 
-fn make_inline_request_item_definitions(
+pub fn make_inline_request_item_definitions(
     spec: &OpenAPI,
     prefix_ident: &str,
     operation: &Operation,
