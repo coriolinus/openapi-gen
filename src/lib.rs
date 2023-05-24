@@ -4,6 +4,7 @@ pub use canonical_form::{
 };
 
 pub mod codegen;
+pub mod openapi_compat;
 
 mod well_known_types;
 pub use well_known_types::Binary;

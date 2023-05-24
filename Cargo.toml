@@ -5,7 +5,7 @@ edition = "2021"
 default-run = "openapi-gen"
 
 [dependencies]
-anyhow = { version = "1.0.71", optional = true }
+anyhow = { version = "1.0.71" }
 async-trait = "0.1.68"
 base64 = { version = "0.21.0", optional = true }
 bounded-integer = { version = "0.5.6", features = ["std", "types", "serde1", "num-traits02"], optional = true }
@@ -32,7 +32,7 @@ uuid = { version = "1.3.2", optional = true }
 
 [features]
 default = []
-cli = ["anyhow", "clap", "serde_yaml"]
+cli = ["clap", "serde_yaml"]
 bytes = ["base64", "serde_with"]
 integer-restrictions = ["bounded-integer"]
 scripts = ["cli"]
@@ -48,4 +48,8 @@ required-features = ["scripts"]
 
 [[bin]]
 name = "operations"
+required-features = ["scripts"]
+
+[[bin]]
+name = "items"
 required-features = ["scripts"]
