@@ -10,7 +10,8 @@ pub struct List {
 
 impl List {
     pub fn emit_definition(&self, derived_name: &str) -> TokenStream {
-        let item_referent = Item::reference_referent_ident(&self.item, derived_name);
+        let item_name = format!("{derived_name}Item");
+        let item_referent = Item::reference_referent_ident(&self.item, &item_name);
         quote!(Vec<#item_referent>)
     }
 }
