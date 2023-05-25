@@ -13,7 +13,7 @@ pub struct StringEnum {
 }
 
 impl StringEnum {
-    pub fn emit_definition(&self, derived_name: &str) -> TokenStream {
+    pub fn emit_definition(&self, _derived_name: &str) -> TokenStream {
         let variants = self
             .variants
             .iter()

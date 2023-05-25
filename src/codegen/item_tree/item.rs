@@ -183,20 +183,14 @@ impl Item {
             item.emit(&derived_name)
         });
 
-        let docs = self
-            .docs
-            .as_ref()
-            .map(|docs| quote!(#[doc = #docs]))
-            .unwrap_or_default();
+        let docs = self.docs.as_ref().map(|docs| quote!(#[doc = #docs]));
 
-        let wrapper_def = if let Some(inner_ident) = self.inner_ident(derived_name) {
+        let wrapper_def = self.inner_ident(derived_name).map(|inner_ident| {
             let outer_ident = self.referent_ident(derived_name);
             quote! {
                 type #outer_ident = Option<#inner_ident>;
             }
-        } else {
-            Default::default()
-        };
+        });
 
         let item_keyword = if self.newtype {
             quote!(struct)
@@ -204,34 +198,20 @@ impl Item {
             self.value.item_keyword()
         };
 
-        let equals = if !self.newtype && !self.value.is_struct_or_enum() {
-            quote!(=)
-        } else {
-            Default::default()
-        };
+        let equals = (!self.newtype && !self.value.is_struct_or_enum()).then_some(quote!(=));
 
-        let item_ident = if let Some(inner_ident) = self.inner_ident(derived_name) {
-            inner_ident
-        } else {
-            self.referent_ident(derived_name)
-        };
+        let item_ident = self
+            .inner_ident(derived_name)
+            .unwrap_or_else(|| self.referent_ident(derived_name));
 
         // TODO: derives
-        let derives = TokenStream::default();
+        let derives: Option<TokenStream> = None;
 
-        let pub_ = if self.is_pub() {
-            quote!(pub)
-        } else {
-            Default::default()
-        };
+        let pub_ = self.is_pub().then_some(quote!(pub));
 
         let item_def = self.value.emit_item_definition(derived_name);
 
-        let semicolon = if self.newtype || !self.value.is_struct_or_enum() {
-            quote!(;)
-        } else {
-            Default::default()
-        };
+        let semicolon = (self.newtype || !self.value.is_struct_or_enum()).then_some(quote!(;));
 
         quote! {
             #( #sub_item_defs )*
