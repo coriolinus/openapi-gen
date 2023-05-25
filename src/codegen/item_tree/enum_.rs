@@ -115,7 +115,8 @@ impl OneOfEnum {
     pub fn emit_definition(&self, derived_name: &str) -> TokenStream {
         let variants = self.variants.iter().enumerate().map(|(idx, variant)| {
             let ident = variant.ident(idx);
-            let referent = Item::reference_referent_ident(&variant.definition, derived_name);
+            let name = format!("{derived_name}Variant{idx}");
+            let referent = Item::reference_referent_ident(&variant.definition, &name);
             quote!(#ident(#referent),)
         });
         quote! {

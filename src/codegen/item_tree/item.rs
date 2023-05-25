@@ -126,17 +126,7 @@ impl Item {
 
     /// Calculate the inner identifier for this item, without filtering by nullability.
     fn inner_ident_unfiltered(&self, derived_name: &str) -> String {
-        let name = self
-            .name
-            .as_deref()
-            .or_else(|| {
-                self.docs.as_ref().and_then(|docs| {
-                    docs.lines()
-                        .next()
-                        .and_then(|line| line.split(['.', '!']).next())
-                })
-            })
-            .unwrap_or(derived_name);
+        let name = self.name.as_deref().unwrap_or(derived_name);
         format!("{}", AsUpperCamelCase(name))
     }
 
