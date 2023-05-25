@@ -38,11 +38,9 @@ impl TryFrom<&NumberType> for Value {
 
     fn try_from(number_type: &NumberType) -> Result<Self, Self::Error> {
         let value = match &number_type.format {
-            VariantOrUnknownOrEmpty::Item(format) => match format {
-                NumberFormat::Float => Value::Scalar(Scalar::F32),
-                NumberFormat::Double => Value::Scalar(Scalar::F64),
-            },
-            VariantOrUnknownOrEmpty::Empty => Value::Scalar(Scalar::F64),
+            VariantOrUnknownOrEmpty::Item(NumberFormat::Float) => Value::Scalar(Scalar::F32),
+            VariantOrUnknownOrEmpty::Item(NumberFormat::Double)
+            | VariantOrUnknownOrEmpty::Empty => Value::Scalar(Scalar::F64),
             VariantOrUnknownOrEmpty::Unknown(unk) => {
                 return Err(format!("unknown number format: {unk}"))
             }
@@ -55,31 +53,17 @@ impl TryFrom<&IntegerType> for Value {
     type Error = String;
 
     fn try_from(integer_type: &IntegerType) -> Result<Self, Self::Error> {
-        macro_rules! by_format {
-            ($t32:expr, $t64:expr) => {
-                match &integer_type.format {
-                    VariantOrUnknownOrEmpty::Item(IntegerFormat::Int32) => Value::Scalar($t32),
-                    VariantOrUnknownOrEmpty::Item(IntegerFormat::Int64) => Value::Scalar($t64),
-                    VariantOrUnknownOrEmpty::Empty => Value::Scalar($t64),
-                    VariantOrUnknownOrEmpty::Unknown(unk) => {
-                        return Err(format!("unknown integer format: {unk}"))
-                    }
-                }
-            };
-        }
-
         // TODO: handle `integer_type.multiple_of`
-        let value = {
-            #[cfg(feature = "integer-restrictions")]
-            {
-                by_format!(
-                    Scalar::i32_from(integer_type),
-                    Scalar::i64_from(integer_type)
-                )
+        let value = match &integer_type.format {
+            VariantOrUnknownOrEmpty::Item(IntegerFormat::Int32) => {
+                Value::Scalar(Scalar::integer_32_from(integer_type))
             }
-            #[cfg(not(feature = "integer-restrictions"))]
-            {
-                by_format!(Scalar::I32, Scalar::I64)
+            VariantOrUnknownOrEmpty::Item(IntegerFormat::Int64)
+            | VariantOrUnknownOrEmpty::Empty => {
+                Value::Scalar(Scalar::integer_64_from(integer_type))
+            }
+            VariantOrUnknownOrEmpty::Unknown(unk) => {
+                return Err(format!("unknown integer format: {unk}"))
             }
         };
         Ok(value)
