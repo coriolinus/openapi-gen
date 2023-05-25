@@ -1,8 +1,6 @@
 use anyhow::anyhow;
 use heck::AsUpperCamelCase;
-use openapiv3::{
-    MediaType, OpenAPI, Operation, PathItem, ReferenceOr, RequestBody, Response, Responses, Schema,
-};
+use openapiv3::{MediaType, OpenAPI, Operation, ReferenceOr, Response, Responses, Schema};
 
 /// Convert a `StatusCode` enum into a `String` suitable for use as an ident for that code.
 pub fn status_name(code: &openapiv3::StatusCode) -> String {

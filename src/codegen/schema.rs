@@ -11,7 +11,7 @@ use crate::codegen::item_tree::Item;
 /// This will also produce an arbitrary number of subsidiary items, which were defined inline.
 ///
 /// This produces only items defined inline. References are assumed to be defined elsewhere.
-pub fn make_items_for_schema(spec: &OpenAPI, item_name: &str, schema: &Schema) -> TokenStream {
+pub fn make_items_for_schema(_spec: &OpenAPI, item_name: &str, schema: &Schema) -> TokenStream {
     let item = match Item::try_from(schema) {
         Ok(item) => item,
         Err(err) => {

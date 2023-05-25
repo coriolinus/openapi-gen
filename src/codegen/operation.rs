@@ -264,15 +264,3 @@ pub fn make_inline_request_item_definitions(
         )*
     }
 }
-
-/// Make definitions for items defined inline within an operation.
-///
-/// Typically, operation definitions will just reference schemas defined elsewhere in the schema. However,
-/// OpenAPI provides for the possibility of defining schemas inline, so we need to handle that case here.
-pub fn make_inline_item_definitions(
-    spec: &OpenAPI,
-    prefix_ident: &str,
-    operation: &Operation,
-) -> TokenStream {
-    todo!()
-}

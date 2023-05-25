@@ -1,11 +1,11 @@
 use heck::AsUpperCamelCase;
-use openapiv3::{ReferenceOr, Schema, SchemaKind, Type};
+use openapiv3::{OpenAPI, ReferenceOr, Schema, SchemaKind, Type};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
 use crate::codegen::make_ident;
 
-use super::{OneOfEnum, Scalar, Value};
+use super::{default_derives, OneOfEnum, Scalar, Value};
 
 fn get_extension_value<'a>(schema: &'a Schema, key: &str) -> Option<&'a serde_json::Value> {
     schema.schema_data.extensions.get(key)
@@ -205,7 +205,16 @@ impl Item {
             .unwrap_or_else(|| self.referent_ident(derived_name));
 
         // TODO: derives
-        let derives: Option<TokenStream> = None;
+        let derives = (!self.is_typedef())
+            .then(|| self.derives(todo!()))
+            .and_then(|derives| (!derives.is_empty()).then_some(derives))
+            .map(|derives| {
+                quote! {
+                    #[derive(
+                        #( #derives ),*
+                    )]
+                }
+            });
 
         let pub_ = self.is_pub().then_some(quote!(pub));
 
@@ -232,5 +241,38 @@ impl Item {
             }
             ReferenceOr::Item(item) => item.referent_ident(derived_name),
         }
+    }
+
+    /// The list of derives which should attach to this item.
+    ///
+    /// TODO: use a registry of some kind instead of the original spec.
+    pub fn derives(&self, spec: &OpenAPI) -> Vec<TokenStream> {
+        let mut derives = default_derives();
+
+        if self.value.impls_copy(spec) {
+            derives.push(quote!(Copy));
+        }
+        if self.value.impls_eq(spec) {
+            derives.push(quote!(Eq));
+        }
+        if self.value.impls_hash(spec) {
+            derives.push(quote!(Hash));
+        }
+        if self.newtype {
+            if self.newtype_from {
+                derives.push(quote!(openapi_gen::reexport::derive_more::From));
+            }
+            if self.newtype_into {
+                derives.push(quote!(openapi_gen::reexport::derive_more::Into));
+            }
+            if self.newtype_deref {
+                derives.push(quote!(openapi_gen::reexport::derive_more::Deref));
+            }
+            if self.newtype_deref_mut {
+                derives.push(quote!(openapi_gen::reexport::derive_more::DerefMut));
+            }
+        }
+
+        derives
     }
 }

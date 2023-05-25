@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use openapiv3::{
-    ArrayType, IntegerFormat, IntegerType, NumberFormat, NumberType, ObjectType, ReferenceOr,
-    SchemaData, StringFormat, StringType, VariantOrUnknownOrEmpty,
+    ArrayType, IntegerFormat, IntegerType, NumberFormat, NumberType, ObjectType, OpenAPI,
+    ReferenceOr, SchemaData, StringFormat, StringType, VariantOrUnknownOrEmpty,
 };
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -313,5 +313,99 @@ impl Value {
             Value::OneOfEnum(one_of_enum) => one_of_enum.emit_definition(derived_name),
             Value::Object(object) => object.emit_definition(derived_name),
         }
+    }
+
+    pub fn impls_eq(&self, spec: &OpenAPI) -> bool {
+        match self {
+            Value::StringEnum(_) => true,
+            Value::Scalar(scalar) => scalar.impls_eq(),
+            Value::List(list) => deref_item(&list.item, spec)
+                .map(|item| item.value.impls_eq(spec))
+                .unwrap_or_default(),
+            Value::Set(set) => deref_item(&set.item, spec)
+                .map(|item| item.value.impls_eq(spec))
+                .unwrap_or_default(),
+            Value::Map(map) => map
+                .value_type
+                .as_ref()
+                .map(|item_ref| {
+                    deref_item(item_ref, spec)
+                        .map(|item| item.value.impls_eq(spec))
+                        .unwrap_or_default()
+                })
+                .unwrap_or(true),
+            Value::OneOfEnum(oo_enum) => oo_enum.variants.iter().all(|variant| {
+                deref_item(&variant.definition, spec)
+                    .map(|item| item.value.impls_eq(spec))
+                    .unwrap_or_default()
+            }),
+            Value::Object(object) => object.members.values().all(|member| {
+                deref_item(&member.definition, spec)
+                    .map(|item| item.value.impls_eq(spec))
+                    .unwrap_or_default()
+            }),
+        }
+    }
+
+    pub fn impls_copy(&self, spec: &OpenAPI) -> bool {
+        match self {
+            Value::List(_) | Value::Map(_) | Value::Set(_) => false,
+            Value::StringEnum(_) => true,
+            Value::Scalar(scalar) => scalar.impls_copy(),
+            Value::OneOfEnum(oo_enum) => oo_enum.variants.iter().all(|variant| {
+                deref_item(&variant.definition, spec)
+                    .map(|item| item.value.impls_copy(spec))
+                    .unwrap_or_default()
+            }),
+            Value::Object(object) => object.members.values().all(|member| {
+                deref_item(&member.definition, spec)
+                    .map(|item| item.value.impls_copy(spec))
+                    .unwrap_or_default()
+            }),
+        }
+    }
+
+    pub fn impls_hash(&self, spec: &OpenAPI) -> bool {
+        match self {
+            Value::Map(_) | Value::Set(_) => false,
+            Value::StringEnum(_) => true,
+            Value::Scalar(scalar) => scalar.impls_hash(),
+            Value::List(list) => deref_item(&list.item, spec)
+                .map(|item| item.value.impls_hash(spec))
+                .unwrap_or_default(),
+            Value::OneOfEnum(oo_enum) => oo_enum.variants.iter().all(|variant| {
+                deref_item(&variant.definition, spec)
+                    .map(|item| item.value.impls_hash(spec))
+                    .unwrap_or_default()
+            }),
+            Value::Object(object) => object.members.values().all(|member| {
+                deref_item(&member.definition, spec)
+                    .map(|item| item.value.impls_hash(spec))
+                    .unwrap_or_default()
+            }),
+        }
+    }
+}
+
+// this is bad and weird.
+// We should have a global map of Ident -> &Item, and use that as the context instead of re-parsing the spec.
+fn deref_item<'a>(item_ref: &'a ReferenceOr<Item>, spec: &'a OpenAPI) -> Option<&'a Item> {
+    match item_ref.as_ref() {
+        ReferenceOr::Item(item) => Some(item),
+        ReferenceOr::Reference { reference } => reference
+            .rsplit_once('/')
+            .and_then(|(prefix, item_name)| {
+                (prefix == "#/components/schemas").then(|| {
+                    let schema = spec
+                        .components
+                        .as_ref()
+                        .and_then(|components| components.schemas.get(item_name))
+                        .map(|schema_ref| schema_ref.resolve(spec));
+                    schema
+                        .and_then(|schema| Item::try_from(schema).ok())
+                        .as_ref()
+                })
+            })
+            .flatten(),
     }
 }
