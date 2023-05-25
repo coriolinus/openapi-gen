@@ -181,10 +181,39 @@ impl Value {
     ) -> Result<Self, String> {
         // TODO: handle `string_type.pattern`
 
-        if !matches!(&string_type.format, VariantOrUnknownOrEmpty::Empty)
-            && !string_type.enumeration.is_empty()
+        let x_extensible_enum = schema_data
+            .extensions
+            .get("x-extensible-enum")
+            .and_then(|value| value.as_array())
+            .map(|values| {
+                values
+                    .iter()
+                    .map(|value| {
+                        value
+                            .as_str()
+                            .map(ToOwned::to_owned)
+                            .ok_or("x-extensible-enum item must be a string".to_string())
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+
+        let enumeration = match (
+            string_type.enumeration.is_empty(),
+            x_extensible_enum.is_empty(),
+        ) {
+            (false, false) => {
+                return Err("cannot specify both `enum` and `x-extensible-enum`".into())
+            }
+            (true, false) => x_extensible_enum,
+            (false, true) => string_type.enumeration.clone(),
+            (true, true) => Vec::new(),
+        };
+
+        if !matches!(&string_type.format, VariantOrUnknownOrEmpty::Empty) && !enumeration.is_empty()
         {
-            return Err("cannot specify both format and enum".into());
+            return Err("cannot specify both format and enumeration".into());
         }
         let value = match &string_type.format {
             VariantOrUnknownOrEmpty::Item(format) => match format {
@@ -209,15 +238,13 @@ impl Value {
                 _ => Value::Scalar(Scalar::String),
             },
             VariantOrUnknownOrEmpty::Empty => {
-                if string_type.enumeration.is_empty() {
+                if enumeration.is_empty() {
                     Value::Scalar(Scalar::String)
                 } else {
                     Value::StringEnum(StringEnum {
-                        variants: string_type
-                            .enumeration
-                            .iter()
-                            .filter(|&e| !schema_data.nullable || e != "null")
-                            .cloned()
+                        variants: enumeration
+                            .into_iter()
+                            .filter(|e| !schema_data.nullable || e != "null")
                             .collect(),
                     })
                 }
