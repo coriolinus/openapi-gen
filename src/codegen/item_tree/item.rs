@@ -88,9 +88,11 @@ impl<'a> TryFrom<&'a Schema> for Item {
             .map_err(|err| err.to_string())?
             .or_else(|| schema.schema_data.description.clone());
 
-        let name = get_extension_value(schema, "name")
-            .and_then(serde_json::Value::as_str)
-            .map(ToOwned::to_owned);
+        let name = schema.schema_data.title.clone().or_else(|| {
+            get_extension_value(schema, "name")
+                .and_then(serde_json::Value::as_str)
+                .map(ToOwned::to_owned)
+        });
 
         let newtype = get_extension_bool(schema, "newtype");
         let newtype_from = get_extension_bool(schema, "newtypeFrom");
@@ -124,10 +126,18 @@ impl Item {
 
     /// Calculate the inner identifier for this item, without filtering by nullability.
     fn inner_ident_unfiltered(&self, derived_name: &str) -> String {
-        format!(
-            "{}",
-            AsUpperCamelCase(self.name.as_deref().unwrap_or(derived_name))
-        )
+        let name = self
+            .name
+            .as_deref()
+            .or_else(|| {
+                self.docs.as_ref().and_then(|docs| {
+                    docs.lines()
+                        .next()
+                        .and_then(|line| line.split(['.', '!']).next())
+                })
+            })
+            .unwrap_or(derived_name);
+        format!("{}", AsUpperCamelCase(name))
     }
 
     /// Calculate the inner identifier for this item.

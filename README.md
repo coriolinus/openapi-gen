@@ -246,10 +246,10 @@ Types defined in the `#/components/schemas` section of the document, as well as 
 
 #### Type Definitions
 
-Primitive types defined with a `name` parameter export a public type definition.
+Primitive types defined with a `title` parameter export a public type definition.
 
 ```yaml
-name: count
+title: count
 type: integer
 ```
 
@@ -302,7 +302,7 @@ If the `newtypeDerefMut: true` extension is also set, then [`derive_more::DerefM
 components:
   parameters:
     X-REQUEST-ID:
-      name: X-Request-ID
+      title: X-Request-ID
       in: header
       description: A custom header that traces a request
       required: true
@@ -405,7 +405,7 @@ Note that the regex language is [specified](https://swagger.io/docs/specificatio
 OpenAPI 3 does not have an distinct `null` type, contrary to JSON Schema. Instead, you may set `nullable: true`. This maps neatly to Rust's `Option` type.
 
 ```yaml
-name: add
+title: add
 type: integer
 nullable: true
 ```
@@ -414,10 +414,10 @@ nullable: true
 pub type Add = Option<i64>;
 ```
 
-If there is `name` parameter (indicating that a typedef or item should be generated) on a nullable named field such as an object, then the inner type gets the canonical name, and the option gets a `Maybe` name.
+If there is `title` parameter (indicating that a typedef or item should be generated) on a nullable named field such as an object, then the inner type gets the canonical name, and the option gets a `Maybe` name.
 
 ```yaml
-name: foo
+title: foo
 type: object
 properties:
     bar:
@@ -454,7 +454,7 @@ If `uniqueItems: true`, then instead of a `Vec<T>`, a `HashSet<T>` is generated.
 Objects with no `additionalProperties` defined create a `struct`.
 
 ```yaml
-name: foo
+title: foo
 type: object
 properties:
     bar:
@@ -472,7 +472,7 @@ struct Foo {
 Properties which are not in the required set are mapped to an `Option`.
 
 ```yaml
-name: foo
+title: foo
 type: object
 properties:
     bar:
@@ -488,7 +488,7 @@ struct Foo {
 Objects which have no defined `properties` and have `additionalProperties` defined map to a `HashMap`.
 
 ```yaml
-name: foo
+title: foo
 type: object
 additionalProperties:
     type: integer
@@ -513,7 +513,7 @@ If `readOnly: true` is set on a property, the server is expected to emit it, but
 If `writeOnly: true` is set on a property, the server is expected to read it, but never emit it. This corresponds to `#[serde(skip_serializing)]`.
 
 ```yaml
-name: auth
+title: auth
 type: object
 properties:
   id:
@@ -543,7 +543,7 @@ pub struct Auth {
 A schema without a type specified produces a `serde_json::Value`.
 
 ```yaml
-name: anyValue
+title: anyValue
 description: "no type specified, so 🤷"
 ```
 
@@ -555,7 +555,7 @@ pub type AnyValue = serde_json::Value;
 These can also be nullable, but only explicitly:
 
 ```yaml
-name: anyValue
+title: anyValue
 nullable: true
 ```
 
@@ -572,7 +572,7 @@ This generator supports only enums with `type: string`.
 String enums produce unit Rust enums.
 
 ```yaml
-name: sort
+title: sort
 description: Sort order
 schema:
   type: string
@@ -596,7 +596,7 @@ If an enum definition includes `nullable: true`, then this generator will produc
 If an enum definition includes `nullable: true`, then this generator will strip `null` from the list of emitted variants.
 
 ```yaml
-name: sort
+title: sort
 schema:
   type: string
   enum: [asc, desc, null]
