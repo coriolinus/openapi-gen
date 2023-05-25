@@ -17,6 +17,12 @@ pub struct ObjectMember {
 
 impl ObjectMember {
     fn emit_definition(&self, parent_derived_name: &str, member_name: &str) -> TokenStream {
+        let docs = self
+            .definition
+            .as_item()
+            .and_then(|item| item.docs.as_deref())
+            .map(|docs| quote!(#[doc = #docs]));
+
         let sub_derived_name = format!(
             "{}{}",
             AsUpperCamelCase(parent_derived_name),
@@ -32,6 +38,7 @@ impl ObjectMember {
         };
 
         quote! {
+            #docs
             #snake_member_name: #option_head #item_ref #option_tail,
         }
     }
