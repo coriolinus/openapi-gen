@@ -61,6 +61,7 @@ impl Variant {
                     .map(|item| item.referent_ident(&derived_name).to_string())
             })
             .unwrap_or(derived_name);
+        let name = format!("{}", AsUpperCamelCase(name));
         make_ident(&name)
     }
 }
