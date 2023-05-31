@@ -71,7 +71,7 @@ impl<'a> TryFrom<&'a Schema> for Item {
                 OneOfEnum::try_from(&schema.schema_data, one_of)?.into()
             }
             SchemaKind::AllOf { .. } | SchemaKind::AnyOf { .. } | SchemaKind::Not { .. } => {
-                return Err("`allOf`, `anyOf`, and `not` are not supported".into())
+                return Err("`allOf`, `anyOf`, and `not` schemas are not supported".into())
             }
         };
 

@@ -30,6 +30,9 @@ pub use item::Item;
 use openapiv3::ReferenceOr;
 use quote::quote;
 
+mod context;
+pub use context::Context;
+
 fn maybe_map_reference_or<T, O, E>(
     reference: ReferenceOr<T>,
     map: impl FnOnce(T) -> Result<O, E>,
@@ -50,3 +53,64 @@ fn default_derives() -> Vec<TokenStream> {
         quote!(openapi_gen::reexport::derive_more::Constructor),
     ]
 }
+
+/// List of Rust Keywords.
+///
+/// These are prohibited as item names.
+///
+/// See <https://doc.rust-lang.org/reference/keywords.html>.
+const RUST_KEYWORDS: &[&str] = &[
+    "abstract",
+    "as",
+    "async",
+    "await",
+    "become",
+    "box",
+    "break",
+    "const",
+    "continue",
+    "crate",
+    "do",
+    "dyn",
+    "else",
+    "enum",
+    "extern",
+    "false",
+    "final",
+    "fn",
+    "for",
+    "if",
+    "impl",
+    "in",
+    "let",
+    "loop",
+    "macro_rules",
+    "macro",
+    "match",
+    "mod",
+    "move",
+    "mut",
+    "override",
+    "priv",
+    "pub",
+    "ref",
+    "return",
+    "self",
+    "Self",
+    "static",
+    "struct",
+    "super",
+    "trait",
+    "true",
+    "try",
+    "type",
+    "typeof",
+    "union",
+    "unsafe",
+    "unsized",
+    "use",
+    "virtual",
+    "where",
+    "while",
+    "yield",
+];
