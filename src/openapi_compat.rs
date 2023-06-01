@@ -150,14 +150,22 @@ where
     request_inline_items.chain(response_inline_items)
 }
 
+/// Iterate over all schemas defined in the `components` section of this spec.
+///
+/// Items are `(name, schema_ref)`.
+pub fn component_schema_ref(spec: &OpenAPI) -> impl Iterator<Item = (&str, &ReferenceOr<Schema>)> {
+    spec.components
+        .iter()
+        .flat_map(|components| components.schemas.iter())
+        .map(|(name, schema_ref)| (name.as_str(), schema_ref))
+}
+
 /// Iterate over all schemas defined inline in the `components` section of this spec.
 ///
 /// Items are `(name, schema)`.
 ///
 /// This does not account for schemas which are type references to other schemas.
 pub fn component_schemas(spec: &OpenAPI) -> impl Iterator<Item = (&str, &Schema)> {
-    spec.components
-        .iter()
-        .flat_map(|components| components.schemas.iter())
-        .filter_map(|(name, schema_ref)| schema_ref.as_item().map(|schema| (name.as_str(), schema)))
+    component_schema_ref(spec)
+        .filter_map(|(name, schema_ref)| schema_ref.as_item().map(|schema| (name, schema)))
 }

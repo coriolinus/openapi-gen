@@ -20,6 +20,7 @@ pub mod reexport {
     pub use bounded_integer;
     pub use derive_more;
     pub use heck;
+    #[cfg(feature = "api-problem")]
     pub use http_api_problem;
     #[cfg(feature = "string-pattern")]
     pub use regress;

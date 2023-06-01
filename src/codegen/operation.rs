@@ -206,61 +206,61 @@ pub fn make_response_item(
     }
 }
 
-pub fn make_inline_request_item_definitions(
-    spec: &OpenAPI,
-    prefix_ident: &str,
-    operation: &Operation,
-) -> TokenStream {
-    let Some(ref request_body) = operation.request_body else {
-        return Default::default();
-    };
-    let request_body = unwrap_or_compile_error!(
-        request_body.resolve(spec),
-        "unable to resolve request body definition"
-    );
+// pub fn make_inline_request_item_definitions(
+//     spec: &OpenAPI,
+//     prefix_ident: &str,
+//     operation: &Operation,
+// ) -> TokenStream {
+//     let Some(ref request_body) = operation.request_body else {
+//         return Default::default();
+//     };
+//     let request_body = unwrap_or_compile_error!(
+//         request_body.resolve(spec),
+//         "unable to resolve request body definition"
+//     );
 
-    let mut already_generated = HashSet::new();
+//     let mut already_generated = HashSet::new();
 
-    let definitions = request_body
-        .content
-        .iter()
-        .filter(|(_mime_type, media_type)| {
-            // a reference, by definition, is defined elsewhere
-            media_type::schema_ref(media_type).is_none()
-        })
-        .filter_map(|(mime_type, media_type)| {
-            let item_name = media_type::get_ident(prefix_ident, mime_type, media_type);
+//     let definitions = request_body
+//         .content
+//         .iter()
+//         .filter(|(_mime_type, media_type)| {
+//             // a reference, by definition, is defined elsewhere
+//             media_type::schema_ref(media_type).is_none()
+//         })
+//         .filter_map(|(mime_type, media_type)| {
+//             let item_name = media_type::get_ident(prefix_ident, mime_type, media_type);
 
-            if !already_generated.insert(item_name.clone()) {
-                // `insert` returns `false` if the set already contained this value
-                // if the set already contains this value, don't regenerate
-                return None;
-            }
+//             if !already_generated.insert(item_name.clone()) {
+//                 // `insert` returns `false` if the set already contained this value
+//                 // if the set already contains this value, don't regenerate
+//                 return None;
+//             }
 
-            let item_ident = make_ident(&item_name);
+//             let item_ident = make_ident(&item_name);
 
-            Some(match media_type.schema.as_ref() {
-                Some(schema) => {
-                    let schema = schema.resolve(spec);
-                    schema::make_items_for_schema(spec, &item_name, schema)
-                }
-                None => {
-                    // if we have a type which doesn't define a schema, then
-                    // the specification author believes that it is perfectly described
-                    // by its mime type. In the future we can maybe do something clever
-                    // by parsing the mime and switching on that, but for now, it's safe
-                    // enough to just declare a typedef to `Vec<u8>`.
+//             Some(match media_type.schema.as_ref() {
+//                 Some(schema) => {
+//                     let schema = schema.resolve(spec);
+//                     schema::make_items_for_schema(spec, &item_name, schema)
+//                 }
+//                 None => {
+//                     // if we have a type which doesn't define a schema, then
+//                     // the specification author believes that it is perfectly described
+//                     // by its mime type. In the future we can maybe do something clever
+//                     // by parsing the mime and switching on that, but for now, it's safe
+//                     // enough to just declare a typedef to `Vec<u8>`.
 
-                    // there's no particular reason this typedef should be public; rustdoc
-                    // will unify it appropriately.
-                    quote!(type #item_ident = Vec<u8>;)
-                }
-            })
-        });
+//                     // there's no particular reason this typedef should be public; rustdoc
+//                     // will unify it appropriately.
+//                     quote!(type #item_ident = Vec<u8>;)
+//                 }
+//             })
+//         });
 
-    quote! {
-        #(
-            #definitions
-        )*
-    }
-}
+//     quote! {
+//         #(
+//             #definitions
+//         )*
+//     }
+// }

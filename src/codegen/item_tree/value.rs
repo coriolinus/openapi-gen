@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use heck::AsUpperCamelCase;
 use openapiv3::{
     ArrayType, IntegerFormat, IntegerType, NumberFormat, NumberType, ObjectType, OpenAPI,
     ReferenceOr, SchemaData, StringFormat, StringType, VariantOrUnknownOrEmpty,
@@ -8,8 +9,10 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use super::{
-    maybe_map_reference_or, Item, List, Map, Object, ObjectMember, OneOfEnum, Scalar, Set,
-    StringEnum,
+    api_model::{self, AsBackref, Ref, Reference, UnknownReference},
+    enum_::Variant,
+    maybe_map_reference_or, ApiModel, Item, List, Map, Object, ObjectMember, OneOfEnum, Scalar,
+    Set, StringEnum,
 };
 
 /// The fundamental value type.
@@ -17,152 +20,44 @@ use super::{
 /// This type doesn't capture all of the information needed for codegen, but it
 /// is the heart of the type abstraction.
 #[derive(Debug, Clone, derive_more::From)]
-pub enum Value {
+pub enum Value<Ref = Reference> {
     Scalar(Scalar),
-    List(List),
-    Set(Set),
     StringEnum(StringEnum),
-    OneOfEnum(OneOfEnum),
-    Object(Object),
-    Map(Map),
+    OneOfEnum(OneOfEnum<Ref>),
+    Set(Set<Ref>),
+    List(List<Ref>),
+    Object(Object<Ref>),
+    Map(Map<Ref>),
 }
 
-impl Default for Value {
+impl<R> Default for Value<R> {
     fn default() -> Self {
         Self::Scalar(Scalar::Any)
     }
 }
 
-impl TryFrom<&NumberType> for Value {
-    type Error = String;
-
-    fn try_from(number_type: &NumberType) -> Result<Self, Self::Error> {
-        let value = match &number_type.format {
-            VariantOrUnknownOrEmpty::Item(NumberFormat::Float) => Value::Scalar(Scalar::F32),
-            VariantOrUnknownOrEmpty::Item(NumberFormat::Double)
-            | VariantOrUnknownOrEmpty::Empty => Value::Scalar(Scalar::F64),
-            VariantOrUnknownOrEmpty::Unknown(unk) => {
-                return Err(format!("unknown number format: {unk}"))
+impl Value<Ref> {
+    pub(crate) fn resolve_refs(
+        self,
+        resolver: impl Fn(&Ref) -> Result<Reference, UnknownReference>,
+    ) -> Result<Value<Reference>, UnknownReference> {
+        match self {
+            Value::Scalar(scalar) => Ok(Value::Scalar(scalar)),
+            Value::StringEnum(string_enum) => Ok(Value::StringEnum(string_enum)),
+            Value::OneOfEnum(one_of_enum) => {
+                Ok(Value::OneOfEnum(one_of_enum.resolve_refs(resolver)?))
             }
-        };
-        Ok(value)
-    }
-}
-
-impl TryFrom<&IntegerType> for Value {
-    type Error = String;
-
-    fn try_from(integer_type: &IntegerType) -> Result<Self, Self::Error> {
-        // TODO: handle `integer_type.multiple_of`
-        let value = match &integer_type.format {
-            VariantOrUnknownOrEmpty::Item(IntegerFormat::Int32) => {
-                Value::Scalar(Scalar::integer_32_from(integer_type))
-            }
-            VariantOrUnknownOrEmpty::Item(IntegerFormat::Int64)
-            | VariantOrUnknownOrEmpty::Empty => {
-                Value::Scalar(Scalar::integer_64_from(integer_type))
-            }
-            VariantOrUnknownOrEmpty::Unknown(unk) => {
-                return Err(format!("unknown integer format: {unk}"))
-            }
-        };
-        Ok(value)
-    }
-}
-
-impl TryFrom<&ArrayType> for Value {
-    type Error = String;
-
-    fn try_from(array_type: &ArrayType) -> Result<Self, Self::Error> {
-        let item = match &array_type.items {
-            None => Box::new(ReferenceOr::item(Value::Scalar(Scalar::Any).into())),
-            Some(items_ref) => {
-                let items_ref = items_ref.as_ref();
-                Box::new(maybe_map_reference_or(items_ref, |schema| {
-                    (&**schema).try_into()
-                })?)
-            }
-        };
-        if array_type.unique_items {
-            Ok(Set { item }.into())
-        } else {
-            Ok(List { item }.into())
+            Value::Set(set) => Ok(Value::Set(set.resolve_refs(resolver)?)),
+            Value::List(list) => Ok(Value::List(list.resolve_refs(resolver)?)),
+            Value::Object(object) => Ok(Value::Object(object.resolve_refs(resolver)?)),
+            Value::Map(map) => Ok(Value::Map(map.resolve_refs(resolver)?)),
         }
     }
-}
 
-impl TryFrom<&ObjectType> for Value {
-    type Error = String;
-
-    fn try_from(object_type: &ObjectType) -> Result<Self, Self::Error> {
-        match (
-            !object_type.properties.is_empty(),
-            object_type.additional_properties.is_some(),
-        ) {
-            (true, true) => Err(
-                "object cannot define non-empty `properties` and also `additionalProperties`"
-                    .into(),
-            ),
-            (_, true) => {
-                // mapping
-                let additional_properties = object_type.additional_properties.as_ref().unwrap();
-                let value_type = match additional_properties {
-                    openapiv3::AdditionalProperties::Any(_) => None,
-                    openapiv3::AdditionalProperties::Schema(schema_ref) => {
-                        let schema_ref = schema_ref.as_ref().as_ref();
-                        Some(Box::new(maybe_map_reference_or(schema_ref, |schema| {
-                            schema.try_into()
-                        })?))
-                    }
-                };
-                Ok(Value::Map(Map { value_type }))
-            }
-            _ => {
-                // object
-                let members = object_type
-                    .properties
-                    .iter()
-                    .map::<Result<_, String>, _>(|(name, schema_ref)| {
-                        let required = object_type.required.contains(name);
-
-                        // TODO: should we resolve references here instead? But that kind of doesn't make sense.
-                        // For now, we're only permitting inline definitions to be read/write-only.
-                        let read_only = schema_ref
-                            .as_item()
-                            .map(|schema| schema.schema_data.read_only)
-                            .unwrap_or_default();
-
-                        let write_only = schema_ref
-                            .as_item()
-                            .map(|schema| schema.schema_data.write_only)
-                            .unwrap_or_default();
-
-                        let definition =
-                            Box::new(maybe_map_reference_or(schema_ref.as_ref(), |schema| {
-                                schema.try_into()
-                            })?);
-                        Ok((
-                            name.to_owned(),
-                            ObjectMember {
-                                required,
-                                definition,
-                                read_only,
-                                write_only,
-                            },
-                        ))
-                    })
-                    .collect::<Result<_, _>>()?;
-                Ok(Value::Object(Object { members }))
-            }
-        }
-    }
-}
-
-impl Value {
-    pub fn try_from_string_type(
+    pub(crate) fn parse_string_type(
         string_type: &StringType,
         schema_data: &SchemaData,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, ValueConversionError> {
         // TODO: handle `string_type.pattern`
 
         let x_extensible_enum = schema_data
@@ -176,7 +71,7 @@ impl Value {
                         value
                             .as_str()
                             .map(ToOwned::to_owned)
-                            .ok_or("x-extensible-enum item must be a string".to_string())
+                            .ok_or(ValueConversionError::ExtensibleEnumInvalidItem)
                     })
                     .collect::<Result<Vec<_>, _>>()
             })
@@ -187,9 +82,7 @@ impl Value {
             string_type.enumeration.is_empty(),
             x_extensible_enum.is_empty(),
         ) {
-            (false, false) => {
-                return Err("cannot specify both `enum` and `x-extensible-enum`".into())
-            }
+            (false, false) => return Err(ValueConversionError::EnumConflict),
             (true, false) => x_extensible_enum,
             (false, true) => string_type.enumeration.clone(),
             (true, true) => Vec::new(),
@@ -197,7 +90,7 @@ impl Value {
 
         if !matches!(&string_type.format, VariantOrUnknownOrEmpty::Empty) && !enumeration.is_empty()
         {
-            return Err("cannot specify both format and enumeration".into());
+            return Err(ValueConversionError::FormatEnumConflict);
         }
         let value = match &string_type.format {
             VariantOrUnknownOrEmpty::Item(format) => match format {
@@ -237,49 +130,245 @@ impl Value {
         Ok(value)
     }
 
-    /// Iterate over sub-items, not includeing `self`.
-    ///
-    /// This only includes inline definitions. It makes no attempt to resolve references.
-    pub fn sub_items<'a>(&'a self) -> Box<dyn 'a + Iterator<Item = (Cow<'a, str>, &'a Item)>> {
-        match self {
-            Value::Scalar(_) | Value::StringEnum(_) => Box::new(std::iter::empty()),
-            Value::List(list) => Box::new(
-                list.item
-                    .as_item()
-                    .map(|item| (Cow::from("Item"), item))
-                    .into_iter(),
-            ),
-            Value::Set(set) => Box::new(
-                set.item
-                    .as_item()
-                    .map(|item| (Cow::from("Item"), item))
-                    .into_iter(),
-            ),
-            Value::OneOfEnum(one_of) => Box::new(one_of.variants.iter().enumerate().filter_map(
-                |(idx, variant)| {
-                    variant
-                        .definition
-                        .as_item()
-                        .map(|item| (format!("Variant{idx}").into(), item))
-                },
-            )),
-            Value::Object(object) => {
-                Box::new(object.members.iter().filter_map(|(name, member)| {
-                    member
-                        .definition
-                        .as_item()
-                        .map(|item| (name.as_str().into(), item))
-                }))
+    pub(crate) fn parse_array_type(
+        model: &mut ApiModel<Ref>,
+        name: &str,
+        array_type: &ArrayType,
+    ) -> Result<Self, ValueConversionError> {
+        match &array_type.items {
+            None => Ok(Self::default()),
+            Some(items) => {
+                let name = format!("{name}Item");
+                let item = model
+                    .convert_reference_or(&name, items)
+                    .map_err(ValueConversionError::from_inline(&name))?;
+                if array_type.unique_items {
+                    Ok(Set { item }.into())
+                } else {
+                    Ok(List { item }.into())
+                }
             }
-            Value::Map(map) => Box::new(
-                map.value_type
-                    .as_ref()
-                    .and_then(|item_ref| item_ref.as_item())
-                    .map(|item| (Cow::from("Item"), item))
-                    .into_iter(),
-            ),
         }
     }
+
+    pub(crate) fn parse_object_type(
+        model: &mut ApiModel<Ref>,
+        name: &str,
+        object_type: &ObjectType,
+    ) -> Result<Self, ValueConversionError> {
+        match (
+            !object_type.properties.is_empty(),
+            object_type.additional_properties.as_ref(),
+        ) {
+            (true, Some(_)) => Err(ValueConversionError::AdditionalPropertiesConflict),
+            (_, Some(additional_properties)) => {
+                // string->item mapping
+                let value_type = match additional_properties {
+                    openapiv3::AdditionalProperties::Any(_) => None,
+                    openapiv3::AdditionalProperties::Schema(schema_ref) => {
+                        let name = format!("{name}Item");
+                        let item = model
+                            .convert_reference_or(&name, &schema_ref.as_ref().as_ref())
+                            .map_err(ValueConversionError::from_inline(&name))?;
+                        Some(item)
+                    }
+                };
+                Ok(Value::Map(Map { value_type }))
+            }
+            _ => {
+                // object
+                let members = object_type
+                    .properties
+                    .iter()
+                    .map::<Result<_, ValueConversionError>, _>(|(member_name, schema_ref)| {
+                        let required = object_type.required.contains(member_name);
+
+                        // TODO: should we resolve references here instead? But that kind of doesn't make sense.
+                        // For now, we're only permitting inline definitions to be read/write-only.
+                        let read_only = schema_ref
+                            .as_item()
+                            .map(|schema| schema.schema_data.read_only)
+                            .unwrap_or_default();
+
+                        let write_only = schema_ref
+                            .as_item()
+                            .map(|schema| schema.schema_data.write_only)
+                            .unwrap_or_default();
+
+                        // If a model exists for the bare property name, qualify
+                        // this one with the object name.
+                        //
+                        // This isn't perfect, because the first member we
+                        // encounter with a particular name gets to keep the
+                        // bare name, while others get their names qualified,
+                        // but it's still better than just appending digits.
+                        let name_qualifier = if model.ident_exists(&member_name) {
+                            name
+                        } else {
+                            ""
+                        };
+                        let name = format!("{name_qualifier}{}", AsUpperCamelCase(member_name));
+
+                        let definition = model
+                            .convert_reference_or(&name, &schema_ref.as_ref())
+                            .map_err(ValueConversionError::from_inline(&name))?;
+
+                        Ok((
+                            name.to_owned(),
+                            ObjectMember {
+                                required,
+                                definition,
+                                read_only,
+                                write_only,
+                            },
+                        ))
+                    })
+                    .collect::<Result<_, _>>()?;
+                Ok(Value::Object(Object { members }))
+            }
+        }
+    }
+
+    pub(crate) fn parse_one_of_type(
+        model: &mut ApiModel<Ref>,
+        name: &str,
+        schema_data: &SchemaData,
+        variants: &[ReferenceOr<openapiv3::Schema>],
+    ) -> Result<Self, ValueConversionError> {
+        let discriminant = schema_data
+            .discriminator
+            .as_ref()
+            .map(|discriminant| discriminant.property_name.clone());
+
+        let variants = variants
+            .iter()
+            .map(|schema_ref| {
+                let mapping_name = schema_data
+                    .discriminator
+                    .as_ref()
+                    .and_then(|discriminator| {
+                        discriminator.mapping.iter().find_map(|(name, reference)| {
+                            // it might seem incomplete to just pull out the `ref` variant of the
+                            // `schema_ref` here, but that's acutally per the docs:
+                            //
+                            // <https://docs.rs/openapiv3-extended/latest/openapiv3/struct.Discriminator.html>
+                            //
+                            // > When using the discriminator, inline schemas will not be considered.
+                            (schema_ref.as_ref_str() == Some(reference.as_str()))
+                                .then(|| name.to_owned())
+                        })
+                    });
+
+                let definition = model
+                    .convert_reference_or(name, &schema_ref.as_ref())
+                    .map_err(ValueConversionError::from_inline(&name))?;
+
+                Ok(Variant {
+                    definition,
+                    mapping_name,
+                })
+            })
+            .collect::<Result<_, _>>()?;
+
+        Ok(Value::OneOfEnum(OneOfEnum {
+            discriminant,
+            variants,
+        }))
+    }
+}
+
+impl<R> TryFrom<&NumberType> for Value<R> {
+    type Error = ValueConversionError;
+
+    fn try_from(number_type: &NumberType) -> Result<Self, Self::Error> {
+        let value = match &number_type.format {
+            VariantOrUnknownOrEmpty::Item(NumberFormat::Float) => Value::Scalar(Scalar::F32),
+            VariantOrUnknownOrEmpty::Item(NumberFormat::Double)
+            | VariantOrUnknownOrEmpty::Empty => Value::Scalar(Scalar::F64),
+            VariantOrUnknownOrEmpty::Unknown(format) => {
+                let format = format.clone();
+                return Err(ValueConversionError::UnknownFormat {
+                    type_: "number".into(),
+                    format,
+                });
+            }
+        };
+        Ok(value)
+    }
+}
+
+impl<R> TryFrom<&IntegerType> for Value<R> {
+    type Error = ValueConversionError;
+
+    fn try_from(integer_type: &IntegerType) -> Result<Self, Self::Error> {
+        // TODO: handle `integer_type.multiple_of`
+        let value = match &integer_type.format {
+            VariantOrUnknownOrEmpty::Item(IntegerFormat::Int32) => {
+                Value::Scalar(Scalar::integer_32_from(integer_type))
+            }
+            VariantOrUnknownOrEmpty::Item(IntegerFormat::Int64)
+            | VariantOrUnknownOrEmpty::Empty => {
+                Value::Scalar(Scalar::integer_64_from(integer_type))
+            }
+            VariantOrUnknownOrEmpty::Unknown(format) => {
+                let format = format.clone();
+                return Err(ValueConversionError::UnknownFormat {
+                    type_: "integer".into(),
+                    format,
+                });
+            }
+        };
+        Ok(value)
+    }
+}
+
+impl<R> Value<R> {
+    //     /// Iterate over sub-items, not including `self`.
+    //     ///
+    //     /// This only includes inline definitions. It makes no attempt to resolve references.
+    //     pub fn sub_items<'a>(
+    //         &'a self,
+    //         model: &'a ApiModel<R>,
+    //     ) -> Box<dyn 'a + Iterator<Item = (Cow<'a, str>, &'a Item)>> {
+    //         match self {
+    //             Value::Scalar(_) | Value::StringEnum(_) => Box::new(std::iter::empty()),
+    //             Value::List(list) => Box::new(
+    //                 list.item
+    //                     .as_item()
+    //                     .map(|item| (Cow::from("Item"), item))
+    //                     .into_iter(),
+    //             ),
+    //             Value::Set(set) => Box::new(
+    //                 set.item
+    //                     .as_item()
+    //                     .map(|item| (Cow::from("Item"), item))
+    //                     .into_iter(),
+    //             ),
+    //             Value::OneOfEnum(one_of) => Box::new(one_of.variants.iter().enumerate().filter_map(
+    //                 |(idx, variant)| {
+    //                     variant
+    //                         .definition
+    //                         .as_item()
+    //                         .map(|item| (format!("Variant{idx}").into(), item))
+    //                 },
+    //             )),
+    //             Value::Object(object) => {
+    //                 Box::new(object.members.iter().filter_map(|(name, member)| {
+    //                     member
+    //                         .definition
+    //                         .as_item()
+    //                         .map(|item| (name.as_str().into(), item))
+    //                 }))
+    //             }
+    //             Value::Map(map) => Box::new(
+    //                 map.value_type
+    //                     .as_ref()
+    //                     .and_then(|item_ref| item_ref.as_item())
+    //                     .map(|item| (Cow::from("Item"), item))
+    //                     .into_iter(),
+    //             ),
+    //         }
+    //     }
 
     /// What kind of item keyword does this value type use?
     pub fn item_keyword(&self) -> TokenStream {
@@ -298,114 +387,105 @@ impl Value {
         }
     }
 
-    /// Emit the bare form of the item definition.
-    ///
-    /// This omits visibility, identifier, and any miscellaneous punctuation (`=`; `;`).
-    ///
-    /// This includes necessary punctuation such as `{` and `}` surrounding a struct definition.
-    pub fn emit_item_definition(&self, derived_name: &str) -> TokenStream {
-        match self {
-            Value::Scalar(scalar) => scalar.emit_type(),
-            Value::List(list) => list.emit_definition(derived_name),
-            Value::Set(set) => set.emit_definition(derived_name),
-            Value::Map(map) => map.emit_definition(derived_name),
-            Value::StringEnum(string_enum) => string_enum.emit_definition(derived_name),
-            Value::OneOfEnum(one_of_enum) => one_of_enum.emit_definition(derived_name),
-            Value::Object(object) => object.emit_definition(derived_name),
-        }
-    }
+    //     /// Emit the bare form of the item definition.
+    //     ///
+    //     /// This omits visibility, identifier, and any miscellaneous punctuation (`=`; `;`).
+    //     ///
+    //     /// This includes necessary punctuation such as `{` and `}` surrounding a struct definition.
+    //     pub fn emit_item_definition(&self, derived_name: &str) -> TokenStream {
+    //         match self {
+    //             Value::Scalar(scalar) => scalar.emit_type(),
+    //             Value::List(list) => list.emit_definition(derived_name),
+    //             Value::Set(set) => set.emit_definition(derived_name),
+    //             Value::Map(map) => map.emit_definition(derived_name),
+    //             Value::StringEnum(string_enum) => string_enum.emit_definition(derived_name),
+    //             Value::OneOfEnum(one_of_enum) => one_of_enum.emit_definition(derived_name),
+    //             Value::Object(object) => object.emit_definition(derived_name),
+    //         }
+    //     }
+}
 
-    pub fn impls_eq(&self, spec: &OpenAPI) -> bool {
+impl Value {
+    pub fn impls_eq(&self, model: &ApiModel) -> bool {
         match self {
             Value::StringEnum(_) => true,
             Value::Scalar(scalar) => scalar.impls_eq(),
-            Value::List(list) => deref_item(&list.item, spec)
-                .map(|item| item.value.impls_eq(spec))
-                .unwrap_or_default(),
-            Value::Set(set) => deref_item(&set.item, spec)
-                .map(|item| item.value.impls_eq(spec))
-                .unwrap_or_default(),
+            Value::List(list) => model[list.item].value.impls_eq(model),
+            Value::Set(set) => model[set.item].value.impls_eq(model),
             Value::Map(map) => map
                 .value_type
-                .as_ref()
-                .map(|item_ref| {
-                    deref_item(item_ref, spec)
-                        .map(|item| item.value.impls_eq(spec))
-                        .unwrap_or_default()
-                })
+                .map(|item| model[item].value.impls_eq(model))
                 .unwrap_or(true),
-            Value::OneOfEnum(oo_enum) => oo_enum.variants.iter().all(|variant| {
-                deref_item(&variant.definition, spec)
-                    .map(|item| item.value.impls_eq(spec))
-                    .unwrap_or_default()
-            }),
-            Value::Object(object) => object.members.values().all(|member| {
-                deref_item(&member.definition, spec)
-                    .map(|item| item.value.impls_eq(spec))
-                    .unwrap_or_default()
-            }),
+            Value::OneOfEnum(oo_enum) => oo_enum
+                .variants
+                .iter()
+                .all(|variant| model[variant.definition].value.impls_eq(model)),
+            Value::Object(object) => object
+                .members
+                .values()
+                .all(|member| model[member.definition].value.impls_eq(model)),
         }
     }
 
-    pub fn impls_copy(&self, spec: &OpenAPI) -> bool {
+    pub fn impls_copy(&self, model: &ApiModel) -> bool {
         match self {
             Value::List(_) | Value::Map(_) | Value::Set(_) => false,
             Value::StringEnum(_) => true,
             Value::Scalar(scalar) => scalar.impls_copy(),
-            Value::OneOfEnum(oo_enum) => oo_enum.variants.iter().all(|variant| {
-                deref_item(&variant.definition, spec)
-                    .map(|item| item.value.impls_copy(spec))
-                    .unwrap_or_default()
-            }),
-            Value::Object(object) => object.members.values().all(|member| {
-                deref_item(&member.definition, spec)
-                    .map(|item| item.value.impls_copy(spec))
-                    .unwrap_or_default()
-            }),
+            Value::OneOfEnum(oo_enum) => oo_enum
+                .variants
+                .iter()
+                .all(|variant| model[variant.definition].value.impls_copy(model)),
+            Value::Object(object) => object
+                .members
+                .values()
+                .all(|member| model[member.definition].value.impls_copy(model)),
         }
     }
 
-    pub fn impls_hash(&self, spec: &OpenAPI) -> bool {
+    pub fn impls_hash(&self, model: &ApiModel) -> bool {
         match self {
             Value::Map(_) | Value::Set(_) => false,
             Value::StringEnum(_) => true,
             Value::Scalar(scalar) => scalar.impls_hash(),
-            Value::List(list) => deref_item(&list.item, spec)
-                .map(|item| item.value.impls_hash(spec))
-                .unwrap_or_default(),
-            Value::OneOfEnum(oo_enum) => oo_enum.variants.iter().all(|variant| {
-                deref_item(&variant.definition, spec)
-                    .map(|item| item.value.impls_hash(spec))
-                    .unwrap_or_default()
-            }),
-            Value::Object(object) => object.members.values().all(|member| {
-                deref_item(&member.definition, spec)
-                    .map(|item| item.value.impls_hash(spec))
-                    .unwrap_or_default()
-            }),
+            Value::List(list) => model[list.item].value.impls_hash(model),
+            Value::OneOfEnum(oo_enum) => oo_enum
+                .variants
+                .iter()
+                .all(|variant| model[variant.definition].value.impls_hash(model)),
+            Value::Object(object) => object
+                .members
+                .values()
+                .all(|member| model[member.definition].value.impls_hash(model)),
         }
     }
 }
 
-// this is bad and weird.
-// We should have a global map of Ident -> &Item, and use that as the context instead of re-parsing the spec.
-fn deref_item<'a>(item_ref: &'a ReferenceOr<Item>, spec: &'a OpenAPI) -> Option<&'a Item> {
-    match item_ref.as_ref() {
-        ReferenceOr::Item(item) => Some(item),
-        ReferenceOr::Reference { reference } => reference
-            .rsplit_once('/')
-            .and_then(|(prefix, item_name)| {
-                (prefix == "#/components/schemas").then(|| {
-                    let schema = spec
-                        .components
-                        .as_ref()
-                        .and_then(|components| components.schemas.get(item_name))
-                        .map(|schema_ref| schema_ref.resolve(spec));
-                    schema
-                        .and_then(|schema| Item::try_from(schema).ok())
-                        .as_ref()
-                })
-            })
-            .flatten(),
+#[derive(Debug, thiserror::Error)]
+pub enum ValueConversionError {
+    #[error("unknown {type_} format: {format}")]
+    UnknownFormat { type_: String, format: String },
+    #[error("x-extensible-enum item must be a string")]
+    ExtensibleEnumInvalidItem,
+    #[error("cannot specify both `enum` and `x-extensible-enum`")]
+    EnumConflict,
+    #[error("cannot specify both format and enumeration")]
+    FormatEnumConflict,
+    #[error("computing inline item definition for '{name}'")]
+    ComputingInlineItem {
+        name: String,
+        #[source]
+        source: Box<api_model::Error>,
+    },
+    #[error("object cannot define non-empty `properties` and also `additionalProperties`")]
+    AdditionalPropertiesConflict,
+}
+
+impl ValueConversionError {
+    fn from_inline(name: &str) -> impl '_ + Fn(api_model::Error) -> ValueConversionError {
+        move |err| ValueConversionError::ComputingInlineItem {
+            name: name.to_owned(),
+            source: Box::new(err),
+        }
     }
 }

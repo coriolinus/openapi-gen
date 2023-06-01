@@ -34,6 +34,8 @@ pub enum Scalar {
     BoundedU32(u32, u32),
     #[cfg(feature = "integer-restrictions")]
     BoundedU64(u64, u64),
+    #[cfg(feature = "api-problem")]
+    ApiProblem,
 }
 
 impl Scalar {
@@ -62,6 +64,8 @@ impl Scalar {
             | Scalar::BoundedI64(_, _)
             | Scalar::BoundedU32(_, _)
             | Scalar::BoundedU64(_, _) => true,
+            #[cfg(feature = "api-problem")]
+            Scalar::ApiProblem => true,
         }
     }
 
@@ -90,6 +94,8 @@ impl Scalar {
             | Scalar::BoundedI64(_, _)
             | Scalar::BoundedU32(_, _)
             | Scalar::BoundedU64(_, _) => true,
+            #[cfg(feature = "api-problem")]
+            Scalar::ApiProblem => false,
         }
     }
 
@@ -117,6 +123,8 @@ impl Scalar {
             | Scalar::BoundedI64(_, _)
             | Scalar::BoundedU32(_, _)
             | Scalar::BoundedU64(_, _) => true,
+            #[cfg(feature = "api-problem")]
+            Scalar::ApiProblem => false,
         }
     }
 
@@ -157,6 +165,8 @@ impl Scalar {
             Scalar::BoundedU64(min, max) => {
                 quote!(openapi_gen::reexport::bounded_integer::BoundedU64<#min, #max>)
             }
+            #[cfg(feature = "api-problem")]
+            Scalar::ApiProblem => quote!(openapi_gen::reexport::http_api_problem::HttpApiProblem),
         }
     }
 
