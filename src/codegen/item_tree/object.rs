@@ -12,9 +12,9 @@ use quote::quote;
 #[derive(Debug, Clone)]
 pub struct ObjectMember<Ref = Reference> {
     pub definition: Ref,
-    pub required: bool,
     pub read_only: bool,
     pub write_only: bool,
+    pub inline_option: bool,
 }
 
 impl ObjectMember<Ref> {
@@ -24,16 +24,16 @@ impl ObjectMember<Ref> {
     ) -> Result<ObjectMember<Reference>, UnknownReference> {
         let Self {
             definition,
-            required,
             read_only,
             write_only,
+            inline_option,
         } = self;
         let definition = resolver(&definition)?;
         Ok(ObjectMember {
             definition,
-            required,
             read_only,
             write_only,
+            inline_option,
         })
     }
 }
@@ -55,16 +55,16 @@ impl ObjectMember {
         let snake_member_name = make_ident(&snake_member_name);
         let item_ref = make_ident(name_resolver(self.definition)?);
 
-        // todo: do we need this? shouldn't we be looking at a `Maybe` type already?
-        let (option_head, option_tail) = if !self.required {
-            (quote!(Option<), quote!(>))
-        } else {
-            Default::default()
-        };
+        // `self.inline_option` is set when we have an optional external ref which
+        // is not always required.
+        let mut item_ref = quote!(#item_ref);
+        if self.inline_option {
+            item_ref = quote!(Option<#item_ref>);
+        }
 
         Ok(quote! {
             #docs
-            #snake_member_name: #option_head #item_ref #option_tail,
+            #snake_member_name: #item_ref,
         })
     }
 }

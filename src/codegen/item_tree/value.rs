@@ -178,7 +178,7 @@ impl Value<Ref> {
                     .properties
                     .iter()
                     .map::<Result<_, ValueConversionError>, _>(|(member_name, schema_ref)| {
-                        let required = object_type.required.contains(member_name);
+                        let nullable = !object_type.required.contains(member_name);
 
                         // TODO: should we resolve references here instead? But that kind of doesn't make sense.
                         // For now, we're only permitting inline definitions to be read/write-only.
@@ -210,13 +210,27 @@ impl Value<Ref> {
                             .convert_reference_or(&name, &schema_ref.as_ref())
                             .map_err(ValueConversionError::from_inline(&name))?;
 
+                        // if this definition was a back-reference, then we can simplify our lives by
+                        // just declaring it to be nullable. This makes the codegen case a bit cleaner
+                        // and more consistent.
+                        //
+                        // If it's a forward ref, then we can't just declare the item generally nullable,
+                        // because there might be other contexts where it's not. In that case, we need to
+                        // track its nullability in the context of this struct member.
+                        let mut inline_option = false;
+                        if let Some(item) = model.resolve_mut(&definition) {
+                            item.nullable = nullable;
+                        } else {
+                            inline_option = nullable;
+                        }
+
                         Ok((
                             name,
                             ObjectMember {
-                                required,
                                 definition,
                                 read_only,
                                 write_only,
+                                inline_option,
                             },
                         ))
                     })

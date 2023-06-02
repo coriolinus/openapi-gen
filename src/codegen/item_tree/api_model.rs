@@ -232,6 +232,36 @@ impl std::ops::Index<Reference> for ApiModel<Reference> {
     }
 }
 
+impl ApiModel<Reference> {
+    #[inline]
+    pub fn resolve(&self, ref_: Reference) -> Option<&Item> {
+        self.definitions.get(ref_.0)
+    }
+
+    #[inline]
+    pub fn resolve_mut(&mut self, ref_: Reference) -> Option<&mut Item> {
+        self.definitions.get_mut(ref_.0)
+    }
+}
+
+impl ApiModel<Ref> {
+    #[inline]
+    pub fn resolve(&self, ref_: &Ref) -> Option<&Item<Ref>> {
+        match ref_ {
+            Ref::Back(idx) => self.definitions.get(*idx),
+            Ref::Forward(_) => None,
+        }
+    }
+
+    #[inline]
+    pub fn resolve_mut(&mut self, ref_: &Ref) -> Option<&mut Item<Ref>> {
+        match ref_ {
+            Ref::Back(idx) => self.definitions.get_mut(*idx),
+            Ref::Forward(_) => None,
+        }
+    }
+}
+
 impl TryFrom<OpenAPI> for ApiModel {
     type Error = Error;
 
