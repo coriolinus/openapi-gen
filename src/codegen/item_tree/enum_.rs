@@ -65,7 +65,7 @@ impl<R> Variant<R> {
     /// - If there is an explicit mapping, use the portion of the mapping name after the last `/`.
     /// - Else use the variant's inner identifier
     /// - Else use `Variant{idx:02}`.
-    pub fn compute_variant_name(&self, model: &ApiModel<R>, idx: usize) -> String
+    pub(crate) fn compute_variant_name(&self, model: &ApiModel<R>, idx: usize) -> String
     where
         R: AsBackref,
     {
@@ -73,7 +73,7 @@ impl<R> Variant<R> {
             .mapping_name
             .as_deref()
             .map(strip_slash_if_present)
-            .or(model.find_name_for_reference(&self.definition))
+            .or_else(|| model.find_name_for_reference(&self.definition))
             .map(ToOwned::to_owned)
             .unwrap_or_else(|| format!("Variant{idx:02}"));
         format!("{}", AsUpperCamelCase(name))
