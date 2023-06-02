@@ -45,6 +45,5 @@ fn default_derives() -> Vec<TokenStream> {
         quote!(PartialEq),
         quote!(openapi_gen::reexport::serde::Serialize),
         quote!(openapi_gen::reexport::serde::Deserialize),
-        quote!(openapi_gen::reexport::derive_more::Constructor),
     ]
 }

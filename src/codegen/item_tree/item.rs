@@ -289,6 +289,9 @@ impl Item {
                 derives.push(quote!(openapi_gen::reexport::derive_more::DerefMut));
             }
         }
+        if self.newtype || matches!(&self.value, Value::Object(_)) {
+            derives.push(quote!(openapi_gen::reexport::derive_more::Constructor));
+        }
 
         derives
     }
