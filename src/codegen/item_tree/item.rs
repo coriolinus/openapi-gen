@@ -37,6 +37,8 @@ pub struct Item<Ref = Reference> {
     pub inner_name: Option<String>,
     /// When true, construct a newtype instead of a typedef.
     pub newtype: bool,
+    /// When true and `newtype` is set, the newtype inner item is public.
+    pub newtype_pub: bool,
     /// When true and `newtype` is set, derive [`derive_more::From`].
     pub newtype_from: bool,
     /// When true and `newtype` is set, derive [`derive_more::Into`].
@@ -62,6 +64,7 @@ impl Item<Ref> {
             name,
             inner_name,
             newtype,
+            newtype_pub,
             newtype_from,
             newtype_into,
             newtype_deref,
@@ -76,6 +79,7 @@ impl Item<Ref> {
             name,
             inner_name,
             newtype,
+            newtype_pub,
             newtype_from,
             newtype_into,
             newtype_deref,
@@ -124,6 +128,7 @@ impl Item<Ref> {
             .or_else(|| schema.schema_data.description.clone());
 
         let newtype = get_extension_bool(schema, "newtype");
+        let newtype_pub = get_extension_bool(schema, "newtypePub");
         let newtype_from = get_extension_bool(schema, "newtypeFrom");
         let newtype_into = get_extension_bool(schema, "newtypeInto");
         let newtype_deref = get_extension_bool(schema, "newtypeDeref");
@@ -165,6 +170,7 @@ impl Item<Ref> {
             name,
             inner_name,
             newtype,
+            newtype_pub,
             newtype_from,
             newtype_into,
             newtype_deref,
@@ -248,7 +254,8 @@ impl Item {
 
         let mut item_def = self.value.emit_item_definition(model, name_resolver)?;
         if self.newtype {
-            item_def = quote!((#item_def));
+            let newtype_pub = self.newtype_pub.then_some(quote!(pub));
+            item_def = quote!((#newtype_pub #item_def));
         }
 
         let semicolon = (self.newtype || !self.value.is_struct_or_enum()).then_some(quote!(;));
