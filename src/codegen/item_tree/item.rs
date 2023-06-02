@@ -180,7 +180,11 @@ impl Item {
     ///
     /// This disables derives when the item is emitted.
     fn is_typedef(&self) -> bool {
-        !self.newtype && matches!(&self.value, Value::Scalar(_))
+        !self.newtype
+            && match &self.value {
+                Value::Scalar(_) | Value::Set(_) | Value::List(_) | Value::Map(_) => true,
+                Value::StringEnum(_) | Value::OneOfEnum(_) | Value::Object(_) => false,
+            }
     }
 
     /// Is this item public?
