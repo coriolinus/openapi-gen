@@ -1,4 +1,4 @@
-use heck::AsUpperCamelCase;
+use heck::{AsUpperCamelCase, ToUpperCamelCase};
 use openapiv3::{Schema, SchemaKind, Type};
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -31,8 +31,10 @@ pub struct Item<Ref = Reference> {
     pub docs: Option<String>,
     /// A `name` extension field was set, explicitly naming this item.
     pub explicit_name: bool,
-    /// Name of this item.
-    pub name: String,
+    /// Name of this item as it appears in the specification.
+    pub spec_name: String,
+    /// Name of this item as it appears in Rust code.
+    pub rust_name: String,
     /// Inner name of this item. Should always and only be `Some` if `self.nullable`.
     pub inner_name: Option<String>,
     /// When true, construct a newtype instead of a typedef.
@@ -61,7 +63,8 @@ impl Item<Ref> {
         let Self {
             docs,
             explicit_name,
-            name,
+            spec_name,
+            rust_name: name,
             inner_name,
             newtype,
             newtype_pub,
@@ -76,7 +79,8 @@ impl Item<Ref> {
         Ok(Item {
             docs,
             explicit_name,
-            name,
+            spec_name,
+            rust_name: name,
             inner_name,
             newtype,
             newtype_pub,
@@ -145,7 +149,7 @@ impl Item<Ref> {
             .and_then(serde_json::Value::as_str)
             .map(ToOwned::to_owned);
         let has_explicit_name = explicit_name.is_some();
-        let name = {
+        let spec_name = {
             let mut name = explicit_name
                 .or_else(|| schema.schema_data.title.clone())
                 .map(|title| format!("{}", AsUpperCamelCase(title)))
@@ -153,13 +157,14 @@ impl Item<Ref> {
             model.deconflict_ident(&mut name);
             name
         };
+        let rust_name = spec_name.to_upper_camel_case();
 
-        let (name, inner_name) = if nullable {
-            let mut maybe_name = format!("Maybe{name}");
+        let (rust_name, inner_name) = if nullable {
+            let mut maybe_name = format!("Maybe{rust_name}");
             model.deconflict_ident(&mut maybe_name);
-            (maybe_name, Some(name))
+            (maybe_name, Some(rust_name))
         } else {
-            (name, None)
+            (rust_name, None)
         };
 
         debug_assert_eq!(inner_name.is_some(), nullable);
@@ -167,7 +172,8 @@ impl Item<Ref> {
         Ok(Self {
             docs,
             explicit_name: has_explicit_name,
-            name,
+            spec_name,
+            rust_name,
             inner_name,
             newtype,
             newtype_pub,
@@ -218,7 +224,7 @@ impl Item {
 
         let (wrapper_def, item_ident) = match &self.inner_name {
             Some(inner) => {
-                let outer_ident = make_ident(&self.name);
+                let outer_ident = make_ident(&self.rust_name);
                 let inner_ident = make_ident(inner);
 
                 (
@@ -228,7 +234,7 @@ impl Item {
                     inner_ident,
                 )
             }
-            None => (None, make_ident(&self.name)),
+            None => (None, make_ident(&self.rust_name)),
         };
 
         let item_keyword = if self.newtype {

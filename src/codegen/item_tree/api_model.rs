@@ -5,7 +5,10 @@ use openapiv3::{OpenAPI, ReferenceOr, Schema};
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::openapi_compat::{component_schemas, operation_inline_schemas, path_operations};
+use crate::openapi_compat::{
+    component_parameters, component_schemas, operation_inline_parameters, operation_inline_schemas,
+    path_operations,
+};
 
 use super::{item::EmitError, rust_keywords::is_rust_keyword, Item, ParseItemError};
 
@@ -142,7 +145,7 @@ impl ApiModel<Ref> {
 
         // when constructing the item, we might have discovered that it needs a somewhat different name than planned.
         // extract that.
-        let name = item.name.clone();
+        let name = item.rust_name.clone();
 
         let idx = self.definitions.len();
         self.definitions.push(item);
@@ -275,11 +278,24 @@ impl TryFrom<OpenAPI> for ApiModel {
             models.add_inline_items(name, reference_name.as_deref(), schema)?;
         }
 
-        for maybe_path_operation in path_operations(&spec) {
-            let (path, operation_name, operation) =
-                maybe_path_operation.map_err(Error::ResolvePathOperation)?;
+        // likewise for component parameters
+        for (name, param) in component_parameters(&spec) {
+            let reference_name = Some(format!("#/components/parameters/{name}"));
+            let Some(schema) = param.parameter_data_ref().schema().map(|schema_ref| schema_ref.resolve(&spec)) else { continue };
+            models.add_inline_items(name, reference_name.as_deref(), schema)?;
+        }
+
+        // add items from operations
+        for (path, operation_name, operation) in path_operations(&spec) {
+            // first inline schemas
             for (name, schema) in operation_inline_schemas(path, operation_name, operation) {
                 models.add_inline_items(&name, None, schema)?;
+            }
+
+            // then inline parameters
+            for param in operation_inline_parameters(operation) {
+                let Some(schema) = param.parameter_data_ref().schema().map(|schema_ref| schema_ref.resolve(&spec)) else { continue };
+                models.add_inline_items(&param.parameter_data_ref().name, None, schema)?;
             }
         }
 

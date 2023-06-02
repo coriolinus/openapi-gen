@@ -1,6 +1,7 @@
-use anyhow::anyhow;
 use heck::AsUpperCamelCase;
-use openapiv3::{MediaType, OpenAPI, Operation, ReferenceOr, Response, Responses, Schema};
+use openapiv3::{
+    MediaType, OpenAPI, Operation, Parameter, PathItem, ReferenceOr, Response, Responses, Schema,
+};
 
 /// Convert a `StatusCode` enum into a `String` suitable for use as an ident for that code.
 pub fn status_name(code: &openapiv3::StatusCode) -> String {
@@ -38,29 +39,24 @@ fn all_responses(
     status_responses.chain(default_response.into_iter())
 }
 
-/// Iterate over all path operations for an `OpenAPI` struct.
+/// Iterate over all path items for an `OpenAPI` struct.
 ///
-/// This returns the tuple `Ok((path, operation_name, operation))`,
-/// or an error in the event that a path item could not be resolved.
-pub fn path_operations(
-    spec: &OpenAPI,
-) -> impl '_ + Iterator<Item = Result<(&str, &str, &Operation), anyhow::Error>> {
+/// This ignores any path items not defined inline in the top-level `paths` construct.
+pub fn path_items(spec: &OpenAPI) -> impl '_ + Iterator<Item = (&str, &PathItem)> {
     spec.paths
         .iter()
-        .map(|(path, pathitem_ref)| {
-            pathitem_ref
-                .as_item()
-                .map(|item| (path, item))
-                .ok_or_else(|| anyhow!("could not resolve path item: {path}"))
-        })
-        .flat_map(|maybe_item| match maybe_item {
-            Ok((path, path_item)) => {
-                Box::new(path_item.iter().map(move |(operation_name, operation)| {
-                    Ok((path.as_str(), operation_name, operation))
-                })) as Box<dyn Iterator<Item = Result<_, _>>>
-            }
-            Err(err) => Box::new(std::iter::once(Err(err))),
-        })
+        .filter_map(|(path, pathitem_ref)| pathitem_ref.as_item().map(|item| (path.as_str(), item)))
+}
+
+/// Iterate over all path operations for an `OpenAPI` struct.
+///
+/// This returns the tuple `(path, operation_name, operation)`.
+pub fn path_operations(spec: &OpenAPI) -> impl '_ + Iterator<Item = (&str, &str, &Operation)> {
+    path_items(spec).flat_map(|(path, path_item)| {
+        path_item
+            .iter()
+            .map(move |(operation_name, operation)| (path, operation_name, operation))
+    })
 }
 
 /// Iterate over all inline request content types defined for this operation.
@@ -150,6 +146,16 @@ where
     request_inline_items.chain(response_inline_items)
 }
 
+/// Iterate over all parameters defined for an operation.
+///
+/// Parameters which could not be resolved are ignored.
+pub fn operation_inline_parameters(operation: &Operation) -> impl Iterator<Item = &Parameter> {
+    operation
+        .parameters
+        .iter()
+        .filter_map(|param| param.as_item())
+}
+
 /// Iterate over all schemas defined in the `components` section of this spec.
 ///
 /// Items are `(name, schema_ref)`.
@@ -168,4 +174,19 @@ pub fn component_schema_ref(spec: &OpenAPI) -> impl Iterator<Item = (&str, &Refe
 pub fn component_schemas(spec: &OpenAPI) -> impl Iterator<Item = (&str, &Schema)> {
     component_schema_ref(spec)
         .filter_map(|(name, schema_ref)| schema_ref.as_item().map(|schema| (name, schema)))
+}
+
+/// Iterate over all parameters defined inline in the `components` section of the spec.
+///
+/// Items are `(name, parameter)`.
+pub fn component_parameters(spec: &OpenAPI) -> impl Iterator<Item = (&str, &Parameter)> {
+    spec.components
+        .iter()
+        .flat_map(|components| components.parameters.iter())
+        .filter_map(|(name, param_ref)| {
+            param_ref
+                .resolve(spec)
+                .ok()
+                .map(|param| (name.as_str(), param))
+        })
 }
