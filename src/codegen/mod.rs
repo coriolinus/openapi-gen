@@ -5,7 +5,7 @@ pub mod media_type;
 pub mod operation;
 
 mod item_tree;
-pub use item_tree::ApiModel;
+pub use item_tree::{ApiModel, Error};
 
 /// We always want call-site semantics for our identifiers, so
 /// they can be accessed from peer code.

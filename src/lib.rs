@@ -3,8 +3,10 @@ pub use canonical_form::{
     CanonicalForm, CanonicalizeError, ConstraintViolation, Reason, ValidationError,
 };
 
-pub mod codegen;
-pub mod openapi_compat;
+mod codegen;
+mod openapi_compat;
+
+pub use codegen::{ApiModel, Error};
 
 mod well_known_types;
 pub use well_known_types::Binary;

@@ -33,7 +33,7 @@ pub use item::{Item, ParseItemError};
 use quote::quote;
 
 mod api_model;
-pub use api_model::ApiModel;
+pub use api_model::{ApiModel, Error};
 
 pub(crate) mod rust_keywords;
 pub mod well_known_types;

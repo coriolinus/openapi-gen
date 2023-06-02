@@ -50,7 +50,9 @@ impl ObjectMember {
             .as_deref()
             .map(|docs| quote!(#[doc = #docs]));
 
-        let snake_member_name = make_ident(&format!("{}", AsSnakeCase(member_name)));
+        let mut snake_member_name = format!("{}", AsSnakeCase(member_name));
+        model.deconflict_member_or_variant_ident(&mut snake_member_name);
+        let snake_member_name = make_ident(&snake_member_name);
         let item_ref = make_ident(name_resolver(self.definition)?);
 
         // todo: do we need this? shouldn't we be looking at a `Maybe` type already?
