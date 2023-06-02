@@ -42,15 +42,3 @@ string-pattern = ["regress"]
 [[bin]]
 name = "openapi-gen"
 required-features = ["cli"]
-
-[[bin]]
-name = "parse"
-required-features = ["scripts"]
-
-[[bin]]
-name = "operations"
-required-features = ["scripts"]
-
-[[bin]]
-name = "items"
-required-features = ["scripts"]
