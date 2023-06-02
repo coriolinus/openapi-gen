@@ -282,7 +282,13 @@ impl TryFrom<OpenAPI> for ApiModel {
         for (name, param) in component_parameters(&spec) {
             let reference_name = Some(format!("#/components/parameters/{name}"));
             let Some(schema) = param.parameter_data_ref().schema().map(|schema_ref| schema_ref.resolve(&spec)) else { continue };
-            models.add_inline_items(name, reference_name.as_deref(), schema)?;
+            let param_ref = models.add_inline_items(name, reference_name.as_deref(), schema)?;
+
+            // top-level named parameters at the least should be newtypes
+            // todo: do we really actually want this rule, or should we leave it up to the spec author?
+            if let Some(item) = models.resolve_mut(&param_ref) {
+                item.newtype = true;
+            }
         }
 
         // add items from operations
