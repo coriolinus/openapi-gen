@@ -1,7 +1,6 @@
-use super::{
-    api_model::{Ref, Reference, UnknownReference},
-    Item,
-};
+use crate::codegen::make_ident;
+
+use super::api_model::{Ref, Reference, UnknownReference};
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -9,13 +8,6 @@ use quote::quote;
 pub struct Set<Ref = Reference> {
     pub item: Ref,
 }
-
-// impl Set {
-//     pub fn emit_definition(&self, derived_name: &str) -> TokenStream {
-//         let item_referent = Item::reference_referent_ident(&self.item, derived_name);
-//         quote!(Vec<#item_referent>)
-//     }
-// }
 
 impl Set<Ref> {
     pub(crate) fn resolve_refs(
@@ -25,5 +17,16 @@ impl Set<Ref> {
         let Self { item } = self;
         let item = resolver(&item)?;
         Ok(Set { item })
+    }
+}
+
+impl Set {
+    pub fn emit_definition<'a>(
+        &self,
+        name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+    ) -> Result<TokenStream, UnknownReference> {
+        let item_name = name_resolver(self.item)?;
+        let ident = make_ident(item_name);
+        Ok(quote!(std::collections::HashSet<#ident>))
     }
 }

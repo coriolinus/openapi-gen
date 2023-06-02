@@ -1,7 +1,6 @@
-use super::{
-    api_model::{Ref, Reference, UnknownReference},
-    Item,
-};
+use crate::codegen::make_ident;
+
+use super::api_model::{Ref, Reference, UnknownReference};
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -21,10 +20,13 @@ impl List<Ref> {
     }
 }
 
-// impl List {
-//     pub fn emit_definition(&self, derived_name: &str) -> TokenStream {
-//         let item_name = format!("{derived_name}Item");
-//         let item_referent = Item::reference_referent_ident(&self.item, &item_name);
-//         quote!(Vec<#item_referent>)
-//     }
-// }
+impl List {
+    pub fn emit_definition<'a>(
+        &self,
+        name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+    ) -> Result<TokenStream, UnknownReference> {
+        let item_name = name_resolver(self.item)?;
+        let ident = make_ident(item_name);
+        Ok(quote!(Vec<#ident>))
+    }
+}

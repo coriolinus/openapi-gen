@@ -1,11 +1,9 @@
-use std::collections::HashSet;
-
 use heck::AsUpperCamelCase;
 use openapiv3::{OpenAPI, Operation};
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::codegen::{media_type, schema};
+use crate::codegen::media_type;
 
 use super::make_ident;
 

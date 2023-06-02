@@ -24,9 +24,9 @@ pub fn status_name(code: &openapiv3::StatusCode) -> String {
 /// Iterate over all `(status, response)` tuples for this `Responses` struct.
 ///
 /// `status` is the canonical status name string, or `"Default"`.
-fn all_responses<'a>(
-    responses: &'a Responses,
-) -> impl 'a + Iterator<Item = (String, ReferenceOr<&'a Response>)> {
+fn all_responses(
+    responses: &Responses,
+) -> impl '_ + Iterator<Item = (String, ReferenceOr<&Response>)> {
     let status_responses = responses
         .responses
         .iter()
@@ -42,9 +42,9 @@ fn all_responses<'a>(
 ///
 /// This returns the tuple `Ok((path, operation_name, operation))`,
 /// or an error in the event that a path item could not be resolved.
-pub fn path_operations<'a>(
-    spec: &'a OpenAPI,
-) -> impl 'a + Iterator<Item = Result<(&'a str, &'a str, &'a Operation), anyhow::Error>> {
+pub fn path_operations(
+    spec: &OpenAPI,
+) -> impl '_ + Iterator<Item = Result<(&str, &str, &Operation), anyhow::Error>> {
     spec.paths
         .iter()
         .map(|(path, pathitem_ref)| {

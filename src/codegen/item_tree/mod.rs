@@ -12,8 +12,11 @@ pub use list::List;
 mod set;
 pub use set::Set;
 
-mod enum_;
-pub use enum_::{OneOfEnum, StringEnum};
+mod one_of_enum;
+pub use one_of_enum::OneOfEnum;
+
+mod string_enum;
+pub use string_enum::StringEnum;
 
 mod object;
 pub use object::{Object, ObjectMember};
@@ -27,25 +30,13 @@ pub use value::Value;
 mod item;
 pub use item::{Item, ParseItemError};
 
-use openapiv3::ReferenceOr;
 use quote::quote;
 
 mod api_model;
 pub use api_model::ApiModel;
 
-pub(crate) mod resolve_schema;
 pub(crate) mod rust_keywords;
 pub mod well_known_types;
-
-fn maybe_map_reference_or<T, O, E>(
-    reference: ReferenceOr<T>,
-    map: impl FnOnce(T) -> Result<O, E>,
-) -> Result<ReferenceOr<O>, E> {
-    match reference {
-        ReferenceOr::Reference { reference } => Ok(ReferenceOr::Reference { reference }),
-        ReferenceOr::Item(t) => Ok(ReferenceOr::Item(map(t)?)),
-    }
-}
 
 fn default_derives() -> Vec<TokenStream> {
     vec![

@@ -1,18 +1,13 @@
-use std::{borrow::Cow, collections::HashMap, ops::Deref};
+use std::{collections::HashMap, ops::Deref};
 
 use indexmap::IndexMap;
 use openapiv3::{OpenAPI, ReferenceOr, Schema};
-use proc_macro2::{Ident, Span};
+use proc_macro2::TokenStream;
+use quote::quote;
 
 use crate::openapi_compat::{component_schemas, operation_inline_schemas, path_operations};
 
-use super::{rust_keywords::is_rust_keyword, Item, ParseItemError};
-
-/// We always want call-site semantics for our identifiers, so
-/// they can be accessed from peer code.
-fn make_ident_raw(name: &str) -> Ident {
-    Ident::new(name, Span::call_site())
-}
+use super::{item::EmitError, rust_keywords::is_rust_keyword, Item, ParseItemError};
 
 /// A reference to an item definition.
 ///
@@ -74,40 +69,29 @@ impl<R> Default for ApiModel<R> {
     }
 }
 
-fn deconflict_keyword(ident_str: &str) -> Cow<str> {
-    let mut ident_str = Cow::from(ident_str);
-    if is_rust_keyword(&ident_str) {
-        ident_str.to_mut().push('_');
-    }
-    ident_str
-}
-
 impl<R> ApiModel<R> {
-    /// Make a struct member ident.
+    /// Ensure a proposed ident does not conflict with Rust keywords.
     ///
-    /// Takes care of disambiguating from keywords.
-    ///
-    /// Does _not_ attempt to disambiguate from other members in the struct or
-    /// variants in the enum.
-    fn make_member_or_variant_ident(&self, ident_str: &str) -> Ident {
-        let ident_str = deconflict_keyword(ident_str);
-        make_ident_raw(&ident_str)
+    /// This does **not** deconflict with other idents, so should be used only for struct members
+    /// or enum variants. For module-level idents, always prefer [`Self::deconflict_ident`].
+    pub fn deconflict_member_or_variant_ident(&self, ident: &mut String) {
+        if is_rust_keyword(ident) {
+            ident.push('_');
+        }
     }
 
-    /// Make an identifier.
-    ///
-    /// Takes care of disambiguating from keywords and existing idents.
-    ///
-    /// Panics if `ident_str.is_empty()`.
-    fn make_ident(&self, ident_str: &str) -> Ident {
-        let ident_str = deconflict_keyword(ident_str);
-        let mut ident = ident_str.to_string();
+    /// Ensure a proposed ident does not conflict with Rust keywords or other existing idents,
+    /// by appending symbols until it is unique.
+    pub fn deconflict_ident(&self, ident: &mut String) {
+        self.deconflict_member_or_variant_ident(ident);
+        let mut proposed_ident = ident.to_string();
         let mut suffix = 1;
-        while self.items.contains_key(&ident) {
-            ident = format!("{ident_str}{suffix}");
+        while self.items.contains_key(&proposed_ident) {
+            proposed_ident = format!("{ident}{suffix}");
             suffix += 1;
         }
-        make_ident_raw(&ident)
+
+        *ident = proposed_ident
     }
 
     /// Test whether an ident has already been created for a particular string.
@@ -116,23 +100,7 @@ impl<R> ApiModel<R> {
     /// disambiguated. However, in certain cases such as struct properties, we might
     /// be able to come up with a better name than just "Foo2".
     pub fn ident_exists(&self, ident_str: &str) -> bool {
-        let ident_str = deconflict_keyword(ident_str);
-        let ident_str: &str = &ident_str;
         self.items.contains_key(ident_str)
-    }
-
-    /// Find the identifier associated with a particular reference.
-    ///
-    /// This computes in linear time over the number of items.
-    pub(crate) fn find_name_for_reference(&self, ref_: &R) -> Option<&str>
-    where
-        R: AsBackref,
-    {
-        ref_.as_backref().and_then(|backref| {
-            self.items
-                .iter()
-                .find_map(|(name, idx)| (*idx == backref).then_some(name.as_str()))
-        })
     }
 }
 
@@ -171,12 +139,18 @@ impl ApiModel<Ref> {
         schema: &Schema,
     ) -> Result<Ref, Error> {
         let item = Item::parse_schema(self, name, schema)?;
+
+        // when constructing the item, we might have discovered that it needs a somewhat different name than planned.
+        // extract that.
+        let name = item.name.clone();
+
         let idx = self.definitions.len();
         self.definitions.push(item);
-        self.items.insert(name.to_owned(), idx);
+        self.items.insert(name, idx);
         if let Some(reference_name) = reference_name {
             self.named_references.insert(reference_name.to_owned(), idx);
         }
+
         Ok(Ref::Back(idx))
     }
 
@@ -210,6 +184,45 @@ impl ApiModel<Ref> {
     }
 }
 
+impl ApiModel {
+    /// Emit the items of this model as a token stream.
+    ///
+    /// This is largely for future-proofing, so we can embed this more easily in
+    /// a proc macro in the future if we so desire.
+    pub fn emit_items_to_token_stream(&self) -> Result<TokenStream, Error> {
+        let names = self
+            .items
+            .iter()
+            .map(|(name, &idx)| (idx, name.as_str()))
+            .collect::<HashMap<_, _>>();
+        let name_resolver = move |ref_: Reference| {
+            names
+                .get(&ref_.0)
+                .copied()
+                .ok_or_else(|| UnknownReference(format!("{ref_:?}")))
+        };
+
+        let items = self
+            .definitions
+            .iter()
+            .map(|item| item.emit(self, &name_resolver))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(quote! {
+            #( #items )*
+        })
+    }
+
+    /// Emit the items defined by this model as Rust code.
+    pub fn emit_items(&self) -> Result<String, Error> {
+        let tokens = self.emit_items_to_token_stream()?;
+        let buffer = tokens.to_string();
+        let file = syn::parse_str::<syn::File>(&buffer)
+            .map_err(|err| Error::CodegenParse { err, buffer })?;
+        Ok(prettyplease::unparse(&file))
+    }
+}
+
 impl std::ops::Index<Reference> for ApiModel<Reference> {
     type Output = Item;
 
@@ -219,7 +232,7 @@ impl std::ops::Index<Reference> for ApiModel<Reference> {
     }
 }
 
-impl TryFrom<OpenAPI> for ApiModel<Reference> {
+impl TryFrom<OpenAPI> for ApiModel {
     type Error = Error;
 
     fn try_from(spec: OpenAPI) -> Result<Self, Self::Error> {
@@ -256,4 +269,12 @@ pub enum Error {
     ParseItem(#[from] ParseItemError),
     #[error("resolving path operation")]
     ResolvePathOperation(#[source] anyhow::Error),
+    #[error("generating code")]
+    Codegen(#[from] EmitError),
+    #[error("generated code cannot be parsed as Rust")]
+    CodegenParse {
+        #[source]
+        err: syn::parse::Error,
+        buffer: String,
+    },
 }

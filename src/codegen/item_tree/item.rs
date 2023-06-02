@@ -1,6 +1,6 @@
 use heck::AsUpperCamelCase;
-use openapiv3::{OpenAPI, ReferenceOr, Schema, SchemaKind, Type};
-use proc_macro2::{Ident, TokenStream};
+use openapiv3::{Schema, SchemaKind, Type};
+use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::codegen::make_ident;
@@ -9,7 +9,7 @@ use super::{
     api_model::{Ref, Reference, UnknownReference},
     default_derives,
     value::ValueConversionError,
-    ApiModel, OneOfEnum, Scalar, Value,
+    ApiModel, Scalar, Value,
 };
 
 fn get_extension_value<'a>(schema: &'a Schema, key: &str) -> Option<&'a serde_json::Value> {
@@ -29,8 +29,12 @@ fn get_extension_bool(schema: &Schema, key: &str) -> bool {
 pub struct Item<Ref = Reference> {
     /// Documentation to be injected for this item.
     pub docs: Option<String>,
-    /// Name defined inline. Overrides the generated name.
-    pub name: Option<String>,
+    /// A `name` extension field was set, explicitly naming this item.
+    pub explicit_name: bool,
+    /// Name of this item.
+    pub name: String,
+    /// Inner name of this item. Should always and only be `Some` if `self.nullable`.
+    pub inner_name: Option<String>,
     /// When true, construct a newtype instead of a typedef.
     pub newtype: bool,
     /// When true and `newtype` is set, derive [`derive_more::From`].
@@ -54,7 +58,9 @@ impl Item<Ref> {
     ) -> Result<Item<Reference>, UnknownReference> {
         let Self {
             docs,
+            explicit_name,
             name,
+            inner_name,
             newtype,
             newtype_from,
             newtype_into,
@@ -66,7 +72,9 @@ impl Item<Ref> {
         let value = value.resolve_refs(resolver)?;
         Ok(Item {
             docs,
+            explicit_name,
             name,
+            inner_name,
             newtype,
             newtype_from,
             newtype_into,
@@ -115,12 +123,6 @@ impl Item<Ref> {
             .map_err(ParseItemError::ExternalDocumentation)?
             .or_else(|| schema.schema_data.description.clone());
 
-        let name = schema.schema_data.title.clone().or_else(|| {
-            get_extension_value(schema, "name")
-                .and_then(serde_json::Value::as_str)
-                .map(ToOwned::to_owned)
-        });
-
         let newtype = get_extension_bool(schema, "newtype");
         let newtype_from = get_extension_bool(schema, "newtypeFrom");
         let newtype_into = get_extension_bool(schema, "newtypeInto");
@@ -129,9 +131,39 @@ impl Item<Ref> {
 
         let nullable = schema.schema_data.nullable;
 
+        // The name used for this item can come from one of three sources:
+        //
+        // - It's the `name` extension value field, or
+        // - It's the `title` field (in UpperCamelCase), or
+        // - It's the derived name for this item
+        let explicit_name = get_extension_value(schema, "name")
+            .and_then(serde_json::Value::as_str)
+            .map(ToOwned::to_owned);
+        let has_explicit_name = explicit_name.is_some();
+        let name = {
+            let mut name = explicit_name
+                .or_else(|| schema.schema_data.title.clone())
+                .map(|title| format!("{}", AsUpperCamelCase(title)))
+                .unwrap_or_else(|| name.to_owned());
+            model.deconflict_ident(&mut name);
+            name
+        };
+
+        let (name, inner_name) = if nullable {
+            let mut maybe_name = format!("Maybe{name}");
+            model.deconflict_ident(&mut maybe_name);
+            (maybe_name, Some(name))
+        } else {
+            (name, None)
+        };
+
+        debug_assert_eq!(inner_name.is_some(), nullable);
+
         Ok(Self {
             docs,
+            explicit_name: has_explicit_name,
             name,
+            inner_name,
             newtype,
             newtype_from,
             newtype_into,
@@ -151,36 +183,6 @@ impl Item {
         !self.newtype && matches!(&self.value, Value::Scalar(_))
     }
 
-    /// Calculate the inner identifier for this item, without filtering by nullability.
-    fn inner_ident_unfiltered(&self, derived_name: &str) -> String {
-        let name = self.name.as_deref().unwrap_or(derived_name);
-        format!("{}", AsUpperCamelCase(name))
-    }
-
-    /// Calculate the inner identifier for this item.
-    ///
-    /// This only exists if the item is nullable.
-    pub fn inner_ident(&self, derived_name: &str) -> Option<Ident> {
-        self.nullable
-            .then(|| make_ident(&self.inner_ident_unfiltered(derived_name)))
-    }
-
-    /// Calculate the referent identifier for this item.
-    ///
-    /// Rules:
-    ///
-    /// - If there's a defined `name`, we use that instead of the derived name.
-    /// - If the item is nullable, we use a `MaybeX` variant.
-    pub fn referent_ident(&self, derived_name: &str) -> Ident {
-        let inner = self.inner_ident_unfiltered(derived_name);
-        let referent = if self.nullable {
-            format!("Maybe{inner}")
-        } else {
-            inner
-        };
-        make_ident(&referent)
-    }
-
     /// Is this item public?
     ///
     /// True if any:
@@ -189,86 +191,71 @@ impl Item {
     /// - is a newtype
     /// - has a `name`
     pub fn is_pub(&self) -> bool {
-        self.newtype || self.value.is_struct_or_enum() || self.name.is_some()
+        self.newtype || self.explicit_name || self.value.is_struct_or_enum()
     }
 
-    // /// Generate an item definition for this item.
-    // ///
-    // /// Uses a depth-first traversal to ensure inline-defined sub-item
-    // /// definitions appear before containing item definitions. However, makes no
-    // /// attempt to generate reference items.
-    // ///
-    // /// `derived_name` is the derived name for this item, based on its position
-    // /// in the tree structure.
-    // pub fn emit(&self, derived_name: &str) -> TokenStream {
-    //     // let sub_item_defs = self.value.sub_items().map(|(name_fragment, item)| {
-    //     //     let derived_name = format!(
-    //     //         "{}{}",
-    //     //         AsUpperCamelCase(derived_name),
-    //     //         AsUpperCamelCase(name_fragment)
-    //     //     );
-    //     //     item.emit(&derived_name)
-    //     // });
-    //     let sub_item_defs: [TokenStream; 0] = todo!();
+    /// Generate an item definition for this item.
+    ///
+    /// `name` is the public name for this item.
+    ///
+    /// The name resolver should be able to efficiently extract item names from references.
+    pub fn emit<'a>(
+        &self,
+        model: &ApiModel,
+        name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+    ) -> Result<TokenStream, UnknownReference> {
+        let docs = self.docs.as_ref().map(|docs| quote!(#[doc = #docs]));
 
-    //     let docs = self.docs.as_ref().map(|docs| quote!(#[doc = #docs]));
+        let (wrapper_def, item_ident) = match &self.inner_name {
+            Some(inner) => {
+                let outer_ident = make_ident(&self.name);
+                let inner_ident = make_ident(inner);
 
-    //     let wrapper_def = self.inner_ident(derived_name).map(|inner_ident| {
-    //         let outer_ident = self.referent_ident(derived_name);
-    //         quote! {
-    //             type #outer_ident = Option<#inner_ident>;
-    //         }
-    //     });
-
-    //     let item_keyword = if self.newtype {
-    //         quote!(struct)
-    //     } else {
-    //         self.value.item_keyword()
-    //     };
-
-    //     let equals = (!self.newtype && !self.value.is_struct_or_enum()).then_some(quote!(=));
-
-    //     let item_ident = self
-    //         .inner_ident(derived_name)
-    //         .unwrap_or_else(|| self.referent_ident(derived_name));
-
-    //     // TODO: derives
-    //     let derives = (!self.is_typedef())
-    //         .then(|| self.derives(todo!()))
-    //         .and_then(|derives| (!derives.is_empty()).then_some(derives))
-    //         .map(|derives| {
-    //             quote! {
-    //                 #[derive(
-    //                     #( #derives ),*
-    //                 )]
-    //             }
-    //         });
-
-    //     let pub_ = self.is_pub().then_some(quote!(pub));
-
-    //     let item_def = self.value.emit_item_definition(derived_name);
-
-    //     let semicolon = (self.newtype || !self.value.is_struct_or_enum()).then_some(quote!(;));
-
-    //     quote! {
-    //         #( #sub_item_defs )*
-
-    //         #wrapper_def
-
-    //         #docs
-    //         #derives
-    //         #pub_ #item_keyword #item_ident #equals #item_def #semicolon
-    //     }
-    // }
-
-    pub fn reference_referent_ident(item_ref: &ReferenceOr<Item>, derived_name: &str) -> Ident {
-        match item_ref {
-            ReferenceOr::Reference { reference } => {
-                let name = reference.rsplit('/').next().unwrap_or(reference.as_ref());
-                make_ident(name)
+                (
+                    Some(quote! {
+                        type #outer_ident = Option<#inner_ident>;
+                    }),
+                    inner_ident,
+                )
             }
-            ReferenceOr::Item(item) => item.referent_ident(derived_name),
+            None => (None, make_ident(&self.name)),
+        };
+
+        let item_keyword = if self.newtype {
+            quote!(struct)
+        } else {
+            self.value.item_keyword()
+        };
+
+        let equals = (!self.newtype && !self.value.is_struct_or_enum()).then_some(quote!(=));
+
+        let derives = (!self.is_typedef())
+            .then(|| self.derives(model))
+            .and_then(|derives| (!derives.is_empty()).then_some(derives))
+            .map(|derives| {
+                quote! {
+                    #[derive(
+                        #( #derives ),*
+                    )]
+                }
+            });
+
+        let pub_ = self.is_pub().then_some(quote!(pub));
+
+        let mut item_def = self.value.emit_item_definition(model, name_resolver)?;
+        if self.newtype {
+            item_def = quote!((#item_def));
         }
+
+        let semicolon = (self.newtype || !self.value.is_struct_or_enum()).then_some(quote!(;));
+
+        Ok(quote! {
+            #wrapper_def
+
+            #docs
+            #derives
+            #pub_ #item_keyword #item_ident #equals #item_def #semicolon
+        })
     }
 
     /// The list of derives which should attach to this item.
@@ -311,4 +298,10 @@ pub enum ParseItemError {
     UnsupportedSchemaKind,
     #[error("failed to get external documentation")]
     ExternalDocumentation(#[source] reqwest::Error),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum EmitError {
+    #[error("unable to resolve name from reference: {0:?}")]
+    UnresolvedReference(Reference),
 }

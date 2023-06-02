@@ -1,7 +1,6 @@
-use super::{
-    api_model::{Ref, Reference, UnknownReference},
-    Item,
-};
+use crate::codegen::make_ident;
+
+use super::api_model::{Ref, Reference, UnknownReference};
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -22,16 +21,20 @@ impl Map<Ref> {
     }
 }
 
-// impl Map {
-//     pub fn emit_definition(&self, derived_name: &str) -> TokenStream {
-//         let value_referent = self
-//             .value_type
-//             .as_ref()
-//             .map(|vt| {
-//                 let vt_ident = Item::reference_referent_ident(vt, derived_name);
-//                 quote!(#vt_ident)
-//             })
-//             .unwrap_or(quote!(serde_json::Value));
-//         quote!(std::collections::HashMap<String, #value_referent>)
-//     }
-// }
+impl Map {
+    pub fn emit_definition<'a>(
+        &self,
+        name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+    ) -> Result<TokenStream, UnknownReference> {
+        let value_referent = self
+            .value_type
+            .map(|reference| {
+                let item_name = name_resolver(reference)?;
+                let ident = make_ident(item_name);
+                Ok(quote!(#ident))
+            })
+            .transpose()?
+            .unwrap_or(quote!(openapi_gen::reexport::serde_json::Value));
+        Ok(quote!(std::collections::HashMap<String, #value_referent>))
+    }
+}

@@ -2,9 +2,9 @@ use crate::codegen::make_ident;
 
 use super::{
     api_model::{Ref, Reference, UnknownReference},
-    Item,
+    ApiModel,
 };
-use heck::{AsSnakeCase, AsUpperCamelCase};
+use heck::AsSnakeCase;
 use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -38,54 +38,40 @@ impl ObjectMember<Ref> {
     }
 }
 
-// impl ObjectMember {
-//     fn emit_definition(&self, parent_derived_name: &str, member_name: &str) -> TokenStream {
-//         let docs = self
-//             .definition
-//             .as_item()
-//             .and_then(|item| item.docs.as_deref())
-//             .map(|docs| quote!(#[doc = #docs]));
+impl ObjectMember {
+    fn emit_definition<'a>(
+        &self,
+        member_name: &str,
+        model: &ApiModel,
+        name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+    ) -> Result<TokenStream, UnknownReference> {
+        let docs = model[self.definition]
+            .docs
+            .as_deref()
+            .map(|docs| quote!(#[doc = #docs]));
 
-//         let sub_derived_name = format!(
-//             "{}{}",
-//             AsUpperCamelCase(parent_derived_name),
-//             AsUpperCamelCase(member_name)
-//         );
-//         let snake_member_name = make_ident(&format!("{}", AsSnakeCase(member_name)));
-//         let item_ref = Item::reference_referent_ident(&self.definition, &sub_derived_name);
+        let snake_member_name = make_ident(&format!("{}", AsSnakeCase(member_name)));
+        let item_ref = make_ident(name_resolver(self.definition)?);
 
-//         let (option_head, option_tail) = if !self.required {
-//             (quote!(Option<), quote!(>))
-//         } else {
-//             Default::default()
-//         };
+        // todo: do we need this? shouldn't we be looking at a `Maybe` type already?
+        let (option_head, option_tail) = if !self.required {
+            (quote!(Option<), quote!(>))
+        } else {
+            Default::default()
+        };
 
-//         quote! {
-//             #docs
-//             #snake_member_name: #option_head #item_ref #option_tail,
-//         }
-//     }
-// }
+        Ok(quote! {
+            #docs
+            #snake_member_name: #option_head #item_ref #option_tail,
+        })
+    }
+}
 
 /// An inline definition of an object
 #[derive(Debug, Clone)]
 pub struct Object<Ref = Reference> {
     pub members: IndexMap<String, ObjectMember<Ref>>,
 }
-
-// impl Object {
-//     pub fn emit_definition(&self, derived_name: &str) -> TokenStream {
-//         let members = self
-//             .members
-//             .iter()
-//             .map(|(member_name, member)| member.emit_definition(derived_name, member_name));
-//         quote! {
-//             {
-//                 #( #members )*
-//             }
-//         }
-//     }
-// }
 
 impl Object<Ref> {
     pub(crate) fn resolve_refs(
@@ -98,5 +84,24 @@ impl Object<Ref> {
             .map(|(name, member)| member.resolve_refs(&resolver).map(|member| (name, member)))
             .collect::<Result<_, _>>()?;
         Ok(Object { members })
+    }
+}
+
+impl Object {
+    pub fn emit_definition<'a>(
+        &self,
+        model: &ApiModel,
+        name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+    ) -> Result<TokenStream, UnknownReference> {
+        let members = self
+            .members
+            .iter()
+            .map(|(member_name, member)| member.emit_definition(member_name, model, &name_resolver))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(quote! {
+            {
+                #( #members )*
+            }
+        })
     }
 }

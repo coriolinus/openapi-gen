@@ -1,31 +1,9 @@
 use crate::codegen::make_ident;
 
-use super::{
-    api_model::{AsBackref, Ref, Reference, UnknownReference},
-    maybe_map_reference_or, ApiModel, Item,
-};
+use super::api_model::{Ref, Reference, UnknownReference};
 use heck::AsUpperCamelCase;
-use openapiv3::{ReferenceOr, Schema, SchemaData};
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
-
-/// OpenAPI's string `enum` type
-#[derive(Debug, Clone)]
-pub struct StringEnum {
-    pub variants: Vec<String>,
-}
-
-impl StringEnum {
-    pub fn emit_definition(&self, _derived_name: &str) -> TokenStream {
-        let variants = self
-            .variants
-            .iter()
-            .map(|variant| make_ident(&format!("{}", AsUpperCamelCase(variant))));
-        quote! {
-            { #( #variants ),* }
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct Variant<Ref = Reference> {
@@ -55,7 +33,7 @@ fn strip_slash_if_present(v: &str) -> &str {
     v.rsplit('/').next().unwrap_or(v)
 }
 
-impl<R> Variant<R> {
+impl Variant {
     /// Compute an appropriate variant identifier for this variant.
     ///
     /// `idx` should be the index of this variant among all variants in the enum.
@@ -63,20 +41,19 @@ impl<R> Variant<R> {
     /// Rules:
     ///
     /// - If there is an explicit mapping, use the portion of the mapping name after the last `/`.
-    /// - Else use the variant's inner identifier
+    /// - Else use the variant's identifier
     /// - Else use `Variant{idx:02}`.
-    pub(crate) fn compute_variant_name(&self, model: &ApiModel<R>, idx: usize) -> String
-    where
-        R: AsBackref,
-    {
-        let name = self
-            .mapping_name
+    fn compute_variant_name<'a>(
+        &self,
+        idx: usize,
+        name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+    ) -> String {
+        self.mapping_name
             .as_deref()
             .map(strip_slash_if_present)
-            .or_else(|| model.find_name_for_reference(&self.definition))
-            .map(ToOwned::to_owned)
-            .unwrap_or_else(|| format!("Variant{idx:02}"));
-        format!("{}", AsUpperCamelCase(name))
+            .or_else(|| name_resolver(self.definition).ok())
+            .map(|name| format!("{}", AsUpperCamelCase(name)))
+            .unwrap_or_else(|| format!("Variant{idx:02}"))
     }
 }
 
@@ -107,17 +84,25 @@ impl OneOfEnum<Ref> {
     }
 }
 
-//     pub fn emit_definition(&self, derived_name: &str) -> TokenStream {
-//         let variants = self.variants.iter().enumerate().map(|(idx, variant)| {
-//             let ident = variant.ident(idx);
-//             let name = format!("{derived_name}Variant{idx}");
-//             let referent = Item::reference_referent_ident(&variant.definition, &name);
-//             quote!(#ident(#referent),)
-//         });
-//         quote! {
-//             {
-//                 #( #variants )*
-//             }
-//         }
-//     }
-// }
+impl OneOfEnum {
+    pub fn emit_definition<'a>(
+        &self,
+        name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+    ) -> Result<TokenStream, UnknownReference> {
+        let variants = self
+            .variants
+            .iter()
+            .enumerate()
+            .map(|(idx, variant)| {
+                let ident = make_ident(&variant.compute_variant_name(idx, &name_resolver));
+                let referent = make_ident(name_resolver(variant.definition)?);
+                Ok(quote!(#ident(#referent),))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(quote! {
+            {
+                #( #variants )*
+            }
+        })
+    }
+}

@@ -1,18 +1,15 @@
-use std::borrow::Cow;
-
 use heck::AsUpperCamelCase;
 use openapiv3::{
-    ArrayType, IntegerFormat, IntegerType, NumberFormat, NumberType, ObjectType, OpenAPI,
-    ReferenceOr, SchemaData, StringFormat, StringType, VariantOrUnknownOrEmpty,
+    ArrayType, IntegerFormat, IntegerType, NumberFormat, NumberType, ObjectType, ReferenceOr,
+    SchemaData, StringFormat, StringType, VariantOrUnknownOrEmpty,
 };
 use proc_macro2::TokenStream;
 use quote::quote;
 
 use super::{
-    api_model::{self, AsBackref, Ref, Reference, UnknownReference},
-    enum_::Variant,
-    maybe_map_reference_or, ApiModel, Item, List, Map, Object, ObjectMember, OneOfEnum, Scalar,
-    Set, StringEnum,
+    api_model::{self, Ref, Reference, UnknownReference},
+    one_of_enum::Variant,
+    ApiModel, List, Map, Object, ObjectMember, OneOfEnum, Scalar, Set, StringEnum,
 };
 
 /// The fundamental value type.
@@ -202,7 +199,7 @@ impl Value<Ref> {
                         // encounter with a particular name gets to keep the
                         // bare name, while others get their names qualified,
                         // but it's still better than just appending digits.
-                        let name_qualifier = if model.ident_exists(&member_name) {
+                        let name_qualifier = if model.ident_exists(member_name) {
                             name
                         } else {
                             ""
@@ -214,7 +211,7 @@ impl Value<Ref> {
                             .map_err(ValueConversionError::from_inline(&name))?;
 
                         Ok((
-                            name.to_owned(),
+                            name,
                             ObjectMember {
                                 required,
                                 definition,
@@ -261,7 +258,7 @@ impl Value<Ref> {
 
                 let definition = model
                     .convert_reference_or(name, &schema_ref.as_ref())
-                    .map_err(ValueConversionError::from_inline(&name))?;
+                    .map_err(ValueConversionError::from_inline(name))?;
 
                 Ok(Variant {
                     definition,
@@ -323,53 +320,6 @@ impl<R> TryFrom<&IntegerType> for Value<R> {
 }
 
 impl<R> Value<R> {
-    //     /// Iterate over sub-items, not including `self`.
-    //     ///
-    //     /// This only includes inline definitions. It makes no attempt to resolve references.
-    //     pub fn sub_items<'a>(
-    //         &'a self,
-    //         model: &'a ApiModel<R>,
-    //     ) -> Box<dyn 'a + Iterator<Item = (Cow<'a, str>, &'a Item)>> {
-    //         match self {
-    //             Value::Scalar(_) | Value::StringEnum(_) => Box::new(std::iter::empty()),
-    //             Value::List(list) => Box::new(
-    //                 list.item
-    //                     .as_item()
-    //                     .map(|item| (Cow::from("Item"), item))
-    //                     .into_iter(),
-    //             ),
-    //             Value::Set(set) => Box::new(
-    //                 set.item
-    //                     .as_item()
-    //                     .map(|item| (Cow::from("Item"), item))
-    //                     .into_iter(),
-    //             ),
-    //             Value::OneOfEnum(one_of) => Box::new(one_of.variants.iter().enumerate().filter_map(
-    //                 |(idx, variant)| {
-    //                     variant
-    //                         .definition
-    //                         .as_item()
-    //                         .map(|item| (format!("Variant{idx}").into(), item))
-    //                 },
-    //             )),
-    //             Value::Object(object) => {
-    //                 Box::new(object.members.iter().filter_map(|(name, member)| {
-    //                     member
-    //                         .definition
-    //                         .as_item()
-    //                         .map(|item| (name.as_str().into(), item))
-    //                 }))
-    //             }
-    //             Value::Map(map) => Box::new(
-    //                 map.value_type
-    //                     .as_ref()
-    //                     .and_then(|item_ref| item_ref.as_item())
-    //                     .map(|item| (Cow::from("Item"), item))
-    //                     .into_iter(),
-    //             ),
-    //         }
-    //     }
-
     /// What kind of item keyword does this value type use?
     pub fn item_keyword(&self) -> TokenStream {
         match self {
@@ -386,23 +336,6 @@ impl<R> Value<R> {
             Value::StringEnum(_) | Value::OneOfEnum(_) | Value::Object(_) => true,
         }
     }
-
-    //     /// Emit the bare form of the item definition.
-    //     ///
-    //     /// This omits visibility, identifier, and any miscellaneous punctuation (`=`; `;`).
-    //     ///
-    //     /// This includes necessary punctuation such as `{` and `}` surrounding a struct definition.
-    //     pub fn emit_item_definition(&self, derived_name: &str) -> TokenStream {
-    //         match self {
-    //             Value::Scalar(scalar) => scalar.emit_type(),
-    //             Value::List(list) => list.emit_definition(derived_name),
-    //             Value::Set(set) => set.emit_definition(derived_name),
-    //             Value::Map(map) => map.emit_definition(derived_name),
-    //             Value::StringEnum(string_enum) => string_enum.emit_definition(derived_name),
-    //             Value::OneOfEnum(one_of_enum) => one_of_enum.emit_definition(derived_name),
-    //             Value::Object(object) => object.emit_definition(derived_name),
-    //         }
-    //     }
 }
 
 impl Value {
@@ -457,6 +390,27 @@ impl Value {
                 .members
                 .values()
                 .all(|member| model[member.definition].value.impls_hash(model)),
+        }
+    }
+
+    /// Emit the bare form of the item definition.
+    ///
+    /// This omits visibility, identifier, and any miscellaneous punctuation (`=`; `;`).
+    ///
+    /// This includes necessary punctuation such as `{` and `}` surrounding a struct definition.
+    pub fn emit_item_definition<'a>(
+        &self,
+        model: &ApiModel,
+        name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+    ) -> Result<TokenStream, UnknownReference> {
+        match self {
+            Value::Scalar(scalar) => Ok(scalar.emit_type()),
+            Value::StringEnum(string_enum) => Ok(string_enum.emit_definition()),
+            Value::List(list) => list.emit_definition(name_resolver),
+            Value::Set(set) => set.emit_definition(name_resolver),
+            Value::Map(map) => map.emit_definition(name_resolver),
+            Value::OneOfEnum(one_of_enum) => one_of_enum.emit_definition(name_resolver),
+            Value::Object(object) => object.emit_definition(model, name_resolver),
         }
     }
 }
