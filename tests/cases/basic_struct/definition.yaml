@@ -1,0 +1,52 @@
+openapi: "3.0.3"
+info:
+  version: "0.1.0"
+  title: "Basic Struct"
+  description: |
+    Test the ability to emit a simple struct with some internal properties and documentation.
+
+paths:
+
+components:
+  schemas:
+    InnerStruct:
+      description: this object is defined separately, intended to be used within a reference
+      type: object
+      properties:
+        foo:
+          description: unsigned integer
+          type: integer
+          minimum: 0
+
+        bar:
+          type: string
+
+      required:
+        - foo
+
+    OuterStruct:
+      type: object
+      properties:
+        inner:
+          "$ref": "#/components/schemas/InnerStruct"
+
+        defined_inline:
+          description: this object is defined inline within `OuterStruct`
+          type: object
+          properties:
+            foo:
+              description: |
+                even given compatible names and types, distinct inline types are distinguished.
+                the software makes no attempt to unify the types, because that would violate the
+                principle of least surprise.
+
+                for type unification, use a reference.
+              type: integer
+              minimum: 0
+
+            bat:
+              type: integer
+
+          required:
+            - foo
+            - bat
