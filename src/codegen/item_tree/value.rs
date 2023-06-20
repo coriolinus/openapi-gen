@@ -153,91 +153,88 @@ impl Value<Ref> {
         name: &str,
         object_type: &ObjectType,
     ) -> Result<Self, ValueConversionError> {
-        match (
-            !object_type.properties.is_empty(),
-            object_type.additional_properties.as_ref(),
-        ) {
-            (true, Some(_)) => Err(ValueConversionError::AdditionalPropertiesConflict),
-            (_, Some(additional_properties)) => {
-                // string->item mapping
-                let value_type = match additional_properties {
-                    openapiv3::AdditionalProperties::Any(_) => None,
-                    openapiv3::AdditionalProperties::Schema(schema_ref) => {
-                        let name = format!("{name}Item");
-                        let item = model
-                            .convert_reference_or(&name, &schema_ref.as_ref().as_ref())
-                            .map_err(ValueConversionError::from_inline(&name))?;
-                        Some(item)
-                    }
-                };
-                Ok(Value::Map(Map { value_type }))
-            }
-            _ => {
-                // object
-                let members = object_type
-                    .properties
-                    .iter()
-                    .map::<Result<_, ValueConversionError>, _>(|(member_name, schema_ref)| {
-                        let nullable = !object_type.required.contains(member_name);
-
-                        // TODO: should we resolve references here instead? But that kind of doesn't make sense.
-                        // For now, we're only permitting inline definitions to be read/write-only.
-                        let read_only = schema_ref
-                            .as_item()
-                            .map(|schema| schema.schema_data.read_only)
-                            .unwrap_or_default();
-
-                        let write_only = schema_ref
-                            .as_item()
-                            .map(|schema| schema.schema_data.write_only)
-                            .unwrap_or_default();
-
-                        // If a model exists for the bare property name, qualify
-                        // this one with the object name.
-                        //
-                        // This isn't perfect, because the first member we
-                        // encounter with a particular name gets to keep the
-                        // bare name, while others get their names qualified,
-                        // but it's still better than just appending digits.
-                        let name_qualifier = if model.ident_exists(member_name) {
-                            name
-                        } else {
-                            ""
-                        };
-                        let name = format!("{name_qualifier}{}", AsUpperCamelCase(member_name));
-
-                        let definition = model
-                            .convert_reference_or(&name, &schema_ref.as_ref())
-                            .map_err(ValueConversionError::from_inline(&name))?;
-
-                        // if this definition was a back-reference, then we can simplify our lives by
-                        // just declaring it to be nullable. This makes the codegen case a bit cleaner
-                        // and more consistent.
-                        //
-                        // If it's a forward ref, then we can't just declare the item generally nullable,
-                        // because there might be other contexts where it's not. In that case, we need to
-                        // track its nullability in the context of this struct member.
-                        let mut inline_option = false;
-                        if let Some(item) = model.resolve_mut(&definition) {
-                            item.nullable = nullable;
-                        } else {
-                            inline_option = nullable;
-                        }
-
-                        Ok((
-                            name,
-                            ObjectMember {
-                                definition,
-                                read_only,
-                                write_only,
-                                inline_option,
-                            },
-                        ))
-                    })
-                    .collect::<Result<_, _>>()?;
-                Ok(Value::Object(Object { members }))
-            }
+        if !object_type.properties.is_empty() && object_type.additional_properties.is_some() {
+            return Err(ValueConversionError::AdditionalPropertiesConflict);
         }
+
+        // string->item mapping
+        if let Some(additional_properties) = object_type.additional_properties.as_ref() {
+            let value_type = match additional_properties {
+                openapiv3::AdditionalProperties::Any(_) => None,
+                openapiv3::AdditionalProperties::Schema(schema_ref) => {
+                    let name = format!("{name}Item");
+                    let item = model
+                        .convert_reference_or(&name, &schema_ref.as_ref().as_ref())
+                        .map_err(ValueConversionError::from_inline(&name))?;
+                    Some(item)
+                }
+            };
+            return Ok(Value::Map(Map { value_type }));
+        }
+
+        // object
+        let members = object_type
+            .properties
+            .iter()
+            .map::<Result<_, ValueConversionError>, _>(|(member_name, schema_ref)| {
+                // TODO: should we resolve references here instead? But that kind of doesn't make sense.
+                // For now, we're only permitting inline definitions to be read/write-only.
+                let read_only = schema_ref
+                    .as_item()
+                    .map(|schema| schema.schema_data.read_only)
+                    .unwrap_or_default();
+
+                let write_only = schema_ref
+                    .as_item()
+                    .map(|schema| schema.schema_data.write_only)
+                    .unwrap_or_default();
+
+                // If a model exists for the bare property name, qualify
+                // this one with the object name.
+                //
+                // This isn't perfect, because the first member we
+                // encounter with a particular name gets to keep the
+                // bare name, while others get their names qualified,
+                // but it's still better than just appending digits.
+                let name_qualifier = if model.ident_exists(member_name) {
+                    name
+                } else {
+                    ""
+                };
+                let name = format!("{name_qualifier}{}", AsUpperCamelCase(member_name));
+
+                let definition = model
+                    .convert_reference_or(&name, &schema_ref.as_ref())
+                    .map_err(ValueConversionError::from_inline(&name))?;
+
+                // In a perfect world, we could just set the item's `nullable` field here in the
+                // event that we've determined that the item is in fact nullable.
+                // Unfortunately, there are two obstacles to this.
+                //
+                // The first is relatively minor: the definition here might be a forward reference,
+                // in which case we don't know that it is nullable in all contexts. We can work around that.
+                //
+                // The second is a bigger problem, though: making an item nullable the "proper" way
+                // involves creating a type alias, which changes its public reference name. This doesn't
+                // invalidate past references to the item--the structure of `ApiModel` avoids that issue--
+                // but it does mean we'd need to design a single-purpose function `ApiModel::make_item_nullable`,
+                // which just feels kind of ugly.
+                //
+                // Instead, we'll just handle nullable fields inline; that's good enough.
+                let inline_option = !object_type.required.contains(member_name);
+
+                Ok((
+                    name,
+                    ObjectMember {
+                        definition,
+                        read_only,
+                        write_only,
+                        inline_option,
+                    },
+                ))
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(Value::Object(Object { members }))
     }
 
     pub(crate) fn parse_one_of_type(

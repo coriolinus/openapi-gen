@@ -30,6 +30,10 @@ impl fmt::Display for Outcome {
 }
 
 impl Outcome {
+    fn is_ok(&self) -> bool {
+        matches!(self, Outcome::Ok)
+    }
+
     fn color_spec(&self) -> ColorSpec {
         let mut spec = ColorSpec::new();
         spec.set_fg(Some(self.fg_color())).set_bg(self.bg_color());
@@ -125,7 +129,7 @@ impl Case {
         })
     }
 
-    fn execute(self) -> Outcome {
+    fn execute(&self) -> Outcome {
         fn execute_inner(definition: OpenAPI) -> Result<syn::File, anyhow::Error> {
             let model = ApiModel::try_from(definition)?;
             let pretty = model.emit_items()?;
@@ -133,7 +137,7 @@ impl Case {
             Ok(file)
         }
 
-        let generated = match std::panic::catch_unwind(move || execute_inner(self.definition)) {
+        let generated = match std::panic::catch_unwind(|| execute_inner(self.definition.clone())) {
             Ok(Ok(generated)) => generated,
             Ok(Err(err)) => return Outcome::Error(err),
             Err(panic) => return Outcome::Panic(panic),
@@ -191,6 +195,11 @@ fn cases() {
         let _ = stdout.reset();
 
         outcome.additional_info(&mut stdout);
+        if !outcome.is_ok() {
+            if let Ok(model) = ApiModel::try_from(case.definition) {
+                dbg!(model);
+            }
+        }
     }
 
     if !all_ok {

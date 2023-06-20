@@ -1,7 +1,6 @@
 ///unsigned integer
 type Foo = u64;
 type Bar = String;
-type MaybeBar = Option<String>;
 ///this object is defined separately, intended to be used within a reference
 #[derive(
     Debug,
@@ -11,12 +10,12 @@ type MaybeBar = Option<String>;
     openapi_gen::reexport::serde::Deserialize,
     Eq,
     Hash,
-    openapi_gen::reexport::derive_more::Constructor,
+    openapi_gen::reexport::derive_more::Constructor
 )]
 pub struct InnerStruct {
     ///unsigned integer
     foo: Foo,
-    bar: MaybeBar,
+    bar: Option<Bar>,
 }
 /**even given compatible names and types, distinct inline types are distinguished.
 the software makes no attempt to unify the types, because that would violate the
@@ -36,15 +35,15 @@ type Bat = i64;
     Copy,
     Eq,
     Hash,
-    openapi_gen::reexport::derive_more::Constructor,
+    openapi_gen::reexport::derive_more::Constructor
 )]
 pub struct DefinedInline {
     /**even given compatible names and types, distinct inline types are distinguished.
-    the software makes no attempt to unify the types, because that would violate the
-    principle of least surprise.
+the software makes no attempt to unify the types, because that would violate the
+principle of least surprise.
 
-    for type unification, use a reference.
-    */
+for type unification, use a reference.
+*/
     foo: Foo1,
     bat: Bat,
 }
@@ -56,7 +55,7 @@ pub struct DefinedInline {
     openapi_gen::reexport::serde::Deserialize,
     Eq,
     Hash,
-    openapi_gen::reexport::derive_more::Constructor,
+    openapi_gen::reexport::derive_more::Constructor
 )]
 pub struct OuterStruct {
     ///this object is defined separately, intended to be used within a reference

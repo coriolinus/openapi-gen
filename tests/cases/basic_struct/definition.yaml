@@ -50,3 +50,7 @@ components:
           required:
             - foo
             - bat
+
+      required:
+        - inner
+        - defined_inline
