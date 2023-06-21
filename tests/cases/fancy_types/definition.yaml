@@ -1,0 +1,160 @@
+openapi: "3.0.3"
+info:
+  version: "0.1.0"
+  title: "Fancy Types"
+  description: |
+    Test the ability to emit specialized types based on string and number formats and bounds.
+
+paths: {}
+
+components:
+  schemas:
+    Container:
+      type: object
+      properties:
+        number:
+          type: number
+        number_float:
+          type: number
+          format: float
+        number_double:
+          type: number
+          format: double
+        integer:
+          type: integer
+        integer_i32:
+          type: integer
+          format: int32
+        integer_i64:
+          type: integer
+          format: int64
+        unsigned_integer:
+          type: integer
+          minimum: 0
+        unsigned_integer_i32:
+          type: integer
+          format: int32
+          minimum: 0
+        unsigned_integer_i64:
+          type: integer
+          format: int64
+          minimum: 0
+        bounded_integer_low:
+          type: integer
+          minimum: 1
+        bounded_integer_high:
+          type: integer
+          maximum: 5
+        bounded_integer_both:
+          type: integer
+          minimum: 0
+          maximum: 5
+        exclusive_bounded_integer_low:
+          type: integer
+          minimum: 1
+          exclusiveMinimum: true
+        exclusive_bounded_integer_high:
+          type: integer
+          maximum: 5
+          exclusiveMaximum: true
+        exclusive_bounded_integer_both:
+          type: integer
+          minimum: 0
+          maximum: 5
+          exclusiveMinimum: true
+          exclusiveMaximum: true
+        bounded_integer_low_i32:
+          type: integer
+          format: int32
+          minimum: 1
+        bounded_integer_high_i32:
+          type: integer
+          format: int32
+          maximum: 5
+        bounded_integer_both_i32:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 5
+        exclusive_bounded_integer_low_i32:
+          type: integer
+          format: int32
+          minimum: 1
+          exclusiveMinimum: true
+        exclusive_bounded_integer_high_i32:
+          type: integer
+          format: int32
+          maximum: 5
+          exclusiveMaximum: true
+        exclusive_bounded_integer_both_i32:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 5
+          exclusiveMinimum: true
+          exclusiveMaximum: true
+        string:
+          type: string
+        string_binary:
+          type: string
+          format: binary
+        string_byte:
+          type: string
+          format: byte
+        string_base64:
+          type: string
+          format: base64
+        string_date:
+          type: string
+          format: date
+        string_datetime:
+          type: string
+          format: date-time
+        string_ip:
+          type: string
+          format: ip
+        string_ipv4:
+          type: string
+          format: ipv4
+        string_ipv6:
+          type: string
+          format: ipv6
+        string_uuid:
+          type: string
+          format: uuid
+        string_unrecognized:
+          type: string
+          format: unrecognized
+      required:
+        - number
+        - number_float
+        - number_double
+        - integer
+        - integer_i32
+        - integer_i64
+        - unsigned_integer
+        - unsigned_integer_i32
+        - unsigned_integer_i64
+        - bounded_integer_low
+        - bounded_integer_high
+        - bounded_integer_both
+        - exclusive_bounded_integer_low
+        - exclusive_bounded_integer_high
+        - exclusive_bounded_integer_both
+        - bounded_integer_low_i32
+        - bounded_integer_high_i32
+        - bounded_integer_both_i32
+        - exclusive_bounded_integer_low_i32
+        - exclusive_bounded_integer_high_i32
+        - exclusive_bounded_integer_both_i32
+        - string
+        - string_binary
+        - string_byte
+        - string_base64
+        - string_date
+        - string_datetime
+        - string_ip
+        - string_ipv4
+        - string_ipv6
+        - string_uuid
+        - string_unrecognized
