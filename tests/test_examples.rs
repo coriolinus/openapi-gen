@@ -171,6 +171,15 @@ fn find_cases() -> impl Iterator<Item = Case> {
 }
 
 #[test]
+#[cfg_attr(
+    not(all(
+        feature = "api-problem",
+        feature = "bytes",
+        feature = "integer-restrictions",
+        feature = "string-pattern"
+    )),
+    ignore = "required features are not enabled"
+)]
 fn cases() {
     let choice = if atty::is(atty::Stream::Stdout) {
         termcolor::ColorChoice::Auto
