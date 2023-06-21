@@ -121,21 +121,15 @@ pub trait CanonicalForm: Sized {
 #[macro_export]
 macro_rules! newtype_derive_canonical_form {
     ($outer:path, $inner:path) => {
-        impl openapi_gen::CanonicalForm for $outer {
-            type JsonRepresentation = <$outer as CanonicalForm>::JsonRepresentation;
-            fn validate<BorrowedRepresentation>(
-                from: &BorrowedRepresentation,
-            ) -> Result<Self, ValidationError>
-            where
-                Self::JsonRepresentation: Borrow<BorrowedRepresentation>,
-                BorrowedRepresentation: ToOwned<Owned = Self::JsonRepresentation>,
-            {
-                let inner = $inner::validate(from)?;
+        impl $crate::CanonicalForm for $outer {
+            type JsonRepresentation = <$inner as $crate::CanonicalForm>::JsonRepresentation;
+            fn validate(
+                from: &<Self as $crate::CanonicalForm>::JsonRepresentation,
+            ) -> Result<Self, $crate::ValidationError> {
+                let inner = <$inner>::validate(from)?;
                 Ok(Self(inner))
             }
-            fn canonicalize(
-                &self,
-            ) -> Result<Self::JsonRepresentation, openapi_gen::CanonicalizeError> {
+            fn canonicalize(&self) -> Result<Self::JsonRepresentation, $crate::CanonicalizeError> {
                 self.0.canonicalize()
             }
         }
