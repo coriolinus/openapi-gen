@@ -66,6 +66,7 @@ impl ObjectMember {
         let mut item_ref = quote!(#item_ref);
         if self.inline_option {
             item_ref = quote!(Option<#item_ref>);
+            serde_attributes.push(quote!(skip_serializing_if = "Option::is_none"));
         }
 
         let serde_attributes = (!serde_attributes.is_empty()).then(|| {

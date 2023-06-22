@@ -15,6 +15,7 @@ type Bar = String;
 pub struct InnerStruct {
     ///unsigned integer
     pub foo: Foo,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bar: Option<Bar>,
 }
 /**even given compatible names and types, distinct inline types are distinguished.
@@ -63,3 +64,4 @@ pub struct OuterStruct {
     ///this object is defined inline within `OuterStruct`
     pub defined_inline: DefinedInline,
 }
+
