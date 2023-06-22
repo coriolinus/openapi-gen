@@ -1,0 +1,32 @@
+openapi: "3.0.3"
+info:
+  version: "0.1.0"
+  title: "Type Definitions and Newtypes"
+  description: |
+    It is possible to make a public type definition by setting the `title` parameter.
+
+    It is possible to make a public newtype by setting the `x-newtype` extension parameter.
+
+paths: {}
+
+components:
+  schemas:
+    Foo:
+      type: object
+      properties:
+        qty_of_bar:
+          description: should be `pub type Count = u64`
+          title: count
+          x-pub-typedef: true
+          type: integer
+          minimum: 0
+
+        first_bar:
+          description: should be `pub struct FirstBar(pub String);`
+          type: string
+          x-newtype:
+            from: true
+            into: true
+            deref: true
+            deref-mut: true
+            pub: true

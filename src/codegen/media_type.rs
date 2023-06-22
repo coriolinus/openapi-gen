@@ -13,15 +13,12 @@ pub fn get_ident(prefix: &str, mime_type: &str, media_type: &MediaType) -> Strin
         Some(ReferenceOr::Reference { reference }) => {
             reference.rsplit('/').next().unwrap_or(reference).to_owned()
         }
-        // form an identifier from the `name` extension of the schema,
-        // or the `title` field of the schema, or fall back to
+        // form an identifier from the `title` field of the schema, or fall back to
         // `RenderTemplatePostApplicationJson`
         Some(ReferenceOr::Item(schema)) => schema
             .schema_data
-            .extensions
-            .get("name")
-            .and_then(|value| value.as_str())
-            .or(schema.schema_data.title.as_deref())
+            .title
+            .as_deref()
             .map(|s| s.to_owned())
             .unwrap_or_else(unknown),
     };

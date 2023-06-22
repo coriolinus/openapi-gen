@@ -10,6 +10,27 @@ use openapiv3::OpenAPI;
 struct Args {
     /// path to openapi specification file
     path: PathBuf,
+
+    /// emit debug information about the spec
+    ///
+    /// when set, this suppresses emitting the normal generated rust code.
+    /// to override this, set `--emit-rust`.
+    #[arg(long)]
+    debug_spec: bool,
+
+    /// emit debug information about the model
+    ///
+    /// when set, this suppresses emitting the normal generated rust code.
+    /// to override this, set `--emit-rust`.
+    #[arg(long)]
+    debug_model: bool,
+
+    /// force emitting generated rust code
+    ///
+    /// this is normally not required, but the generated code is suppressed by default
+    /// when `--debug-spec` or `--debug-model` is used.
+    #[arg(long)]
+    emit_rust: bool,
 }
 
 fn main() -> Result<()> {
@@ -21,7 +42,7 @@ fn main() -> Result<()> {
     };
     let spec: OpenAPI = serde_yaml::from_reader(reader).context("parsing yaml")?;
 
-    let model = ApiModel::try_from(spec).context("converting to api model")?;
+    let model = ApiModel::try_from(spec.clone()).context("converting to api model")?;
     let pretty = model
         .emit_items()
         .map_err(|err| {
@@ -34,7 +55,15 @@ fn main() -> Result<()> {
         })
         .context("emitting rust code")?;
 
-    println!("{pretty}");
+    if args.debug_spec {
+        dbg!(&spec);
+    }
+    if args.debug_model {
+        dbg!(&model);
+    }
+    if args.emit_rust || !(args.debug_spec || args.debug_model) {
+        println!("{pretty}");
+    }
 
     Ok(())
 }

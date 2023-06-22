@@ -244,13 +244,29 @@ pub trait Api {
 
 Types defined in the `#/components/schemas` section of the document, as well as types defined inline elsewhere in the document, are exported.
 
-#### Type Definitions
+#### Name Override
 
-Primitive types defined with a `title` parameter export a public type definition.
+Types defined with a `title` parameter use that to override the derived name. This name is still subject to admendment for deconfliction, if required.
 
 ```yaml
 title: count
 type: integer
+```
+
+```rust
+type Count = i64;
+```
+
+#### Public Type Definitions
+
+Under the hood, this code generates a large quantity of type definitions. By default, these are private, beacuse this tool's output isn't intended to be edited by humans, and `rustdoc` is smart enough to unpack these.
+
+However, it may sometimes be desirable to make the typedef public for a given type. In that case, use the `x-pub-typedef` extension for that item.
+
+```yaml
+title: count
+type: integer
+x-pub-typedef: true
 ```
 
 ```rust
@@ -265,7 +281,7 @@ This is expressed as `trait CanonicalForm`. This is automatically implemented fo
 
 #### Newtypes
 
-Types defined with the `newtype: true` extension are wrapped in a newtype. The minimum set of derives is:
+Types defined with the `x-newtype: true` extension are wrapped in a newtype. The minimum set of derives is:
 
 - `Debug`
 - `Clone`
@@ -278,14 +294,21 @@ Types defined with the `newtype: true` extension are wrapped in a newtype. The m
 - [`derive_more::Display`]
 - [`derive_more::FromStr`]
 
+`x-newtype` may optionally be an object instead of a boolean. In that case, it supports these fields, all of which default to false:
 
-If the `newtypeFrom: true` extension is also set, then [`derive_more::From`] is derived.
+```yaml
+x-newtype:
+  from:      true  # derive `derive_more::From`
+  into:      true  # derive `derive_more::Into`
+  deref:     true  # derive `derive_more::Deref`
+  deref-mut: true  # derive `derive_more::DerefMut`
+  pub:       true  # mark the inner item as `pub`
+```
 
-If the `newtypeInto: true` extension is also set, then [`derive_more::Into`] is derived.
-
-If the `newtypeDeref: true` extension is also set, then [`derive_more::Deref`] is derived.
-
-If the `newtypeDerefMut: true` extension is also set, then [`derive_more::DerefMut`][`derive_more::Deref`] is derived.
+- [`derive_more::From`]
+- [`derive_more::Into`]
+- [`derive_more::Deref`]
+- [`derive_more::DerefMut`][`derive_more::Deref`]
 
 [`serde::Serialize`]: https://docs.rs/serde/latest/serde/trait.Serialize.html
 [`serde::Deserialize`]: https://docs.rs/serde/latest/serde/trait.Deserialize.html
@@ -414,7 +437,7 @@ nullable: true
 pub type Add = Option<i64>;
 ```
 
-If there is `title` parameter (indicating that a typedef or item should be generated) on a nullable named field such as an object, then the inner type gets the canonical name, and the option gets a `Maybe` name.
+When an item is nullable, a `Maybe*` typedef is generated which handles wrapping the inner type in an `Option`.
 
 ```yaml
 title: foo

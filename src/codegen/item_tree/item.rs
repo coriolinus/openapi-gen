@@ -2,6 +2,7 @@ use heck::{AsUpperCamelCase, ToUpperCamelCase};
 use openapiv3::{Schema, SchemaKind, Type};
 use proc_macro2::TokenStream;
 use quote::quote;
+use serde::Deserialize;
 
 use crate::codegen::make_ident;
 
@@ -12,6 +13,7 @@ use super::{
     ApiModel, Scalar, Value,
 };
 
+// note: openapiv3 intentionally ignores extensions whose name does not start with "x-".
 fn get_extension_value<'a>(schema: &'a Schema, key: &str) -> Option<&'a serde_json::Value> {
     schema.schema_data.extensions.get(key)
 }
@@ -22,6 +24,36 @@ fn get_extension_bool(schema: &Schema, key: &str) -> bool {
         .unwrap_or_default()
 }
 
+#[derive(Default, Debug, Clone, Copy, Deserialize)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct NewtypeOptions {
+    /// When true, derive [`derive_more::From`].
+    from: bool,
+    /// When true, derive [`derive_more::Into`].
+    into: bool,
+    /// When true, derive [`derive_more::Deref`].
+    deref: bool,
+    /// When true, derive [`derive_more::DerefMut`].
+    deref_mut: bool,
+    /// When true, the inner item is `pub`.
+    #[serde(rename = "pub")]
+    pub_: bool,
+}
+
+impl NewtypeOptions {
+    // orphan rule prevents a normal `From` impl
+    fn from(value: serde_json::Value) -> Option<Self> {
+        match value {
+            serde_json::Value::Bool(b) => b.then(|| NewtypeOptions::default()),
+            serde_json::Value::Object(_) => serde_json::from_value(value).ok(),
+            serde_json::Value::Null
+            | serde_json::Value::Number(_)
+            | serde_json::Value::String(_)
+            | serde_json::Value::Array(_) => None,
+        }
+    }
+}
+
 /// Root struct of the abstract item tree used here to model OpenAPI items.
 ///
 /// This ultimately controls everything about how an item is emitted in Rust.
@@ -29,26 +61,16 @@ fn get_extension_bool(schema: &Schema, key: &str) -> bool {
 pub struct Item<Ref = Reference> {
     /// Documentation to be injected for this item.
     pub docs: Option<String>,
-    /// A `name` extension field was set, explicitly naming this item.
-    pub explicit_name: bool,
     /// Name of this item as it appears in the specification.
     pub spec_name: String,
     /// Name of this item as it appears in Rust code.
     pub rust_name: String,
     /// Inner name of this item. Should always and only be `Some` if `self.nullable`.
     pub inner_name: Option<String>,
-    /// When true, construct a newtype instead of a typedef.
-    pub newtype: bool,
-    /// When true and `newtype` is set, the newtype inner item is public.
-    pub newtype_pub: bool,
-    /// When true and `newtype` is set, derive [`derive_more::From`].
-    pub newtype_from: bool,
-    /// When true and `newtype` is set, derive [`derive_more::Into`].
-    pub newtype_into: bool,
-    /// When true and `newtype` is set, derive [`derive_more::Deref`].
-    pub newtype_deref: bool,
-    /// When true and `newtype` is set, derive [`derive_more::DerefMut`].
-    pub newtype_deref_mut: bool,
+    /// When `Some`, construct a newtype instead of a typedef.
+    pub newtype: Option<NewtypeOptions>,
+    /// When true, typedef is public.
+    pub pub_typedef: bool,
     /// When true, emits an outer typedef around an `Option`, and an inner item definition.
     pub nullable: bool,
     /// What value this item contains
@@ -62,32 +84,22 @@ impl Item<Ref> {
     ) -> Result<Item<Reference>, UnknownReference> {
         let Self {
             docs,
-            explicit_name,
             spec_name,
             rust_name: name,
             inner_name,
             newtype,
-            newtype_pub,
-            newtype_from,
-            newtype_into,
-            newtype_deref,
-            newtype_deref_mut,
+            pub_typedef,
             nullable,
             value,
         } = self;
         let value = value.resolve_refs(resolver)?;
         Ok(Item {
             docs,
-            explicit_name,
             spec_name,
             rust_name: name,
             inner_name,
             newtype,
-            newtype_pub,
-            newtype_from,
-            newtype_into,
-            newtype_deref,
-            newtype_deref_mut,
+            pub_typedef,
             nullable,
             value,
         })
@@ -132,28 +144,26 @@ impl Item<Ref> {
             .map_err(ParseItemError::ExternalDocumentation)?
             .or_else(|| schema.schema_data.description.clone());
 
-        let newtype = get_extension_bool(schema, "newtype");
-        let newtype_pub = get_extension_bool(schema, "newtypePub");
-        let newtype_from = get_extension_bool(schema, "newtypeFrom");
-        let newtype_into = get_extension_bool(schema, "newtypeInto");
-        let newtype_deref = get_extension_bool(schema, "newtypeDeref");
-        let newtype_deref_mut = get_extension_bool(schema, "newtypeDerefMut");
+        let pub_typedef = get_extension_bool(schema, "x-pub-typedef");
+        let newtype = get_extension_value(schema, "x-newtype")
+            .cloned()
+            .and_then(NewtypeOptions::from);
 
         let nullable = schema.schema_data.nullable;
 
-        // The name used for this item can come from one of three sources:
-        //
-        // - It's the `name` extension value field, or
-        // - It's the `title` field (in UpperCamelCase), or
-        // - It's the derived name for this item
-        let explicit_name = get_extension_value(schema, "name")
-            .and_then(serde_json::Value::as_str)
-            .map(ToOwned::to_owned);
-        let has_explicit_name = explicit_name.is_some();
-        let spec_name = explicit_name
-            .or_else(|| schema.schema_data.title.clone())
-            .unwrap_or_else(|| spec_name.to_owned());
+        // The names used for this item can either be set explicitly with the `title` field, or we can just derive it.
+        let (spec_name, rust_name) = schema
+            .schema_data
+            .title
+            .as_ref()
+            .map(|title| {
+                let mut rust_name = title.to_upper_camel_case();
+                model.deconflict_ident(&mut rust_name);
+                (title.clone(), rust_name)
+            })
+            .unwrap_or_else(|| (spec_name.to_owned(), rust_name.to_owned()));
 
+        // the public name and inner name depend on whether this is nullable or not
         let (rust_name, inner_name) = if nullable {
             let mut maybe_name = format!("Maybe{rust_name}");
             model.deconflict_ident(&mut maybe_name);
@@ -162,20 +172,13 @@ impl Item<Ref> {
             (rust_name.to_owned(), None)
         };
 
-        debug_assert_eq!(inner_name.is_some(), nullable);
-
         Ok(Self {
             docs,
-            explicit_name: has_explicit_name,
             spec_name,
             rust_name,
             inner_name,
             newtype,
-            newtype_pub,
-            newtype_from,
-            newtype_into,
-            newtype_deref,
-            newtype_deref_mut,
+            pub_typedef,
             nullable,
             value,
         })
@@ -187,7 +190,7 @@ impl Item {
     ///
     /// This disables derives when the item is emitted.
     fn is_typedef(&self) -> bool {
-        !self.newtype
+        self.newtype.is_none()
             && match &self.value {
                 Value::Scalar(_) | Value::Set(_) | Value::List(_) | Value::Map(_) => true,
                 Value::StringEnum(_) | Value::OneOfEnum(_) | Value::Object(_) => false,
@@ -200,14 +203,12 @@ impl Item {
     ///
     /// - is a struct or enum
     /// - is a newtype
-    /// - has a `name`
+    /// - is marked as public
     pub fn is_pub(&self) -> bool {
-        self.newtype || self.explicit_name || self.value.is_struct_or_enum()
+        self.newtype.is_some() || self.pub_typedef || self.value.is_struct_or_enum()
     }
 
     /// Generate an item definition for this item.
-    ///
-    /// `name` is the public name for this item.
     ///
     /// The name resolver should be able to efficiently extract item names from references.
     pub fn emit<'a>(
@@ -232,13 +233,14 @@ impl Item {
             None => (None, make_ident(&self.rust_name)),
         };
 
-        let item_keyword = if self.newtype {
+        let item_keyword = if self.newtype.is_some() {
             quote!(struct)
         } else {
             self.value.item_keyword()
         };
 
-        let equals = (!self.newtype && !self.value.is_struct_or_enum()).then_some(quote!(=));
+        let equals =
+            (self.newtype.is_none() && !self.value.is_struct_or_enum()).then_some(quote!(=));
 
         let derives = (!self.is_typedef())
             .then(|| self.derives(model))
@@ -254,12 +256,12 @@ impl Item {
         let pub_ = self.is_pub().then_some(quote!(pub));
 
         let mut item_def = self.value.emit_item_definition(model, name_resolver)?;
-        if self.newtype {
-            let newtype_pub = self.newtype_pub.then_some(quote!(pub));
-            item_def = quote!((#newtype_pub #item_def));
+        if self.newtype.map(|options| options.pub_).unwrap_or_default() {
+            let newtype_pub = self.pub_typedef.then_some(quote!(pub));
+            item_def = quote!((pub #item_def));
         }
 
-        let semicolon = (self.newtype || !self.value.is_struct_or_enum()).then_some(quote!(;));
+        let semicolon = (self.newtype.is_some() || self.is_typedef()).then_some(quote!(;));
 
         Ok(quote! {
             #wrapper_def
@@ -283,21 +285,21 @@ impl Item {
         if self.value.impls_hash(model) {
             derives.push(quote!(Hash));
         }
-        if self.newtype {
-            if self.newtype_from {
+        if let Some(options) = self.newtype {
+            if options.from {
                 derives.push(quote!(openapi_gen::reexport::derive_more::From));
             }
-            if self.newtype_into {
+            if options.into {
                 derives.push(quote!(openapi_gen::reexport::derive_more::Into));
             }
-            if self.newtype_deref {
+            if options.deref {
                 derives.push(quote!(openapi_gen::reexport::derive_more::Deref));
             }
-            if self.newtype_deref_mut {
+            if options.deref_mut {
                 derives.push(quote!(openapi_gen::reexport::derive_more::DerefMut));
             }
         }
-        if self.newtype || matches!(&self.value, Value::Object(_)) {
+        if self.newtype.is_some() || matches!(&self.value, Value::Object(_)) {
             derives.push(quote!(openapi_gen::reexport::derive_more::Constructor));
         }
 
