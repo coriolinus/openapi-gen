@@ -129,16 +129,17 @@ impl Value<Ref> {
 
     pub(crate) fn parse_array_type(
         model: &mut ApiModel<Ref>,
-        name: &str,
+        spec_name: &str,
+        rust_name: &str,
         array_type: &ArrayType,
     ) -> Result<Self, ValueConversionError> {
         match &array_type.items {
             None => Ok(Self::default()),
             Some(items) => {
-                let name = format!("{name}Item");
+                let rust_name = format!("{rust_name}Item");
                 let item = model
-                    .convert_reference_or(&name, items)
-                    .map_err(ValueConversionError::from_inline(&name))?;
+                    .convert_reference_or(spec_name, &rust_name, items)
+                    .map_err(ValueConversionError::from_inline(&rust_name))?;
                 if array_type.unique_items {
                     Ok(Set { item }.into())
                 } else {
@@ -150,7 +151,8 @@ impl Value<Ref> {
 
     pub(crate) fn parse_object_type(
         model: &mut ApiModel<Ref>,
-        name: &str,
+        spec_name: &str,
+        rust_name: &str,
         object_type: &ObjectType,
     ) -> Result<Self, ValueConversionError> {
         if !object_type.properties.is_empty() && object_type.additional_properties.is_some() {
@@ -162,10 +164,10 @@ impl Value<Ref> {
             let value_type = match additional_properties {
                 openapiv3::AdditionalProperties::Any(_) => None,
                 openapiv3::AdditionalProperties::Schema(schema_ref) => {
-                    let name = format!("{name}Item");
+                    let rust_name = format!("{rust_name}Item");
                     let item = model
-                        .convert_reference_or(&name, &schema_ref.as_ref().as_ref())
-                        .map_err(ValueConversionError::from_inline(&name))?;
+                        .convert_reference_or(spec_name, &rust_name, &schema_ref.as_ref().as_ref())
+                        .map_err(ValueConversionError::from_inline(&rust_name))?;
                     Some(item)
                 }
             };
@@ -196,16 +198,17 @@ impl Value<Ref> {
                 // encounter with a particular name gets to keep the
                 // bare name, while others get their names qualified,
                 // but it's still better than just appending digits.
-                let name_qualifier = if model.ident_exists(member_name) {
-                    name
+                let ucc_member_name = format!("{}", AsUpperCamelCase(member_name));
+                let mut rust_name = if model.ident_exists(&ucc_member_name) {
+                    format!("{rust_name}{ucc_member_name}")
                 } else {
-                    ""
+                    ucc_member_name
                 };
-                let name = format!("{name_qualifier}{}", AsUpperCamelCase(member_name));
+                model.deconflict_ident(&mut rust_name);
 
                 let definition = model
-                    .convert_reference_or(&name, &schema_ref.as_ref())
-                    .map_err(ValueConversionError::from_inline(&name))?;
+                    .convert_reference_or(member_name, &rust_name, &schema_ref.as_ref())
+                    .map_err(ValueConversionError::from_inline(&rust_name))?;
 
                 // In a perfect world, we could just set the item's `nullable` field here in the
                 // event that we've determined that the item is in fact nullable.
@@ -224,7 +227,7 @@ impl Value<Ref> {
                 let inline_option = !object_type.required.contains(member_name);
 
                 Ok((
-                    name,
+                    member_name.to_owned(),
                     ObjectMember {
                         definition,
                         read_only,
@@ -239,7 +242,8 @@ impl Value<Ref> {
 
     pub(crate) fn parse_one_of_type(
         model: &mut ApiModel<Ref>,
-        name: &str,
+        spec_name: &str,
+        rust_name: &str,
         schema_data: &SchemaData,
         variants: &[ReferenceOr<openapiv3::Schema>],
     ) -> Result<Self, ValueConversionError> {
@@ -268,8 +272,8 @@ impl Value<Ref> {
                     });
 
                 let definition = model
-                    .convert_reference_or(name, &schema_ref.as_ref())
-                    .map_err(ValueConversionError::from_inline(name))?;
+                    .convert_reference_or(spec_name, rust_name, &schema_ref.as_ref())
+                    .map_err(ValueConversionError::from_inline(rust_name))?;
 
                 Ok(Variant {
                     definition,

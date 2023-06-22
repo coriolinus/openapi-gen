@@ -55,8 +55,8 @@ impl ObjectMember {
         let snake_member_name = make_ident(&snake_member_name);
         let item_ref = make_ident(name_resolver(self.definition)?);
 
-        // `self.inline_option` is set when we have an optional external ref which
-        // is not always required.
+        // `self.inline_option` is set when this item is optional, not intrinsically,
+        // but within the context of this object.
         let mut item_ref = quote!(#item_ref);
         if self.inline_option {
             item_ref = quote!(Option<#item_ref>);

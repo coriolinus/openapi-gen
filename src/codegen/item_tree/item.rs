@@ -96,7 +96,8 @@ impl Item<Ref> {
     /// Parse a schema, recursively adding inline items
     pub(crate) fn parse_schema(
         model: &mut ApiModel<Ref>,
-        name: &str,
+        spec_name: &str,
+        rust_name: &str,
         schema: &Schema,
     ) -> Result<Self, ParseItemError> {
         let value: Value<Ref> = match &schema.schema_kind {
@@ -108,13 +109,13 @@ impl Item<Ref> {
                 Value::parse_string_type(string_type, &schema.schema_data)?
             }
             SchemaKind::Type(Type::Array(array_type)) => {
-                Value::parse_array_type(model, name, array_type)?
+                Value::parse_array_type(model, spec_name, rust_name, array_type)?
             }
             SchemaKind::Type(Type::Object(object_type)) => {
-                Value::parse_object_type(model, name, object_type)?
+                Value::parse_object_type(model, spec_name, rust_name, object_type)?
             }
             SchemaKind::OneOf { one_of } => {
-                Value::parse_one_of_type(model, name, &schema.schema_data, one_of)?
+                Value::parse_one_of_type(model, spec_name, rust_name, &schema.schema_data, one_of)?
             }
             SchemaKind::AllOf { .. } | SchemaKind::AnyOf { .. } | SchemaKind::Not { .. } => {
                 return Err(ParseItemError::UnsupportedSchemaKind)
@@ -149,22 +150,16 @@ impl Item<Ref> {
             .and_then(serde_json::Value::as_str)
             .map(ToOwned::to_owned);
         let has_explicit_name = explicit_name.is_some();
-        let spec_name = {
-            let mut name = explicit_name
-                .or_else(|| schema.schema_data.title.clone())
-                .map(|title| format!("{}", AsUpperCamelCase(title)))
-                .unwrap_or_else(|| name.to_owned());
-            model.deconflict_ident(&mut name);
-            name
-        };
-        let rust_name = spec_name.to_upper_camel_case();
+        let spec_name = explicit_name
+            .or_else(|| schema.schema_data.title.clone())
+            .unwrap_or_else(|| spec_name.to_owned());
 
         let (rust_name, inner_name) = if nullable {
             let mut maybe_name = format!("Maybe{rust_name}");
             model.deconflict_ident(&mut maybe_name);
-            (maybe_name, Some(rust_name))
+            (maybe_name, Some(rust_name.to_owned()))
         } else {
-            (rust_name, None)
+            (rust_name.to_owned(), None)
         };
 
         debug_assert_eq!(inner_name.is_some(), nullable);

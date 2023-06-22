@@ -1,5 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
+use heck::ToUpperCamelCase;
 use indexmap::IndexMap;
 use openapiv3::{OpenAPI, ReferenceOr, Schema};
 use proc_macro2::TokenStream;
@@ -115,14 +116,15 @@ impl ApiModel<Ref> {
     /// Otherwise, the reference is simply converted to an appropriate `Ref`.
     pub fn convert_reference_or<S>(
         &mut self,
-        name: &str,
+        spec_name: &str,
+        rust_name: &str,
         schema_ref: &ReferenceOr<S>,
     ) -> Result<Ref, Error>
     where
         S: Deref<Target = Schema>,
     {
         match schema_ref {
-            ReferenceOr::Item(schema) => self.add_inline_items(name, None, schema),
+            ReferenceOr::Item(schema) => self.add_inline_items(spec_name, rust_name, None, schema),
             ReferenceOr::Reference { reference } => match self.named_references.get(reference) {
                 Some(position) => Ok(Ref::Back(*position)),
                 None => Ok(Ref::Forward(reference.to_owned())),
@@ -137,11 +139,12 @@ impl ApiModel<Ref> {
     /// External item definitions are permitted to be forward references.
     pub fn add_inline_items(
         &mut self,
-        name: &str,
+        spec_name: &str,
+        rust_name: &str,
         reference_name: Option<&str>,
         schema: &Schema,
     ) -> Result<Ref, Error> {
-        let item = Item::parse_schema(self, name, schema)?;
+        let item = Item::parse_schema(self, spec_name, rust_name, schema)?;
 
         // when constructing the item, we might have discovered that it needs a somewhat different name than planned.
         // extract that.
@@ -269,43 +272,42 @@ impl TryFrom<OpenAPI> for ApiModel {
     type Error = Error;
 
     fn try_from(spec: OpenAPI) -> Result<Self, Self::Error> {
-        let mut models = ApiModel::<Ref>::default();
+        let mut model = ApiModel::<Ref>::default();
 
         // start by adding each schema defined in the components.
         // this gives the best chance of creating back refs instead of forward.
-        for (name, schema) in component_schemas(&spec) {
-            let reference_name = Some(format!("#/components/schemas/{name}"));
-            models.add_inline_items(name, reference_name.as_deref(), schema)?;
+        for (spec_name, schema) in component_schemas(&spec) {
+            let rust_name = spec_name.to_upper_camel_case();
+            let reference_name = Some(format!("#/components/schemas/{spec_name}"));
+            model.add_inline_items(spec_name, &rust_name, reference_name.as_deref(), schema)?;
         }
 
         // likewise for component parameters
-        for (name, param) in component_parameters(&spec) {
-            let reference_name = Some(format!("#/components/parameters/{name}"));
+        for (spec_name, param) in component_parameters(&spec) {
+            let rust_name = spec_name.to_upper_camel_case();
+            let reference_name = Some(format!("#/components/parameters/{spec_name}"));
             let Some(schema) = param.parameter_data_ref().schema().map(|schema_ref| schema_ref.resolve(&spec)) else { continue };
-            let param_ref = models.add_inline_items(name, reference_name.as_deref(), schema)?;
-
-            // top-level named parameters at the least should be newtypes
-            // todo: do we really actually want this rule, or should we leave it up to the spec author?
-            if let Some(item) = models.resolve_mut(&param_ref) {
-                item.newtype = true;
-            }
+            model.add_inline_items(spec_name, &rust_name, reference_name.as_deref(), schema)?;
         }
 
         // add items from operations
         for (path, operation_name, operation) in path_operations(&spec) {
             // first inline schemas
-            for (name, schema) in operation_inline_schemas(path, operation_name, operation) {
-                models.add_inline_items(&name, None, schema)?;
+            for (spec_name, schema) in operation_inline_schemas(path, operation_name, operation) {
+                let rust_name = spec_name.to_upper_camel_case();
+                model.add_inline_items(&spec_name, &rust_name, None, schema)?;
             }
 
             // then inline parameters
             for param in operation_inline_parameters(operation) {
+                let spec_name = &param.parameter_data_ref().name;
+                let rust_name = spec_name.to_upper_camel_case();
                 let Some(schema) = param.parameter_data_ref().schema().map(|schema_ref| schema_ref.resolve(&spec)) else { continue };
-                models.add_inline_items(&param.parameter_data_ref().name, None, schema)?;
+                model.add_inline_items(spec_name, &rust_name, None, schema)?;
             }
         }
 
-        models.resolve_refs()
+        model.resolve_refs()
     }
 }
 

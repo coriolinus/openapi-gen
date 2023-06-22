@@ -23,7 +23,7 @@ principle of least surprise.
 
 for type unification, use a reference.
 */
-type Foo1 = u64;
+type DefinedInlineFoo = u64;
 type Bat = i64;
 ///this object is defined inline within `OuterStruct`
 #[derive(
@@ -44,7 +44,7 @@ principle of least surprise.
 
 for type unification, use a reference.
 */
-    foo: Foo1,
+    foo: DefinedInlineFoo,
     bat: Bat,
 }
 #[derive(

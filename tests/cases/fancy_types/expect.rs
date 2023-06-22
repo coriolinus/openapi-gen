@@ -93,7 +93,7 @@ pub struct Container {
     exclusive_bounded_integer_low_i32: ExclusiveBoundedIntegerLowI32,
     exclusive_bounded_integer_high_i32: ExclusiveBoundedIntegerHighI32,
     exclusive_bounded_integer_both_i32: ExclusiveBoundedIntegerBothI32,
-    string: String,
+    string: String_,
     string_binary: StringBinary,
     string_byte: StringByte,
     string_base64: StringBase64,
