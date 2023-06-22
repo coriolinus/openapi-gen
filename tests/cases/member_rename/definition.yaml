@@ -1,0 +1,32 @@
+openapi: "3.0.3"
+info:
+  version: "0.1.0"
+  title: "Member Rename"
+  description: |
+    Test the ability to emit serde rename attributes appropriately.
+
+paths: {}
+
+components:
+  schemas:
+    GiftTag:
+      type: object
+      properties:
+        for:
+          description: who this gift is for
+          type: string
+        from:
+          description: |
+            who this gift is from.
+
+            May be omitted for anonymous gifting.
+          type: string
+        Message:
+          description: |
+            a teaser message to excite the imagination before opening the gift.
+
+            The point is to see if the rename attribute is emitted appropriately if the
+            default casing is unexpected.
+          type: string
+      required:
+        - for

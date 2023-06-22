@@ -50,10 +50,16 @@ impl ObjectMember {
             .as_deref()
             .map(|docs| quote!(#[doc = #docs]));
 
+        let mut serde_attributes = Vec::new();
+
         let mut snake_member_name = format!("{}", AsSnakeCase(member_name));
         model.deconflict_member_or_variant_ident(&mut snake_member_name);
         let snake_member_name = make_ident(&snake_member_name);
         let item_ref = make_ident(name_resolver(self.definition)?);
+
+        if snake_member_name != member_name {
+            serde_attributes.push(quote!(rename = #member_name));
+        }
 
         // `self.inline_option` is set when this item is optional, not intrinsically,
         // but within the context of this object.
@@ -62,8 +68,15 @@ impl ObjectMember {
             item_ref = quote!(Option<#item_ref>);
         }
 
+        let serde_attributes = (!serde_attributes.is_empty()).then(|| {
+            quote! {
+                #[serde(#( #serde_attributes ),*)]
+            }
+        });
+
         Ok(quote! {
             #docs
+            #serde_attributes
             pub #snake_member_name: #item_ref,
         })
     }
