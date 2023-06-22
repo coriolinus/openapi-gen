@@ -1,3 +1,19 @@
+//! Test a dynamic set of example cases against the expected generated code.
+//!
+//! Each test case is a subfolder of `openapi_gen/tests/cases`, and contains two files:
+//! `definition.yaml` and `expect.rs`. The former contains a valid OpenAPI specification,
+//! and the latter contains the code which is expected to be generated.
+//!
+//! Because generated code can vary based on what features are enabled, these tests are disabled
+//! unless all such features are enabled. For running this test, the simplest shorthand it just
+//! `cargo test --all-features`.
+//!
+//! Additional debugging information can sometimes be helpful. This can be controlled by setting
+//! certain environment variables to any non-empty value.
+//!
+//! - `DBG_DEFINITION`: emit `dbg!(definition)` for cases which fail.
+//! - `DBG_MODEL`: emit `dbg!(model)` for cases which fail.
+
 use std::{
     any::Any,
     fmt,
@@ -170,6 +186,12 @@ fn find_cases() -> impl Iterator<Item = Case> {
         .filter_map(|dir_entry| Case::load_path(dir_entry.path()))
 }
 
+fn env_is_set(name: impl AsRef<std::ffi::OsStr>) -> bool {
+    std::env::var_os(name)
+        .map(|value| !value.is_empty())
+        .unwrap_or_default()
+}
+
 #[test]
 #[cfg_attr(
     not(all(
@@ -205,8 +227,15 @@ fn cases() {
 
         outcome.additional_info(&mut stdout);
         if !outcome.is_ok() {
-            if let Ok(model) = ApiModel::try_from(case.definition) {
-                dbg!(model);
+            if env_is_set("DBG_DEFINITION") {
+                dbg!(&case.definition);
+            }
+            if env_is_set("DBG_MODEL") {
+                if let Ok(model) = ApiModel::try_from(case.definition) {
+                    dbg!(model);
+                } else {
+                    eprintln!("failed to parse ApiModel from OpenAPI definition");
+                }
             }
         }
     }
