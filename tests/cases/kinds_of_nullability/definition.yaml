@@ -1,0 +1,28 @@
+openapi: "3.0.3"
+info:
+  version: "0.1.0"
+  title: "Kinds of Nullability"
+  description: |
+    Test and demonstrate all four variations of nullability
+
+paths: {}
+
+components:
+  schemas:
+    Foo:
+      type: object
+      properties:
+        not_nullable_and_required:
+          type: integer
+        not_nullable_and_not_required:
+          type: integer
+        nullable_and_required:
+          type: integer
+          nullable: true
+        nullable_and_not_required:
+          description: note that this produces an `Option<Option<_>>`
+          type: integer
+          nullable: true
+      required:
+        - not_nullable_and_required
+        - nullable_and_required
