@@ -64,7 +64,7 @@ impl ObjectMember {
 
         Ok(quote! {
             #docs
-            #snake_member_name: #item_ref,
+            pub #snake_member_name: #item_ref,
         })
     }
 }

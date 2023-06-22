@@ -14,8 +14,8 @@ type Bar = String;
 )]
 pub struct InnerStruct {
     ///unsigned integer
-    foo: Foo,
-    bar: Option<Bar>,
+    pub foo: Foo,
+    pub bar: Option<Bar>,
 }
 /**even given compatible names and types, distinct inline types are distinguished.
 the software makes no attempt to unify the types, because that would violate the
@@ -44,8 +44,8 @@ principle of least surprise.
 
 for type unification, use a reference.
 */
-    foo: DefinedInlineFoo,
-    bat: Bat,
+    pub foo: DefinedInlineFoo,
+    pub bat: Bat,
 }
 #[derive(
     Debug,
@@ -59,7 +59,7 @@ for type unification, use a reference.
 )]
 pub struct OuterStruct {
     ///this object is defined separately, intended to be used within a reference
-    inner: InnerStruct,
+    pub inner: InnerStruct,
     ///this object is defined inline within `OuterStruct`
-    defined_inline: DefinedInline,
+    pub defined_inline: DefinedInline,
 }
