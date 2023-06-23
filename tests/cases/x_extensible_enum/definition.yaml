@@ -1,0 +1,17 @@
+openapi: "3.0.3"
+info:
+  version: "0.1.0"
+  title: "x-extensible-enum"
+  description: |
+    We support the `x-extensible-enum` schema extension, which produces an enum with an `Other` variant.
+
+paths: {}
+
+components:
+  schemas:
+    DeliveryMethod:
+      type: string
+      x-extensible-enum:
+        - parcel
+        - letter
+        - email
