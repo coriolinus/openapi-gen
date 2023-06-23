@@ -1,0 +1,73 @@
+openapi: "3.0.3"
+info:
+  version: "0.1.0"
+  title: "More Model Types"
+  description: |
+    Finish adding cases for all model types.
+
+paths: {}
+
+components:
+  schemas:
+    IsAwesome:
+      type: boolean
+
+    ArbitraryJson:
+      description: arbitrary JSON captured in a `serde_json::Value`
+      x-newtype: true
+
+    Thing:
+      type: object
+      properties:
+        awesomeness:
+          "$ref": "#/components/schemas/IsAwesome"
+        data:
+          "$ref": "#/components/schemas/ArbitraryJson"
+
+      required:
+        - awesomeness
+        - data
+
+    List:
+      type: array
+      items:
+        "$ref": "#/components/schemas/Thing"
+
+    Set:
+      type: array
+      items:
+        type: integer
+      uniqueItems: true
+
+    Map:
+      type: object
+      additionalProperties:
+        "$ref": "#/components/schemas/Thing"
+
+    Ordering:
+      description: sort order
+      type: string
+      enum: [asc, desc]
+
+    Color:
+      type: string
+      nullable: true
+      enum: [red, green, blue, null]
+
+    Collection:
+      description: discriminated collection types
+      oneOf:
+        - "$ref": "#/components/schemas/List"
+        - "$ref": "#/components/schemas/Set"
+        - "$ref": "#/components/schemas/Map"
+      discriminator:
+        propertyName: type
+
+    UntaggedEnum:
+      description: |
+        An untagged enum matches the first variant which successfully parses,
+        so ensure they are distinguishable
+      oneOf:
+        - "$ref": "#/components/schemas/Thing"
+        - "$ref": "#/components/schemas/Ordering"
+        - "$ref": "#/components/schemas/Color"

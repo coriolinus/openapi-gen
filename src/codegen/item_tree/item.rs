@@ -257,8 +257,10 @@ impl Item {
 
         let mut item_def = self.value.emit_item_definition(model, name_resolver)?;
         if self.newtype.map(|options| options.pub_).unwrap_or_default() {
-            let newtype_pub = self.pub_typedef.then_some(quote!(pub));
-            item_def = quote!((pub #item_def));
+            item_def = quote!(pub #item_def);
+        }
+        if self.newtype.is_some() {
+            item_def = quote!((#item_def));
         }
 
         let semicolon = (self.newtype.is_some() || self.is_typedef()).then_some(quote!(;));
