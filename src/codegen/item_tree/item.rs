@@ -113,10 +113,13 @@ impl Item<Ref> {
         schema: &Schema,
     ) -> Result<Self, ParseItemError> {
         let value: Value<Ref> = match &schema.schema_kind {
-            SchemaKind::Any(_) => Scalar::Any.into(),
             SchemaKind::Type(Type::Boolean {}) => Value::Scalar(Scalar::Bool),
             SchemaKind::Type(Type::Number(number_type)) => number_type.try_into()?,
             SchemaKind::Type(Type::Integer(integer_type)) => integer_type.try_into()?,
+            SchemaKind::Any(any_schema) => {
+                Value::try_parse_string_enum_type(&schema.schema_data, any_schema)
+                    .unwrap_or(Scalar::Any.into())
+            }
             SchemaKind::Type(Type::String(string_type)) => {
                 Value::parse_string_type(string_type, &schema.schema_data)?
             }

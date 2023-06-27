@@ -42,6 +42,16 @@ pub enum Ordering {
     Desc,
 }
 type MaybeColor = Option<Color>;
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde::Serialize,
+    openapi_gen::reexport::serde::Deserialize,
+    Copy,
+    Eq,
+    Hash
+)]
 pub enum Color {
     Red,
     Green,
@@ -77,3 +87,4 @@ pub enum UntaggedEnum {
     Ordering(Ordering),
     MaybeColor(MaybeColor),
 }
+
