@@ -22,10 +22,10 @@ pub struct Thing {
     ///arbitrary JSON captured in a `serde_json::Value`
     pub data: ArbitraryJson,
 }
-type List = Vec<Thing>;
+pub type List = Vec<Thing>;
 type SetItem = i64;
-type Set = std::collections::HashSet<SetItem>;
-type Map = std::collections::HashMap<String, Thing>;
+pub type Set = std::collections::HashSet<SetItem>;
+pub type Map = std::collections::HashMap<String, Thing>;
 ///sort order
 #[derive(
     Debug,

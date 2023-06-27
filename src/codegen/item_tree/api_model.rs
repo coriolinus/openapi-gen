@@ -279,7 +279,12 @@ impl TryFrom<OpenAPI> for ApiModel {
         for (spec_name, schema) in component_schemas(&spec) {
             let rust_name = spec_name.to_upper_camel_case();
             let reference_name = Some(format!("#/components/schemas/{spec_name}"));
-            model.add_inline_items(spec_name, &rust_name, reference_name.as_deref(), schema)?;
+            let ref_ =
+                model.add_inline_items(spec_name, &rust_name, reference_name.as_deref(), schema)?;
+            // all top-level components are public, even if they are typedefs
+            if let Some(item) = model.resolve_mut(&ref_) {
+                item.pub_typedef = true;
+            }
         }
 
         // likewise for component parameters
@@ -287,7 +292,12 @@ impl TryFrom<OpenAPI> for ApiModel {
             let rust_name = spec_name.to_upper_camel_case();
             let reference_name = Some(format!("#/components/parameters/{spec_name}"));
             let Some(schema) = param.parameter_data_ref().schema().map(|schema_ref| schema_ref.resolve(&spec)) else { continue };
-            model.add_inline_items(spec_name, &rust_name, reference_name.as_deref(), schema)?;
+            let ref_ =
+                model.add_inline_items(spec_name, &rust_name, reference_name.as_deref(), schema)?;
+            // all top-level component parameters are also public
+            if let Some(item) = model.resolve_mut(&ref_) {
+                item.pub_typedef = true;
+            }
         }
 
         // add items from operations
