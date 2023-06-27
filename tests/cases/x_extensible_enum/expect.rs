@@ -11,5 +11,6 @@ pub enum DeliveryMethod {
     Parcel,
     Letter,
     Email,
-    Other(String)
+    Other(String),
 }
+

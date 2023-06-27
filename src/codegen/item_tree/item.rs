@@ -1,4 +1,4 @@
-use heck::{AsUpperCamelCase, ToUpperCamelCase};
+use heck::ToUpperCamelCase;
 use openapiv3::{Schema, SchemaKind, Type};
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -44,7 +44,7 @@ impl NewtypeOptions {
     // orphan rule prevents a normal `From` impl
     fn from(value: serde_json::Value) -> Option<Self> {
         match value {
-            serde_json::Value::Bool(b) => b.then(|| NewtypeOptions::default()),
+            serde_json::Value::Bool(b) => b.then_some(NewtypeOptions::default()),
             serde_json::Value::Object(_) => serde_json::from_value(value).ok(),
             serde_json::Value::Null
             | serde_json::Value::Number(_)
@@ -167,9 +167,9 @@ impl Item<Ref> {
         let (rust_name, inner_name) = if nullable {
             let mut maybe_name = format!("Maybe{rust_name}");
             model.deconflict_ident(&mut maybe_name);
-            (maybe_name, Some(rust_name.to_owned()))
+            (maybe_name, Some(rust_name))
         } else {
-            (rust_name.to_owned(), None)
+            (rust_name, None)
         };
 
         Ok(Self {

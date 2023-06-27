@@ -21,7 +21,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use openapi_gen::ApiModel;
+use openapi_gen::{ApiModel, Error};
 use openapiv3::OpenAPI;
 use similar::{ChangeTag, TextDiff};
 use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
@@ -29,9 +29,15 @@ use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 #[derive(Debug, derive_more::From)]
 enum Outcome {
     Ok,
-    Mismatch { expect: String, have: String },
+    Mismatch {
+        expect: String,
+        have: String,
+    },
     Panic(Box<dyn 'static + Any + Send>),
-    Error(anyhow::Error),
+    Error {
+        err: anyhow::Error,
+        generated_code: String,
+    },
 }
 
 impl fmt::Display for Outcome {
@@ -40,7 +46,7 @@ impl fmt::Display for Outcome {
             Outcome::Ok => f.write_str("ok"),
             Outcome::Mismatch { .. } => f.write_str("mismatch"),
             Outcome::Panic(_) => f.write_str("panic"),
-            Outcome::Error(_) => f.write_str("error"),
+            Outcome::Error { .. } => f.write_str("error"),
         }
     }
 }
@@ -59,7 +65,7 @@ impl Outcome {
     fn fg_color(&self) -> Color {
         match self {
             Outcome::Ok => Color::Green,
-            Outcome::Mismatch { .. } | Outcome::Panic(_) | Outcome::Error(_) => Color::Red,
+            Outcome::Mismatch { .. } | Outcome::Panic(_) | Outcome::Error { .. } => Color::Red,
         }
     }
 
@@ -67,17 +73,21 @@ impl Outcome {
         match self {
             Outcome::Ok | Outcome::Mismatch { .. } => None,
             Outcome::Panic(_) => Some(Color::Yellow),
-            Outcome::Error(_) => Some(Color::Cyan),
+            Outcome::Error { .. } => Some(Color::Cyan),
         }
     }
 
     fn additional_info(&self, out: &mut StandardStream) {
         match self {
             Outcome::Ok | Outcome::Panic(_) => (),
-            Outcome::Error(err) => {
+            Outcome::Error {
+                err,
+                generated_code,
+            } => {
                 for (idx, err) in err.chain().enumerate() {
                     let _ = writeln!(out, "{idx:>2}: {err}");
                 }
+                let _ = writeln!(out, "\n{generated_code}");
             }
             Outcome::Mismatch { expect, have } => {
                 let diff = TextDiff::from_lines(expect, have);
@@ -146,16 +156,29 @@ impl Case {
     }
 
     fn execute(&self) -> Outcome {
-        fn execute_inner(definition: OpenAPI) -> Result<syn::File, anyhow::Error> {
-            let model = ApiModel::try_from(definition)?;
-            let pretty = model.emit_items()?;
-            let file = syn::parse_str::<syn::File>(&pretty)?;
+        fn execute_inner(definition: OpenAPI) -> Result<syn::File, (anyhow::Error, String)> {
+            let model =
+                ApiModel::try_from(definition).map_err(|err| (err.into(), String::new()))?;
+            let pretty = model.emit_items().map_err(|err| {
+                let buffer = if let Error::CodegenParse { buffer, .. } = &err {
+                    buffer.clone()
+                } else {
+                    String::new()
+                };
+                (err.into(), buffer)
+            })?;
+            let file = syn::parse_str::<syn::File>(&pretty).map_err(|err| (err.into(), pretty))?;
             Ok(file)
         }
 
         let generated = match std::panic::catch_unwind(|| execute_inner(self.definition.clone())) {
             Ok(Ok(generated)) => generated,
-            Ok(Err(err)) => return Outcome::Error(err),
+            Ok(Err((err, generated_code))) => {
+                return Outcome::Error {
+                    err,
+                    generated_code,
+                }
+            }
             Err(panic) => return Outcome::Panic(panic),
         };
 

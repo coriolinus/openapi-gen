@@ -75,14 +75,14 @@ impl Value<Ref> {
             .transpose()?
             .unwrap_or_default();
 
-        let enumeration = match (
+        let (enumeration, extensible) = match (
             string_type.enumeration.is_empty(),
             x_extensible_enum.is_empty(),
         ) {
             (false, false) => return Err(ValueConversionError::EnumConflict),
-            (true, false) => x_extensible_enum,
-            (false, true) => string_type.enumeration.clone(),
-            (true, true) => Vec::new(),
+            (true, false) => (x_extensible_enum, true),
+            (false, true) => (string_type.enumeration.clone(), false),
+            (true, true) => (Vec::new(), false),
         };
 
         if !matches!(&string_type.format, VariantOrUnknownOrEmpty::Empty) && !enumeration.is_empty()
@@ -120,6 +120,7 @@ impl Value<Ref> {
                             .into_iter()
                             .filter(|e| !schema_data.nullable || e != "null")
                             .collect(),
+                        extensible,
                     })
                 }
             }
@@ -378,7 +379,7 @@ impl Value {
     pub fn impls_copy(&self, model: &ApiModel) -> bool {
         match self {
             Value::List(_) | Value::Map(_) | Value::Set(_) => false,
-            Value::StringEnum(_) => true,
+            Value::StringEnum(string_enum) => string_enum.impls_copy(),
             Value::Scalar(scalar) => scalar.impls_copy(),
             Value::OneOfEnum(oo_enum) => oo_enum
                 .variants
