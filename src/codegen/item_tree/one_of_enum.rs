@@ -105,4 +105,14 @@ impl OneOfEnum {
             }
         })
     }
+
+    pub(crate) fn serde_container_attributes(&self) -> Vec<TokenStream> {
+        let mut attributes = Vec::new();
+        if let Some(tag) = &self.discriminant {
+            attributes.push(quote!(tag = #tag));
+        } else {
+            attributes.push(quote!(untagged));
+        }
+        attributes
+    }
 }

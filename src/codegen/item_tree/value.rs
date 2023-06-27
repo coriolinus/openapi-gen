@@ -429,6 +429,13 @@ impl Value {
             Value::Object(object) => object.emit_definition(model, name_resolver),
         }
     }
+
+    pub fn serde_container_attributes(&self) -> Vec<TokenStream> {
+        match self {
+            Value::OneOfEnum(one_of_enum) => one_of_enum.serde_container_attributes(),
+            _ => Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

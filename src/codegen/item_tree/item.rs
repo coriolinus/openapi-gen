@@ -253,6 +253,10 @@ impl Item {
                 }
             });
 
+        let serde_container_attributes = self.value.serde_container_attributes();
+        let serde_container_attributes = (!serde_container_attributes.is_empty())
+            .then(move || quote!(#[serde( #( #serde_container_attributes ),*)]));
+
         let pub_ = self.is_pub().then_some(quote!(pub));
 
         let mut item_def = self.value.emit_item_definition(model, name_resolver)?;
@@ -270,6 +274,7 @@ impl Item {
 
             #docs
             #derives
+            #serde_container_attributes
             #pub_ #item_keyword #item_ident #equals #item_def #semicolon
         })
     }
