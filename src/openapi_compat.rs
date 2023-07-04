@@ -239,10 +239,16 @@ pub(crate) fn operation_inline_parameters<'a>(
     spec: &'a OpenAPI,
     operation: &'a Operation,
 ) -> impl Iterator<Item = &'a Parameter> {
-    operation
-        .parameters
-        .iter()
-        .filter_map(|param| param.resolve(spec).ok())
+    operation.parameters.iter().filter_map(|param_ref| {
+        let Ok(param) = Resolve::resolve(param_ref, spec) else {
+                return None;
+            };
+        let schema_ref = param_schema(param);
+        let is_local = schema_ref
+            .map(|schema_ref| schema_ref.as_item().is_some())
+            .unwrap_or_default();
+        is_local.then_some(param)
+    })
 }
 
 /// Iterate over all schemas defined in the `components` section of this spec.
@@ -269,14 +275,43 @@ pub(crate) fn component_inline_and_external_schemas(
         })
 }
 
+/// Get the schema ref from a parameter.
+///
+/// This is necessary because parameters might just declare a schema, or they might nest it under a content-type.
+fn param_schema(param: &Parameter) -> Option<&ReferenceOr<Schema>> {
+    use openapiv3::ParameterSchemaOrContent;
+
+    match &param.parameter_data_ref().format {
+        ParameterSchemaOrContent::Schema(schema) => Some(&schema),
+        ParameterSchemaOrContent::Content(content) => {
+            // in the context of a parameter, the content type map must contain at most one entry
+            // <https://docs.rs/openapiv3-extended/latest/openapiv3/enum.ParameterSchemaOrContent.html>
+            content
+                .first()
+                .and_then(|(_content_type, media_type)| media_type.schema.as_ref())
+        }
+    }
+}
+
 /// Iterate over all parameters defined inline in the `components` section of the spec.
 ///
 /// Items are `(name, parameter)`.
+///
+/// Note that this skips parameters whose schema is defined externally.
 pub(crate) fn component_inline_parameters(
     spec: &OpenAPI,
 ) -> impl Iterator<Item = (&str, &Parameter)> {
     spec.components
         .iter()
         .flat_map(|components| components.parameters.iter())
-        .filter_map(|(name, param_ref)| param_ref.as_item().map(|param| (name.as_str(), param)))
+        .filter_map(|(name, param_ref)| {
+            let Ok(param) = Resolve::resolve(param_ref, spec) else {
+                return None;
+            };
+            let schema_ref = param_schema(param);
+            let is_local = schema_ref
+                .map(|schema_ref| schema_ref.as_item().is_some())
+                .unwrap_or_default();
+            is_local.then_some((name.as_str(), param))
+        })
 }

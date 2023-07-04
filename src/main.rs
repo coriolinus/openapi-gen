@@ -41,8 +41,15 @@ fn main() -> Result<()> {
         std::io::BufReader::new(file)
     };
     let spec: OpenAPI = serde_yaml::from_reader(reader).context("parsing yaml")?;
+    if args.debug_spec {
+        dbg!(&spec);
+    }
 
     let model = ApiModel::try_from(spec.clone()).context("converting to api model")?;
+    if args.debug_model {
+        dbg!(&model);
+    }
+
     let pretty = model
         .emit_items()
         .map_err(|err| {
@@ -54,13 +61,6 @@ fn main() -> Result<()> {
             err
         })
         .context("emitting rust code")?;
-
-    if args.debug_spec {
-        dbg!(&spec);
-    }
-    if args.debug_model {
-        dbg!(&model);
-    }
     if args.emit_rust || !(args.debug_spec || args.debug_model) {
         println!("{pretty}");
     }
