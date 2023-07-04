@@ -1,0 +1,67 @@
+openapi: "3.0.3" # Use older openAPI spec version due to a bug in Zally: https://github.com/zalando/zally/issues/1230
+info:
+  title: "Well Known Type"
+  description: |
+    Generally, this generator assumes that definition files are self-contained. However, certain externally defined types are "well-known" and
+    handled appropriately. These should do the right thing.
+
+    For other externally defined types, the generator should produce an appropriate typedef.
+  version: "0.1.0"
+
+
+paths:
+  "/thing/{id}":
+    get:
+      operationId: "getThing"
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+
+      responses:
+        '200':
+          description: the thing with that id
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/Thing"
+
+    put:
+      operationId: "putThing"
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/Thing"
+      responses:
+        '200':
+          description: the thing which was just uploaded
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/Thing"
+
+components:
+  parameters:
+    PathId:
+      in: path
+      name: id
+      required: true
+      schema:
+        $ref: "#/components/schemas/Id"
+
+  schemas:
+    Id:
+      type: string
+      format: uuid
+      x-newtype:
+        pub: true
+
+    Thing:
+      type: object
+      properties:
+        foo:
+          type: number
+        bar:
+          type: string
