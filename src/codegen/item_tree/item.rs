@@ -57,7 +57,7 @@ impl NewtypeOptions {
 /// Root struct of the abstract item tree used here to model OpenAPI items.
 ///
 /// This ultimately controls everything about how an item is emitted in Rust.
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Item<Ref = Reference> {
     /// Documentation to be injected for this item.
     pub docs: Option<String>,
@@ -75,6 +75,21 @@ pub struct Item<Ref = Reference> {
     pub nullable: bool,
     /// What value this item contains
     pub value: Value<Ref>,
+}
+
+impl<R> Default for Item<R> {
+    fn default() -> Self {
+        Self {
+            docs: Default::default(),
+            spec_name: Default::default(),
+            rust_name: Default::default(),
+            inner_name: Default::default(),
+            newtype: Default::default(),
+            pub_typedef: Default::default(),
+            nullable: Default::default(),
+            value: Default::default(),
+        }
+    }
 }
 
 impl Item<Ref> {

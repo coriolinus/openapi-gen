@@ -7,11 +7,11 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::openapi_compat::{
-    component_parameters, component_schemas, operation_inline_parameters, operation_inline_schemas,
-    path_operations,
+    component_inline_and_external_schemas, component_inline_parameters,
+    operation_inline_parameters, operation_inline_schemas, path_operations, OrScalar,
 };
 
-use super::{item::EmitError, rust_keywords::is_rust_keyword, Item, ParseItemError};
+use super::{item::EmitError, rust_keywords::is_rust_keyword, Item, ParseItemError, Scalar};
 
 /// A reference to an item definition.
 ///
@@ -160,6 +160,31 @@ impl ApiModel<Ref> {
         Ok(Ref::Back(idx))
     }
 
+    /// Add a typedef to a scalar to this model.
+    pub fn add_scalar(
+        &mut self,
+        spec_name: &str,
+        rust_name: &str,
+        reference_name: Option<&str>,
+        scalar: Scalar,
+    ) -> Result<Ref, Error> {
+        let value = scalar.into();
+        let name = rust_name.to_owned();
+        let item = Item {
+            spec_name: spec_name.to_owned(),
+            rust_name: rust_name.to_owned(),
+            value,
+            ..Default::default()
+        };
+        let idx = self.definitions.len();
+        self.definitions.push(item);
+        self.items.insert(name, idx);
+        if let Some(reference_name) = reference_name {
+            self.named_references.insert(reference_name.to_owned(), idx);
+        }
+        Ok(Ref::Back(idx))
+    }
+
     /// Resolve all references into forward references, enabling the code generation use case.
     pub fn resolve_refs(self) -> Result<ApiModel<Reference>, Error> {
         let Self {
@@ -276,11 +301,20 @@ impl TryFrom<OpenAPI> for ApiModel {
 
         // start by adding each schema defined in the components.
         // this gives the best chance of creating back refs instead of forward.
-        for (spec_name, schema) in component_schemas(&spec) {
+        for (spec_name, schema_or_scalar) in component_inline_and_external_schemas(&spec) {
             let rust_name = spec_name.to_upper_camel_case();
             let reference_name = Some(format!("#/components/schemas/{spec_name}"));
-            let ref_ =
-                model.add_inline_items(spec_name, &rust_name, reference_name.as_deref(), schema)?;
+            let ref_ = match schema_or_scalar {
+                OrScalar::Item(schema) => model.add_inline_items(
+                    spec_name,
+                    &rust_name,
+                    reference_name.as_deref(),
+                    schema,
+                )?,
+                OrScalar::Scalar(scalar) => {
+                    model.add_scalar(spec_name, &rust_name, reference_name.as_deref(), scalar)?
+                }
+            };
             // all top-level components are public, even if they are typedefs
             if let Some(item) = model.resolve_mut(&ref_) {
                 item.pub_typedef = true;
@@ -288,7 +322,7 @@ impl TryFrom<OpenAPI> for ApiModel {
         }
 
         // likewise for component parameters
-        for (spec_name, param) in component_parameters(&spec) {
+        for (spec_name, param) in component_inline_parameters(&spec) {
             let rust_name = spec_name.to_upper_camel_case();
             let reference_name = Some(format!("#/components/parameters/{spec_name}"));
             let Some(schema) = param.parameter_data_ref().schema().map(|schema_ref| schema_ref.resolve(&spec)) else { continue };
@@ -303,13 +337,22 @@ impl TryFrom<OpenAPI> for ApiModel {
         // add items from operations
         for (path, operation_name, operation) in path_operations(&spec) {
             // first inline schemas
-            for (spec_name, schema) in operation_inline_schemas(path, operation_name, operation) {
+            for schema_metadata in operation_inline_schemas(&spec, path, operation_name, operation)
+            {
+                let spec_name = schema_metadata.to_string();
                 let rust_name = spec_name.to_upper_camel_case();
-                model.add_inline_items(&spec_name, &rust_name, None, schema)?;
+                match schema_metadata.schema_or_scalar {
+                    OrScalar::Item(schema) => {
+                        model.add_inline_items(&spec_name, &rust_name, None, schema)?;
+                    }
+                    OrScalar::Scalar(scalar) => {
+                        model.add_scalar(&spec_name, &rust_name, None, scalar)?;
+                    }
+                };
             }
 
             // then inline parameters
-            for param in operation_inline_parameters(operation) {
+            for param in operation_inline_parameters(&spec, operation) {
                 let spec_name = &param.parameter_data_ref().name;
                 let rust_name = spec_name.to_upper_camel_case();
                 let Some(schema) = param.parameter_data_ref().schema().map(|schema_ref| schema_ref.resolve(&spec)) else { continue };

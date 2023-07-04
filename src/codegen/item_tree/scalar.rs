@@ -7,6 +7,7 @@ use quote::quote;
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[non_exhaustive]
 pub enum Scalar {
+    Unit,
     F64,
     F32,
     I64,
@@ -43,7 +44,8 @@ impl Scalar {
     pub fn impls_eq(self) -> bool {
         match self {
             Scalar::F64 | Scalar::F32 | Scalar::Any => false,
-            Scalar::I64
+            Scalar::Unit
+            | Scalar::I64
             | Scalar::I32
             | Scalar::U32
             | Scalar::U64
@@ -72,7 +74,8 @@ impl Scalar {
     /// Should a newtype derived from this scalar impl `Copy`?
     pub fn impls_copy(self) -> bool {
         match self {
-            Scalar::F64
+            Scalar::Unit
+            | Scalar::F64
             | Scalar::F32
             | Scalar::I64
             | Scalar::I32
@@ -102,7 +105,8 @@ impl Scalar {
     pub fn impls_hash(self) -> bool {
         match self {
             Scalar::F64 | Scalar::F32 | Scalar::Any => false,
-            Scalar::I64
+            Scalar::Unit
+            | Scalar::I64
             | Scalar::I32
             | Scalar::U32
             | Scalar::U64
@@ -130,6 +134,7 @@ impl Scalar {
 
     pub fn emit_type(self) -> TokenStream {
         match self {
+            Scalar::Unit => quote!(()),
             Scalar::Bool => quote!(bool),
             Scalar::F64 => quote!(f64),
             Scalar::F32 => quote!(f32),

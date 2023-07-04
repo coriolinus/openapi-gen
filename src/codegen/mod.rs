@@ -5,6 +5,7 @@ pub mod media_type;
 pub mod operation;
 
 mod item_tree;
+pub(crate) use item_tree::{well_known_types::find_well_known_type, Scalar};
 pub use item_tree::{ApiModel, Error};
 
 /// We always want call-site semantics for our identifiers, so

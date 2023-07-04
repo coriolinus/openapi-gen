@@ -1,0 +1,32 @@
+openapi: "3.0.3" # Use older openAPI spec version due to a bug in Zally: https://github.com/zalando/zally/issues/1230
+info:
+  title: "Well Known Type"
+  description: |
+    Generally, this generator assumes that definition files are self-contained. However, certain externally defined types are "well-known" and
+    handled appropriately. These should do the right thing.
+
+    For other externally defined types, the generator should produce an appropriate typedef.
+  version: "0.1.0"
+
+
+paths:
+  "/well-known-types":
+    post:
+      operationId: "wellKnownTypes"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "https://example.com/openapi/schema.yaml#components/schemas/Request"
+      responses:
+        '204':
+          description: success, but no type expected
+        default:
+          description: an error occurred; see status code and problem object for more information
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "https://opensource.zalando.com/restful-api-guidelines/models/problem-1.0.1.yaml#/Problem"
+
+components: {}

@@ -5,11 +5,11 @@ pub use canonical_form::{
 
 mod codegen;
 mod openapi_compat;
+mod resolve_trait;
 
 pub use codegen::{ApiModel, Error};
 
 mod well_known_types;
-pub use well_known_types::Binary;
 #[cfg(feature = "bytes")]
 pub use well_known_types::Bytes;
 
