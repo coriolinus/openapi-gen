@@ -7,11 +7,15 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::openapi_compat::{
-    component_inline_and_external_schemas, component_inline_parameters,
-    operation_inline_parameters, operation_inline_schemas, path_operations, OrScalar,
+    component_inline_and_external_schemas, component_inline_parameters, OrScalar,
 };
 
-use super::{item::EmitError, rust_keywords::is_rust_keyword, Item, ParseItemError, Scalar};
+use super::{
+    endpoint::{insert_endpoints, Endpoint},
+    item::EmitError,
+    rust_keywords::is_rust_keyword,
+    Item, ParseItemError, Scalar,
+};
 
 /// A reference to an item definition.
 ///
@@ -29,13 +33,18 @@ pub(crate) enum Ref {
     Forward(String),
 }
 
-pub(crate) trait AsBackref {
+pub(crate) trait AsBackref: Sized {
     fn as_backref(&self) -> Option<usize>;
+    fn from_backref(backref: usize) -> Self;
 }
 
 impl AsBackref for Reference {
     fn as_backref(&self) -> Option<usize> {
         Some(self.0)
+    }
+
+    fn from_backref(backref: usize) -> Self {
+        Self(backref)
     }
 }
 
@@ -45,6 +54,10 @@ impl AsBackref for Ref {
             Ref::Back(idx) => Some(*idx),
             Ref::Forward(_) => None,
         }
+    }
+
+    fn from_backref(backref: usize) -> Self {
+        Self::Back(backref)
     }
 }
 
@@ -61,6 +74,8 @@ pub struct ApiModel<Ref = Reference> {
     /// Keys here are the qualified path to the reference name:
     /// `#/components/schemas/Foo`.
     named_references: HashMap<String, usize>,
+    /// Api endpoints. These will be used later to generate `trait Api`.
+    pub(crate) endpoints: Vec<Endpoint<Ref>>,
 }
 
 impl<R> Default for ApiModel<R> {
@@ -69,6 +84,7 @@ impl<R> Default for ApiModel<R> {
             definitions: Default::default(),
             items: Default::default(),
             named_references: Default::default(),
+            endpoints: Default::default(),
         }
     }
 }
@@ -105,6 +121,17 @@ impl<R> ApiModel<R> {
     /// be able to come up with a better name than just "Foo2".
     pub fn ident_exists(&self, ident_str: &str) -> bool {
         self.items.contains_key(ident_str)
+    }
+
+    /// Get a reference from a named reference (`#/components/schemas/Foo`) if one exists among the definitions.
+    pub(crate) fn get_named_reference(&self, reference: &str) -> Option<R>
+    where
+        R: AsBackref,
+    {
+        self.named_references
+            .get(reference)
+            .copied()
+            .map(AsBackref::from_backref)
     }
 }
 
@@ -191,6 +218,7 @@ impl ApiModel<Ref> {
             definitions,
             items,
             named_references,
+            endpoints,
         } = self;
 
         let resolver = |ref_: &Ref| match ref_ {
@@ -207,10 +235,16 @@ impl ApiModel<Ref> {
             .map(|item| item.resolve_refs(resolver))
             .collect::<Result<_, _>>()?;
 
+        let endpoints = endpoints
+            .into_iter()
+            .map(|endpoint| endpoint.resolve_refs(resolver))
+            .collect::<Result<_, _>>()?;
+
         Ok(ApiModel {
             definitions,
             items,
             named_references,
+            endpoints,
         })
     }
 }
@@ -334,31 +368,7 @@ impl TryFrom<OpenAPI> for ApiModel {
             }
         }
 
-        // add items from operations
-        for (path, operation_name, operation) in path_operations(&spec) {
-            // first inline schemas
-            for schema_metadata in operation_inline_schemas(&spec, path, operation_name, operation)
-            {
-                let spec_name = schema_metadata.to_string();
-                let rust_name = spec_name.to_upper_camel_case();
-                match schema_metadata.schema_or_scalar {
-                    OrScalar::Item(schema) => {
-                        model.add_inline_items(&spec_name, &rust_name, None, schema)?;
-                    }
-                    OrScalar::Scalar(scalar) => {
-                        model.add_scalar(&spec_name, &rust_name, None, scalar)?;
-                    }
-                };
-            }
-
-            // then inline parameters
-            for param in operation_inline_parameters(&spec, operation) {
-                let spec_name = &param.parameter_data_ref().name;
-                let rust_name = spec_name.to_upper_camel_case();
-                let Some(schema) = param.parameter_data_ref().schema().map(|schema_ref| schema_ref.resolve(&spec)) else { continue };
-                model.add_inline_items(spec_name, &rust_name, None, schema)?;
-            }
-        }
+        insert_endpoints(&spec, &mut model)?;
 
         model.resolve_refs()
     }
@@ -384,4 +394,6 @@ pub enum Error {
         err: syn::parse::Error,
         buffer: String,
     },
+    #[error("parsing endpoint definition")]
+    ParseEndpoint(#[from] super::endpoint::Error),
 }

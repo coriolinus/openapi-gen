@@ -2,6 +2,7 @@
 //! This view does not map neatly to Rust. Instead, we want to construct our own object model which more neatly
 //! maps to our output types. This module contains the definitions for that model.
 
+pub mod endpoint;
 pub(crate) mod rust_keywords;
 pub mod well_known_types;
 

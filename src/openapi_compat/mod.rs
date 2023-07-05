@@ -64,23 +64,11 @@ fn all_responses(
 /// Iterate over all path items for an `OpenAPI` struct.
 ///
 /// This ignores any path items not defined inline in the top-level `paths` construct.
+/// (Path items are not a standardized member of the components.)
 pub(crate) fn path_items(spec: &OpenAPI) -> impl '_ + Iterator<Item = (&str, &PathItem)> {
     spec.paths
         .iter()
         .filter_map(|(path, pathitem_ref)| pathitem_ref.as_item().map(|item| (path.as_str(), item)))
-}
-
-/// Iterate over all path operations for an `OpenAPI` struct.
-///
-/// This returns the tuple `(path, operation_name, operation)`.
-pub(crate) fn path_operations(
-    spec: &OpenAPI,
-) -> impl '_ + Iterator<Item = (&str, &str, &Operation)> {
-    path_items(spec).flat_map(|(path, path_item)| {
-        path_item
-            .iter()
-            .map(move |(operation_name, operation)| (path, operation_name, operation))
-    })
 }
 
 /// Iterate over all request content types defined for this operation.
