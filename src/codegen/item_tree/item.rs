@@ -8,7 +8,6 @@ use crate::codegen::make_ident;
 
 use super::{
     api_model::{Ref, Reference, UnknownReference},
-    default_derives,
     value::ValueConversionError,
     ApiModel, Scalar, Value,
 };
@@ -299,7 +298,13 @@ impl Item {
 
     /// The list of derives which should attach to this item.
     pub fn derives(&self, model: &ApiModel) -> Vec<TokenStream> {
-        let mut derives = default_derives();
+        let mut derives = vec![
+            quote!(Debug),
+            quote!(Clone),
+            quote!(PartialEq),
+            quote!(openapi_gen::reexport::serde::Serialize),
+            quote!(openapi_gen::reexport::serde::Deserialize),
+        ];
 
         if self.value.impls_copy(model) {
             derives.push(quote!(Copy));
