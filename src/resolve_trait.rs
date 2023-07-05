@@ -4,7 +4,9 @@ use anyhow::{anyhow, bail, Result};
 use openapiv3::{OpenAPI, Parameter, ReferenceOr, RequestBody, Response, Schema, SchemaReference};
 
 fn schema_reference_from_str(reference: &str) -> Result<SchemaReference> {
-    let components = reference.split('/').collect::<Vec<_>>();
+    // limit to 7 items taken here, because that's all we need to know whether a components section
+    // matches any of the recognized patterns
+    let components = reference.split('/').take(7).collect::<Vec<_>>();
     match components.as_slice() {
         ["#", "components", "schemas", schema] => Ok(SchemaReference::Schema {
             schema: (*schema).to_owned(),
