@@ -8,6 +8,9 @@ use crate::{
     resolve_trait::Resolve,
 };
 
+mod or_scalar;
+pub(crate) use or_scalar::OrScalar;
+
 /// Convert a `StatusCode` enum into a `String` suitable for use as an ident for that code.
 pub(crate) fn status_name(code: &openapiv3::StatusCode) -> String {
     match code {
@@ -39,39 +42,6 @@ fn is_inline<T>(ref_: &ReferenceOr<T>) -> bool {
 
 fn is_inline_or_external<T>(ref_: &ReferenceOr<T>) -> bool {
     is_inline(ref_) || is_external(ref_)
-}
-
-#[derive(Debug, Clone)]
-pub(crate) enum OrScalar<T> {
-    Item(T),
-    Scalar(Scalar),
-}
-
-impl<T> From<Scalar> for OrScalar<T> {
-    fn from(value: Scalar) -> Self {
-        Self::Scalar(value)
-    }
-}
-
-impl<T> OrScalar<T>
-where
-    ReferenceOr<T>: Resolve<Output = T>,
-{
-    /// Convert a `ReferenceOr<T>` into an `OrScalar<T>`.
-    ///
-    /// Well-known types are converted into the appropriate scalar.
-    ///
-    /// Unknown references, including those which look like internal references
-    /// but are not found,  are converted into `Scalar::Any`.
-    pub(crate) fn new<'a>(spec: &'a OpenAPI, ref_: &'a ReferenceOr<T>) -> OrScalar<&'a T> {
-        if let Some(wkt) = ref_.as_ref_str().and_then(find_well_known_type) {
-            return wkt.into();
-        }
-        match ref_.resolve(spec) {
-            Ok(t) => OrScalar::Item(t),
-            Err(_) => OrScalar::Scalar(Scalar::Any),
-        }
-    }
 }
 
 /// Iterate over all `(status, response)` tuples for this `Responses` struct.
