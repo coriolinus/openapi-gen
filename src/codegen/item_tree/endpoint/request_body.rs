@@ -101,16 +101,20 @@ pub(crate) fn convert_ref(
                     .content
                     .iter()
                     .map::<Result<_, _>, _>(|(content_type, media_type)| {
+                        let spec_name = content_type.clone();
+                        let mut rust_name = spec_name.to_upper_camel_case();
+                        model.deconflict_member_or_variant_ident(&mut rust_name);
+
                         let variant_item = convert_optional_schema_ref(
                             model,
-                            spec_name.to_owned(),
-                            rust_name.to_owned(),
+                            spec_name,
+                            rust_name,
                             media_type.schema.as_ref(),
                         )?;
                         let definition = model.add_item(variant_item, None).map_err(wrap_err)?;
                         Ok(one_of_enum::Variant {
                             definition,
-                            mapping_name: Some(content_type.to_upper_camel_case()),
+                            mapping_name: None,
                         })
                     })
                     .collect::<Result<_, _>>()?;
