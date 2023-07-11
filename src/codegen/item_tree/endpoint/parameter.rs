@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use heck::ToUpperCamelCase;
-use openapiv3::{OpenAPI, ParameterSchemaOrContent, ReferenceOr};
+use openapiv3::{ParameterSchemaOrContent, ReferenceOr};
 
 use crate::ApiModel;
 

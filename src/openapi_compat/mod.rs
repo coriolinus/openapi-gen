@@ -3,10 +3,7 @@ use openapiv3::{
     MediaType, OpenAPI, Operation, Parameter, PathItem, ReferenceOr, Response, Responses, Schema,
 };
 
-use crate::{
-    codegen::{find_well_known_type, Scalar},
-    resolve_trait::Resolve,
-};
+use crate::resolve_trait::Resolve;
 
 mod or_scalar;
 pub(crate) use or_scalar::OrScalar;
@@ -30,7 +27,7 @@ pub(crate) fn status_name(code: &openapiv3::StatusCode) -> String {
     }
 }
 
-fn is_external<T>(ref_: &ReferenceOr<T>) -> bool {
+pub(crate) fn is_external<T>(ref_: &ReferenceOr<T>) -> bool {
     ref_.as_ref_str()
         .map(|ref_str| !ref_str.starts_with("#/components/"))
         .unwrap_or_default()
@@ -251,25 +248,16 @@ fn param_schema(param: &Parameter) -> Option<&ReferenceOr<Schema>> {
     }
 }
 
-/// Iterate over all parameters defined inline in the `components` section of the spec.
+/// Iterate over all parameters defined in the `components` section of the spec.
 ///
 /// Items are `(name, parameter)`.
-///
-/// Note that this skips parameters whose schema is defined externally.
-pub(crate) fn component_inline_parameters(
-    spec: &OpenAPI,
-) -> impl Iterator<Item = (&str, &Parameter)> {
+pub(crate) fn component_parameters(spec: &OpenAPI) -> impl Iterator<Item = (&str, &Parameter)> {
     spec.components
         .iter()
         .flat_map(|components| components.parameters.iter())
         .filter_map(|(name, param_ref)| {
-            let Ok(param) = Resolve::resolve(param_ref, spec) else {
-                return None;
-            };
-            let schema_ref = param_schema(param);
-            let is_local = schema_ref
-                .map(|schema_ref| schema_ref.as_item().is_some())
-                .unwrap_or_default();
-            is_local.then_some((name.as_str(), param))
+            Resolve::resolve(param_ref, spec)
+                .ok()
+                .map(|param| (name.as_str(), param))
         })
 }

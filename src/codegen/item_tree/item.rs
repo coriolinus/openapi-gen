@@ -209,7 +209,11 @@ impl Item {
     fn is_typedef(&self) -> bool {
         self.newtype.is_none()
             && match &self.value {
-                Value::Scalar(_) | Value::Set(_) | Value::List(_) | Value::Map(_) => true,
+                Value::Scalar(_)
+                | Value::Set(_)
+                | Value::List(_)
+                | Value::Map(_)
+                | Value::Ref(_) => true,
                 Value::StringEnum(_) | Value::OneOfEnum(_) | Value::Object(_) => false,
             }
     }

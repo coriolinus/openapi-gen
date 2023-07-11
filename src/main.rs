@@ -45,7 +45,7 @@ fn main() -> Result<()> {
         dbg!(&spec);
     }
 
-    let model = ApiModel::try_from(spec.clone()).context("converting to api model")?;
+    let model = ApiModel::try_from(spec).context("converting to api model")?;
     if args.debug_model {
         dbg!(&model);
     }

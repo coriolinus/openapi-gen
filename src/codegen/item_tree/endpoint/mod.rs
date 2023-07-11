@@ -1,3 +1,4 @@
+use heck::AsUpperCamelCase;
 use indexmap::IndexMap;
 use openapiv3::OpenAPI;
 
@@ -9,7 +10,6 @@ pub(crate) mod parameter;
 use parameter::{convert_param_ref, Parameter, ParameterKey};
 
 pub(crate) mod request_body;
-use request_body::RequestBody;
 
 pub(crate) mod verb;
 use verb::Verb;
@@ -39,7 +39,7 @@ pub struct Endpoint<Ref = Reference> {
     /// Request body.
     ///
     /// This is overridden to `None` if `verb` is `GET`, `HEAD`, `DELETE`, or `TRACE`.
-    pub request_body: Option<RequestBody<Ref>>,
+    pub request_body: Option<Ref>,
     // TODO: responses!
 }
 
@@ -63,7 +63,7 @@ impl Endpoint<Ref> {
             .map(|(pkey, param)| Ok((pkey, param.resolve_refs(&resolver)?)))
             .collect::<Result<_, _>>()?;
         let request_body = request_body
-            .map(|request_body| request_body.resolve_refs(&resolver))
+            .map(|request_body_ref| resolver(&request_body_ref))
             .transpose()?;
 
         Ok(Endpoint {
@@ -114,10 +114,19 @@ pub(crate) fn insert_endpoints(spec: &OpenAPI, model: &mut ApiModel<Ref>) -> Res
 
             let operation_id = operation.operation_id.clone();
 
+            let request_body_spec_name = match operation_id.as_deref() {
+                Some(operation_id) => format!("{}Request", AsUpperCamelCase(operation_id)),
+                None => format!(
+                    "{}{}Request",
+                    AsUpperCamelCase(verb.to_string()),
+                    AsUpperCamelCase(path)
+                ),
+            };
+
             let request_body = operation
                 .request_body
                 .as_ref()
-                .map(|body_ref| RequestBody::<Ref>::try_new(body_ref, model))
+                .map(|body_ref| request_body::convert_ref(model, &request_body_spec_name, body_ref))
                 .transpose()?
                 .filter(|_request_body| verb.request_body_is_legal());
 
@@ -147,4 +156,6 @@ pub enum Error {
     },
     #[error("could not create reference from supplied parameter ref")]
     ConvertParamRef(#[source] anyhow::Error),
+    #[error("could not create reference from supplied request body ref")]
+    ConvertRequestBodyRef(#[source] anyhow::Error),
 }

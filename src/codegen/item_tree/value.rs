@@ -6,6 +6,8 @@ use openapiv3::{
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use crate::codegen::make_ident;
+
 use super::{
     api_model::{self, Ref, Reference, UnknownReference},
     one_of_enum::Variant,
@@ -25,6 +27,8 @@ pub enum Value<Ref = Reference> {
     List(List<Ref>),
     Object(Object<Ref>),
     Map(Map<Ref>),
+    #[from(ignore)]
+    Ref(Ref),
 }
 
 impl<R> Default for Value<R> {
@@ -48,6 +52,7 @@ impl Value<Ref> {
             Value::List(list) => Ok(Value::List(list.resolve_refs(resolver)?)),
             Value::Object(object) => Ok(Value::Object(object.resolve_refs(resolver)?)),
             Value::Map(map) => Ok(Value::Map(map.resolve_refs(resolver)?)),
+            Value::Ref(ref_) => Ok(Value::Ref(resolver(&ref_)?)),
         }
     }
 
@@ -262,7 +267,7 @@ impl Value<Ref> {
                     .and_then(|discriminator| {
                         discriminator.mapping.iter().find_map(|(name, reference)| {
                             // it might seem incomplete to just pull out the `ref` variant of the
-                            // `schema_ref` here, but that's acutally per the docs:
+                            // `schema_ref` here, but that's actually per the docs:
                             //
                             // <https://docs.rs/openapiv3-extended/latest/openapiv3/struct.Discriminator.html>
                             //
@@ -407,7 +412,9 @@ impl<R> Value<R> {
     /// What kind of item keyword does this value type use?
     pub fn item_keyword(&self) -> TokenStream {
         match self {
-            Value::Scalar(_) | Value::List(_) | Value::Set(_) | Value::Map(_) => quote!(type),
+            Value::Scalar(_) | Value::List(_) | Value::Set(_) | Value::Map(_) | Value::Ref(_) => {
+                quote!(type)
+            }
             Value::StringEnum(_) | Value::OneOfEnum(_) => quote!(enum),
             Value::Object(_) => quote!(struct),
         }
@@ -416,7 +423,9 @@ impl<R> Value<R> {
     /// `true` when this is a struct or enum.
     pub fn is_struct_or_enum(&self) -> bool {
         match self {
-            Value::Scalar(_) | Value::List(_) | Value::Set(_) | Value::Map(_) => false,
+            Value::Scalar(_) | Value::List(_) | Value::Set(_) | Value::Map(_) | Value::Ref(_) => {
+                false
+            }
             Value::StringEnum(_) | Value::OneOfEnum(_) | Value::Object(_) => true,
         }
     }
@@ -441,6 +450,10 @@ impl Value {
                 .members
                 .values()
                 .all(|member| model[member.definition].value.impls_eq(model)),
+            Value::Ref(ref_) => model
+                .resolve(*ref_)
+                .map(|item| item.value.impls_eq(model))
+                .unwrap_or_default(),
         }
     }
 
@@ -457,6 +470,10 @@ impl Value {
                 .members
                 .values()
                 .all(|member| model[member.definition].value.impls_copy(model)),
+            Value::Ref(ref_) => model
+                .resolve(*ref_)
+                .map(|item| item.value.impls_copy(model))
+                .unwrap_or_default(),
         }
     }
 
@@ -474,6 +491,10 @@ impl Value {
                 .members
                 .values()
                 .all(|member| model[member.definition].value.impls_hash(model)),
+            Value::Ref(ref_) => model
+                .resolve(*ref_)
+                .map(|item| item.value.impls_hash(model))
+                .unwrap_or_default(),
         }
     }
 
@@ -495,6 +516,11 @@ impl Value {
             Value::Map(map) => map.emit_definition(name_resolver),
             Value::OneOfEnum(one_of_enum) => one_of_enum.emit_definition(name_resolver),
             Value::Object(object) => object.emit_definition(model, name_resolver),
+            Value::Ref(ref_) => {
+                let name = name_resolver(*ref_)?;
+                let ident = make_ident(name);
+                Ok(quote!(#ident))
+            }
         }
     }
 

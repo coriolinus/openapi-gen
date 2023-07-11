@@ -7,7 +7,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::openapi_compat::{
-    component_inline_and_external_schemas, component_inline_parameters, OrScalar,
+    component_inline_and_external_schemas, component_parameters, OrScalar,
 };
 
 use super::{
@@ -172,9 +172,18 @@ impl ApiModel<Ref> {
         schema: &Schema,
     ) -> Result<Ref, Error> {
         let item = Item::parse_schema(self, spec_name, rust_name, schema)?;
+        self.add_item(item, reference_name)
+    }
 
-        // when constructing the item, we might have discovered that it needs a somewhat different name than planned.
-        // extract that.
+    /// Add a computed item to this model.
+    ///
+    /// Typically, `add_inline_items` will be more useful, but occasionally there is a reason
+    /// to compute the item externally and add it here in a separate step.
+    pub fn add_item(
+        &mut self,
+        item: Item<Ref>,
+        reference_name: Option<&str>,
+    ) -> Result<Ref, Error> {
         let name = item.rust_name.clone();
 
         let idx = self.definitions.len();
@@ -356,7 +365,7 @@ impl TryFrom<OpenAPI> for ApiModel {
         }
 
         // likewise for component parameters
-        for (spec_name, param) in component_inline_parameters(&spec) {
+        for (spec_name, param) in component_parameters(&spec) {
             let rust_name = spec_name.to_upper_camel_case();
             let reference_name = Some(format!("#/components/parameters/{spec_name}"));
             let Some(schema) = param.parameter_data_ref().schema().map(|schema_ref| schema_ref.resolve(&spec)) else { continue };

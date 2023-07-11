@@ -1,45 +1,139 @@
-use indexmap::IndexMap;
-use openapiv3::ReferenceOr;
+use anyhow::anyhow;
+use heck::ToUpperCamelCase;
+use openapiv3::{ReferenceOr, Schema};
 
-use crate::ApiModel;
+use crate::{
+    codegen::{
+        item_tree::{one_of_enum, Item, Value},
+        Scalar,
+    },
+    openapi_compat::is_external,
+    ApiModel,
+};
 
-use super::super::api_model::{Ref, Reference, UnknownReference};
+use super::{super::api_model::Ref, Error};
 
-#[derive(Debug, Clone)]
-pub struct RequestBody<Ref = Reference> {
-    pub description: Option<String>,
-    /// Request body data by content type.
-    pub content: IndexMap<String, Ref>,
-    pub required: bool,
+fn wrap_err<E: Into<anyhow::Error>>(err: E) -> Error {
+    Error::ConvertRequestBodyRef(err.into())
 }
 
-impl RequestBody<Ref> {
-    pub(crate) fn resolve_refs(
-        self,
-        resolver: impl Fn(&Ref) -> Result<Reference, UnknownReference>,
-    ) -> Result<RequestBody<Reference>, UnknownReference> {
-        let Self {
-            description,
-            content,
-            required,
-        } = self;
-
-        let content = content
-            .into_iter()
-            .map(|(content_type, ref_)| Ok((content_type, resolver(&ref_)?)))
-            .collect::<Result<_, _>>()?;
-
-        Ok(RequestBody {
-            description,
-            content,
-            required,
-        })
+/// Convert an `Option<ReferenceOr<Schema>>` into an `Item`
+///
+/// Basic Rules:
+///
+/// - `None` => `Scalar::Any`
+/// - `Some(ReferenceOr::Reference)` => `Value::Ref(_)`
+/// - `Some(ReferenceOr::Item(schema))` => Item::parse_schema`
+fn convert_optional_schema_ref(
+    model: &mut ApiModel<Ref>,
+    spec_name: String,
+    rust_name: String,
+    optional_schema_ref: Option<&ReferenceOr<Schema>>,
+) -> Result<Item<Ref>, Error> {
+    match optional_schema_ref.as_ref() {
+        None => Ok(Item {
+            value: Value::Scalar(Scalar::Any),
+            spec_name,
+            rust_name,
+            pub_typedef: true,
+            ..Default::default()
+        }),
+        Some(&ref_ @ ReferenceOr::Reference { reference }) => {
+            let value = if is_external(ref_) {
+                // external references map to `Any`.
+                // todo: warn, in this event.
+                Value::from(Scalar::Any)
+            } else {
+                // internal references just reference the internal definition
+                let ref_ = model
+                    .get_named_reference(reference)
+                    .ok_or_else(|| anyhow!("unknown schema ref: {reference}"))
+                    .map_err(wrap_err)?;
+                Value::Ref(ref_)
+            };
+            Ok(Item {
+                value,
+                spec_name,
+                rust_name,
+                pub_typedef: true,
+                ..Default::default()
+            })
+        }
+        Some(ReferenceOr::Item(schema)) => {
+            Item::parse_schema(model, &spec_name, &rust_name, schema).map_err(wrap_err)
+        }
     }
+}
 
-    pub(crate) fn try_new(
-        body_ref: &ReferenceOr<openapiv3::RequestBody>,
-        model: &mut ApiModel<Ref>,
-    ) -> Result<Self, super::Error> {
-        todo!()
+/// Convert a `ReferenceOr<openapiv3::RequestBody>` into a `Ref`.
+pub(crate) fn convert_ref(
+    model: &mut ApiModel<Ref>,
+    spec_name: &str,
+    body_ref: &ReferenceOr<openapiv3::RequestBody>,
+) -> Result<Ref, super::Error> {
+    match body_ref {
+        // reference branch is fairly straightforward: just load the reference
+        ReferenceOr::Reference { reference } => {
+            Ok(model.get_named_reference(reference).ok_or_else(|| {
+                Error::ConvertRequestBodyRef(anyhow!("named reference '{reference}' not found"))
+            })?)
+        }
+
+        // item branch is a touch more complicated, but not really.
+        // we just have to convert the item description, then return the ref.
+        ReferenceOr::Item(request_body) => {
+            let rust_name = spec_name.to_upper_camel_case();
+            let mut item = if request_body.content.len() == 1 {
+                let optional_schema_ref = request_body
+                    .content
+                    .first()
+                    .and_then(|(_content_type, media_type)| media_type.schema.as_ref());
+                convert_optional_schema_ref(
+                    model,
+                    spec_name.to_owned(),
+                    rust_name,
+                    optional_schema_ref,
+                )?
+            } else {
+                // someone had the ill grace to produce several different request types differentiated by the `content_type`.
+                // this means we can't emit a simple item, but have to turn this into a `OneOf` enum.
+                let variants = request_body
+                    .content
+                    .iter()
+                    .map::<Result<_, _>, _>(|(content_type, media_type)| {
+                        let variant_item = convert_optional_schema_ref(
+                            model,
+                            spec_name.to_owned(),
+                            rust_name.to_owned(),
+                            media_type.schema.as_ref(),
+                        )?;
+                        let definition = model.add_item(variant_item, None).map_err(wrap_err)?;
+                        Ok(one_of_enum::Variant {
+                            definition,
+                            mapping_name: Some(content_type.to_upper_camel_case()),
+                        })
+                    })
+                    .collect::<Result<_, _>>()?;
+                let value = one_of_enum::OneOfEnum {
+                    discriminant: None,
+                    variants,
+                }
+                .into();
+                Item {
+                    spec_name: spec_name.to_owned(),
+                    rust_name,
+                    value,
+                    ..Item::default()
+                }
+            };
+
+            if item.docs.is_none() && request_body.content.len() == 1 {
+                item.docs = request_body.description.clone();
+            }
+
+            item.nullable = !request_body.required;
+
+            model.add_item(item, None).map_err(wrap_err)
+        }
     }
 }
