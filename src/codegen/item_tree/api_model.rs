@@ -7,11 +7,14 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::openapi_compat::{
-    component_inline_and_external_schemas, component_parameters, OrScalar,
+    component_inline_and_external_schemas, component_parameters, component_requests,
+    component_responses, OrScalar,
 };
 
 use super::{
-    endpoint::{insert_endpoints, Endpoint},
+    endpoint::{
+        insert_endpoints, request_body::create_request_body, response::create_response, Endpoint,
+    },
     item::EmitError,
     rust_keywords::is_rust_keyword,
     Item, ParseItemError, Scalar,
@@ -342,20 +345,19 @@ impl TryFrom<OpenAPI> for ApiModel {
     fn try_from(spec: OpenAPI) -> Result<Self, Self::Error> {
         let mut model = ApiModel::<Ref>::default();
 
-        // start by adding each schema defined in the components.
-        // this gives the best chance of creating back refs instead of forward.
-        for (spec_name, schema_or_scalar) in component_inline_and_external_schemas(&spec) {
+        // component schemas
+        for (spec_name, reference_name, schema_or_scalar) in
+            component_inline_and_external_schemas(&spec)
+        {
             let rust_name = spec_name.to_upper_camel_case();
-            let reference_name = Some(format!("#/components/schemas/{spec_name}"));
+            let reference_name = Some(reference_name);
+            let reference_name = reference_name.as_deref();
             let ref_ = match schema_or_scalar {
-                OrScalar::Item(schema) => model.add_inline_items(
-                    spec_name,
-                    &rust_name,
-                    reference_name.as_deref(),
-                    schema,
-                )?,
+                OrScalar::Item(schema) => {
+                    model.add_inline_items(spec_name, &rust_name, reference_name, schema)?
+                }
                 OrScalar::Scalar(scalar) => {
-                    model.add_scalar(spec_name, &rust_name, reference_name.as_deref(), scalar)?
+                    model.add_scalar(spec_name, &rust_name, reference_name, scalar)?
                 }
             };
             // all top-level components are public, even if they are typedefs
@@ -364,18 +366,52 @@ impl TryFrom<OpenAPI> for ApiModel {
             }
         }
 
-        // likewise for component parameters
-        for (spec_name, param) in component_parameters(&spec) {
+        // component parameters
+        for (spec_name, reference_name, param) in component_parameters(&spec) {
             let rust_name = spec_name.to_upper_camel_case();
-            let reference_name = Some(format!("#/components/parameters/{spec_name}"));
+            let reference_name = Some(reference_name);
+            let reference_name = reference_name.as_deref();
             let Some(schema) = param.parameter_data_ref().schema().map(|schema_ref| schema_ref.resolve(&spec)) else { continue };
-            let ref_ =
-                model.add_inline_items(spec_name, &rust_name, reference_name.as_deref(), schema)?;
+            let ref_ = model.add_inline_items(spec_name, &rust_name, reference_name, schema)?;
             // all top-level component parameters are also public
             if let Some(item) = model.resolve_mut(&ref_) {
                 item.pub_typedef = true;
+                if item.docs.is_none() {
+                    item.docs = param.parameter_data_ref().description.clone();
+                }
             }
         }
+
+        // component requests
+        for (spec_name, reference_name, request_body) in component_requests(&spec) {
+            let reference_name = Some(reference_name);
+            let reference_name = reference_name.as_deref();
+            let ref_ = create_request_body(&mut model, spec_name, reference_name, request_body)?;
+            // all top-level component parameters are also public
+            if let Some(item) = model.resolve_mut(&ref_) {
+                item.pub_typedef = true;
+                item.nullable = !request_body.required;
+                if item.docs.is_none() {
+                    item.docs = request_body.description.clone();
+                }
+            }
+        }
+
+        // component responses
+        for (spec_name, reference_name, response) in component_responses(&spec) {
+            let reference_name = Some(reference_name);
+            let reference_name = reference_name.as_deref();
+            let ref_ = create_response(&mut model, spec_name, reference_name, response)?;
+            // all top-level component parameters are also public
+            if let Some(item) = model.resolve_mut(&ref_) {
+                item.pub_typedef = true;
+                if item.docs.is_none() {
+                    item.docs = Some(response.description.clone());
+                }
+            }
+        }
+
+        // todo: component headers
 
         insert_endpoints(&spec, &mut model)?;
 

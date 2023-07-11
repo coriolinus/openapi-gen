@@ -1,7 +1,9 @@
 //! This module is temporary; we want to use https://github.com/kurtbuilds/openapiv3/pull/5 once it is merged.
 
 use anyhow::{anyhow, bail, Result};
-use openapiv3::{OpenAPI, Parameter, ReferenceOr, RequestBody, Response, Schema, SchemaReference};
+use openapiv3::{
+    Header, OpenAPI, Parameter, ReferenceOr, RequestBody, Response, Schema, SchemaReference,
+};
 
 fn schema_reference_from_str(reference: &str) -> Result<SchemaReference> {
     // limit to 7 items taken here, because that's all we need to know whether a components section
@@ -37,18 +39,6 @@ fn parse_reference<'a>(reference: &'a str, group: &str) -> Result<&'a str> {
         .filter(|(head, _name)| head.strip_prefix("#/components/") == Some(group))
         .map(|(_head, name)| name)
         .ok_or_else(|| anyhow!("invalid {} reference: {}", group, reference))
-}
-
-fn get_response_name(reference: &str) -> Result<&str> {
-    parse_reference(reference, "responses")
-}
-
-fn get_request_body_name(reference: &str) -> Result<&str> {
-    parse_reference(reference, "requestBodies")
-}
-
-fn get_parameter_name(reference: &str) -> Result<&str> {
-    parse_reference(reference, "parameters")
 }
 
 /// Abstract over types which can potentially resolve a contained type, given an `OpenAPI` instance.
@@ -91,68 +81,48 @@ impl Resolve for ReferenceOr<Schema> {
     }
 }
 
-impl Resolve for ReferenceOr<Parameter> {
-    type Output = Parameter;
+macro_rules! impl_resolve_for {
+    (ReferenceOr<$output:ident>; $getter:ident; $components_field:ident) => {
+        impl Resolve for ReferenceOr<$output> {
+            type Output = $output;
 
-    fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output> {
-        match self {
-            ReferenceOr::Item(item) => Ok(item),
-            ReferenceOr::Reference { reference } => {
-                let name = get_parameter_name(reference)?;
-                let components = spec
-                    .components
-                    .as_ref()
-                    .ok_or_else(|| anyhow!("no components in spec"))?;
-                let param_ref = components
-                    .parameters
-                    .get(name)
-                    .ok_or_else(|| anyhow!("{reference} not found in OpenAPI spec"))?;
-                item_or_err(param_ref, reference)
+            fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output> {
+                match self {
+                    ReferenceOr::Item(item) => Ok(item),
+                    ReferenceOr::Reference { reference } => {
+                        let name = $getter(reference)?;
+                        let components = spec
+                            .components
+                            .as_ref()
+                            .ok_or_else(|| anyhow!("no components in spec"))?;
+                        let param_ref = components
+                            .$components_field
+                            .get(name)
+                            .ok_or_else(|| anyhow!("{reference} not found in OpenAPI spec"))?;
+                        item_or_err(param_ref, reference)
+                    }
+                }
             }
         }
-    }
+    };
 }
 
-impl Resolve for ReferenceOr<Response> {
-    type Output = Response;
-
-    fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output> {
-        match self {
-            ReferenceOr::Item(item) => Ok(item),
-            ReferenceOr::Reference { reference } => {
-                let name = get_response_name(reference)?;
-                let components = spec
-                    .components
-                    .as_ref()
-                    .ok_or_else(|| anyhow!("no components in spec"))?;
-                let response_ref = components
-                    .responses
-                    .get(name)
-                    .ok_or_else(|| anyhow!("{reference} not found in OpenAPI spec"))?;
-                item_or_err(response_ref, reference)
-            }
-        }
-    }
+fn get_response_name(reference: &str) -> Result<&str> {
+    parse_reference(reference, "responses")
 }
+impl_resolve_for!(ReferenceOr<Response>; get_response_name; responses);
 
-impl Resolve for ReferenceOr<RequestBody> {
-    type Output = RequestBody;
-
-    fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output> {
-        match self {
-            ReferenceOr::Item(item) => Ok(item),
-            ReferenceOr::Reference { reference } => {
-                let name = get_request_body_name(reference)?;
-                let components = spec
-                    .components
-                    .as_ref()
-                    .ok_or_else(|| anyhow!("no components in spec"))?;
-                let request_body_ref = components
-                    .request_bodies
-                    .get(name)
-                    .ok_or_else(|| anyhow!("{reference} not found in OpenAPI spec"))?;
-                item_or_err(request_body_ref, reference)
-            }
-        }
-    }
+fn get_parameter_name(reference: &str) -> Result<&str> {
+    parse_reference(reference, "parameters")
 }
+impl_resolve_for!(ReferenceOr<Parameter>; get_parameter_name; parameters);
+
+fn get_request_body_name(reference: &str) -> Result<&str> {
+    parse_reference(reference, "requestBodies")
+}
+impl_resolve_for!(ReferenceOr<RequestBody>; get_request_body_name; request_bodies);
+
+fn get_header_name(reference: &str) -> Result<&str> {
+    parse_reference(reference, "headers")
+}
+impl_resolve_for!(ReferenceOr<Header>; get_header_name; headers);

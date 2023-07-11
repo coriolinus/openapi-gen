@@ -1,6 +1,7 @@
 use heck::AsUpperCamelCase;
 use openapiv3::{
-    MediaType, OpenAPI, Operation, Parameter, PathItem, ReferenceOr, Response, Responses, Schema,
+    MediaType, OpenAPI, Operation, Parameter, PathItem, ReferenceOr, RequestBody, Response,
+    Responses, Schema,
 };
 
 use crate::resolve_trait::Resolve;
@@ -208,25 +209,33 @@ pub(crate) fn operation_inline_parameters<'a>(
 
 /// Iterate over all schemas defined in the `components` section of this spec.
 ///
-/// Items are `(name, schema_ref)`.
-pub(crate) fn component_schema_ref(
+/// Items are `(schema_name, reference_name, schema_ref)`.
+fn component_schema_ref(
     spec: &OpenAPI,
-) -> impl Iterator<Item = (&str, &ReferenceOr<Schema>)> {
+) -> impl Iterator<Item = (&str, String, &ReferenceOr<Schema>)> {
     spec.components
         .iter()
         .flat_map(|components| components.schemas.iter())
-        .map(|(name, schema_ref)| (name.as_str(), schema_ref))
+        .map(|(name, schema_ref)| {
+            (
+                name.as_str(),
+                format!("#/components/schemas/{name}"),
+                schema_ref,
+            )
+        })
 }
 
 /// Iterate over all inline and external schemas defined in the `components` section of this spec.
+///
+/// Items are `(spec_name, reference_name, schema_or_scalar)`.
 pub(crate) fn component_inline_and_external_schemas(
     spec: &OpenAPI,
-) -> impl Iterator<Item = (&str, OrScalar<&Schema>)> {
+) -> impl Iterator<Item = (&str, String, OrScalar<&Schema>)> {
     component_schema_ref(spec)
-        .filter(|(_name, schema_ref)| is_inline_or_external(schema_ref))
-        .map(|(name, schema_ref)| {
+        .filter(|(_name, _ref_name, schema_ref)| is_inline_or_external(schema_ref))
+        .map(|(name, reference_name, schema_ref)| {
             let schema_or_scalar = OrScalar::new(spec, schema_ref);
-            (name, schema_or_scalar)
+            (name, reference_name, schema_or_scalar)
         })
 }
 
@@ -250,14 +259,60 @@ fn param_schema(param: &Parameter) -> Option<&ReferenceOr<Schema>> {
 
 /// Iterate over all parameters defined in the `components` section of the spec.
 ///
-/// Items are `(name, parameter)`.
-pub(crate) fn component_parameters(spec: &OpenAPI) -> impl Iterator<Item = (&str, &Parameter)> {
+/// Items are `(spec_name, reference_name, parameter)`.
+pub(crate) fn component_parameters(
+    spec: &OpenAPI,
+) -> impl Iterator<Item = (&str, String, &Parameter)> {
     spec.components
         .iter()
         .flat_map(|components| components.parameters.iter())
         .filter_map(|(name, param_ref)| {
-            Resolve::resolve(param_ref, spec)
-                .ok()
-                .map(|param| (name.as_str(), param))
+            Resolve::resolve(param_ref, spec).ok().map(|param| {
+                (
+                    name.as_str(),
+                    format!("#/components/parameters/{name}"),
+                    param,
+                )
+            })
+        })
+}
+
+/// Iterate over all named requests from the `components` section of the spec.
+///
+/// Items are `(spec_name, reference_name, request_body)`
+pub(crate) fn component_requests(
+    spec: &OpenAPI,
+) -> impl Iterator<Item = (&str, String, &RequestBody)> {
+    spec.components
+        .iter()
+        .flat_map(|components| components.request_bodies.iter())
+        .filter_map(|(name, request_ref)| {
+            Resolve::resolve(request_ref, spec).ok().map(|request| {
+                (
+                    name.as_str(),
+                    format!("#/components/requestBodies/{name}"),
+                    request,
+                )
+            })
+        })
+}
+
+/// Iterate over all named responses from the `components` section of the spec.
+///
+/// Items are `(spec_name, reference_name, response)`.
+pub(crate) fn component_responses(
+    spec: &OpenAPI,
+) -> impl Iterator<Item = (&str, String, &Response)> {
+    spec.components
+        .iter()
+        .flat_map(|components| components.responses.iter())
+        .filter_map(|(name, response_ref)| {
+            Resolve::resolve(response_ref, spec).ok().map(|response| {
+                (
+                    name.as_str(),
+                    format!("#/components/responses/{name}"),
+                    response,
+                )
+            })
         })
 }

@@ -1,6 +1,6 @@
 use heck::AsUpperCamelCase;
 use indexmap::IndexMap;
-use openapiv3::OpenAPI;
+use openapiv3::{OpenAPI, Operation};
 
 use crate::{openapi_compat::path_items, ApiModel};
 
@@ -10,6 +10,8 @@ pub(crate) mod parameter;
 use parameter::{convert_param_ref, Parameter, ParameterKey};
 
 pub(crate) mod request_body;
+
+pub(crate) mod response;
 
 pub(crate) mod verb;
 use verb::Verb;
@@ -40,7 +42,11 @@ pub struct Endpoint<Ref = Reference> {
     ///
     /// This is overridden to `None` if `verb` is `GET`, `HEAD`, `DELETE`, or `TRACE`.
     pub request_body: Option<Ref>,
-    // TODO: responses!
+    /// Response body enum.
+    ///
+    /// This is always an enum, even in the event that there are 0 variants. (That is a degenerate case
+    /// indicating a malformed OpenAPI specification).
+    pub response: Ref,
 }
 
 impl Endpoint<Ref> {
@@ -56,6 +62,7 @@ impl Endpoint<Ref> {
             parameters,
             operation_id,
             request_body,
+            response,
         } = self;
 
         let parameters = parameters
@@ -65,6 +72,7 @@ impl Endpoint<Ref> {
         let request_body = request_body
             .map(|request_body_ref| resolver(&request_body_ref))
             .transpose()?;
+        let response = resolver(&response)?;
 
         Ok(Endpoint {
             path,
@@ -74,7 +82,24 @@ impl Endpoint<Ref> {
             parameters,
             operation_id,
             request_body,
+            response,
         })
+    }
+}
+
+fn make_operation_spec_name(
+    operation_id: Option<&str>,
+    operation_type: &str,
+    verb: Verb,
+    path: &str,
+) -> String {
+    match operation_id {
+        Some(operation_id) => format!("{}{operation_type}", AsUpperCamelCase(operation_id)),
+        None => format!(
+            "{}{}{operation_type}",
+            AsUpperCamelCase(verb.to_string()),
+            AsUpperCamelCase(path)
+        ),
     }
 }
 
@@ -114,21 +139,24 @@ pub(crate) fn insert_endpoints(spec: &OpenAPI, model: &mut ApiModel<Ref>) -> Res
 
             let operation_id = operation.operation_id.clone();
 
-            let request_body_spec_name = match operation_id.as_deref() {
-                Some(operation_id) => format!("{}Request", AsUpperCamelCase(operation_id)),
-                None => format!(
-                    "{}{}Request",
-                    AsUpperCamelCase(verb.to_string()),
-                    AsUpperCamelCase(path)
-                ),
+            let request_body = {
+                let spec_name =
+                    make_operation_spec_name(operation_id.as_deref(), "Request", verb, path);
+                operation
+                    .request_body
+                    .as_ref()
+                    .filter(|_request_body| verb.request_body_is_legal())
+                    .map(|body_ref| {
+                        request_body::create_request_body_from_ref(model, &spec_name, body_ref)
+                    })
+                    .transpose()?
             };
 
-            let request_body = operation
-                .request_body
-                .as_ref()
-                .map(|body_ref| request_body::convert_ref(model, &request_body_spec_name, body_ref))
-                .transpose()?
-                .filter(|_request_body| verb.request_body_is_legal());
+            let response = {
+                let spec_name =
+                    make_operation_spec_name(operation_id.as_deref(), "Response", verb, path);
+                response::create_responses(model, &spec_name, &operation.responses)?
+            };
 
             let endpoint = Endpoint::<Ref> {
                 path: path.to_string(),
@@ -138,6 +166,7 @@ pub(crate) fn insert_endpoints(spec: &OpenAPI, model: &mut ApiModel<Ref>) -> Res
                 parameters,
                 operation_id,
                 request_body,
+                response,
             };
 
             model.endpoints.push(endpoint);

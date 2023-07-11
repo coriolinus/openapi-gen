@@ -1,4 +1,4 @@
-use heck::AsUpperCamelCase;
+use heck::{AsUpperCamelCase, ToUpperCamelCase};
 use openapiv3::{OpenAPI, Operation};
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -119,7 +119,7 @@ fn status_name(code: openapiv3::StatusCode) -> String {
         openapiv3::StatusCode::Code(n) => http::StatusCode::from_u16(n)
             .ok()
             .and_then(|status| status.canonical_reason())
-            .map(|reason| format!("{}", AsUpperCamelCase(reason)))
+            .map(ToUpperCamelCase::to_upper_camel_case)
             .unwrap_or_else(|| format!("Code{n}")),
         openapiv3::StatusCode::Range(r) => match r {
             1 => "InformationalRange".into(),
