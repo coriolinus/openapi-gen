@@ -185,6 +185,8 @@ pub enum Error {
     },
     #[error("could not create reference from supplied parameter ref")]
     ConvertParamRef(#[source] anyhow::Error),
-    #[error("could not create reference from supplied request body ref")]
-    ConvertRequestBodyRef(#[source] anyhow::Error),
+    #[error("could not create from supplied request body")]
+    CreateRequestBody(#[source] anyhow::Error),
+    #[error("could not create from supplied response")]
+    CreateResponse(#[source] anyhow::Error),
 }

@@ -14,7 +14,7 @@ use crate::{
 use super::{super::api_model::Ref, Error};
 
 fn wrap_err<E: Into<anyhow::Error>>(err: E) -> Error {
-    Error::ConvertRequestBodyRef(err.into())
+    Error::CreateRequestBody(err.into())
 }
 
 /// Convert an `Option<ReferenceOr<Schema>>` into an `Item`
@@ -135,7 +135,7 @@ pub(crate) fn create_request_body_from_ref(
         // reference branch is fairly straightforward: just load the reference
         ReferenceOr::Reference { reference } => {
             Ok(model.get_named_reference(reference).ok_or_else(|| {
-                Error::ConvertRequestBodyRef(anyhow!("named reference '{reference}' not found"))
+                Error::CreateRequestBody(anyhow!("named reference '{reference}' not found"))
             })?)
         }
 

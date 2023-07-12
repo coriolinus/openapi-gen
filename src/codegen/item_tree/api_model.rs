@@ -13,7 +13,10 @@ use crate::openapi_compat::{
 
 use super::{
     endpoint::{
-        insert_endpoints, request_body::create_request_body, response::create_response, Endpoint,
+        insert_endpoints,
+        request_body::create_request_body,
+        response::{create_response_variants, ResponseCollector},
+        Endpoint,
     },
     item::EmitError,
     rust_keywords::is_rust_keyword,
@@ -401,7 +404,21 @@ impl TryFrom<OpenAPI> for ApiModel {
         for (spec_name, reference_name, response) in component_responses(&spec) {
             let reference_name = Some(reference_name);
             let reference_name = reference_name.as_deref();
-            let ref_ = create_response(&mut model, spec_name, reference_name, response)?;
+            let mut response_collector = ResponseCollector::default();
+            create_response_variants(
+                &mut model,
+                spec_name,
+                reference_name,
+                response,
+                &mut response_collector,
+            )?;
+            let rust_name = spec_name.to_upper_camel_case();
+            let ref_ = response_collector.add_as_item(
+                &mut model,
+                spec_name,
+                &rust_name,
+                reference_name,
+            )?;
             // all top-level component parameters are also public
             if let Some(item) = model.resolve_mut(&ref_) {
                 item.pub_typedef = true;

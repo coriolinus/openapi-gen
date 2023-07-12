@@ -64,6 +64,15 @@ pub struct OneOfEnum<Ref = Reference> {
     pub variants: Vec<Variant<Ref>>,
 }
 
+impl<R> Default for OneOfEnum<R> {
+    fn default() -> Self {
+        Self {
+            discriminant: Default::default(),
+            variants: Default::default(),
+        }
+    }
+}
+
 impl OneOfEnum<Ref> {
     pub(crate) fn resolve_refs(
         self,
