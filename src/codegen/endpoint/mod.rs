@@ -1,8 +1,14 @@
-use heck::AsUpperCamelCase;
+use std::collections::HashMap;
+
+use heck::{AsUpperCamelCase, ToSnakeCase};
 use indexmap::IndexMap;
 use openapiv3::OpenAPI;
+use proc_macro2::TokenStream;
+use quote::quote;
 
-use crate::{openapi_compat::path_items, ApiModel};
+use crate::{
+    codegen::endpoint::parameter::ParameterLocation, openapi_compat::path_items, ApiModel,
+};
 
 use super::api_model::{Ref, Reference, UnknownReference};
 
@@ -49,6 +55,126 @@ pub struct Endpoint<Ref = Reference> {
     pub response: Ref,
 }
 
+impl<R> Endpoint<R> {
+    /// Compute a documentation string for this endpoint.
+    fn doc_string(&self) -> String {
+        let internal_docs = match (
+            self.endpoint_documentation.as_deref(),
+            self.operation_documentation.as_deref(),
+        ) {
+            // we put operation docs before endpoint docs because they should in theory be more specific
+            (Some(endpoint), Some(operation)) => Some(format!("{operation}\n\n{endpoint}\n\n")),
+            (Some(docs), None) | (None, Some(docs)) => Some(docs.to_owned()),
+            (None, None) => None,
+        };
+
+        let mut docs = internal_docs
+            .map(|internal| format!("{internal}\n\n## Endpoint Data\n\n"))
+            .unwrap_or_default();
+        docs.push_str(&format!("`{} {}`\n\n", self.verb, self.path));
+        if let Some(operation_id) = self.operation_id.as_deref() {
+            docs.push_str("Operation ID: `");
+            docs.push_str(operation_id);
+            docs.push_str("`\n\n");
+        }
+
+        docs
+    }
+
+    /// Compute the function name for this endpoint.
+    ///
+    /// The endpoint doesn't know internally whether it is unique at the verb/path combo,
+    /// or whether it needs a suffix to disambiguate from other content types. That must
+    /// therefore be provided externally.
+    fn function_name(&self, suffix: Option<&str>) -> String {
+        self.operation_id
+            .clone()
+            .unwrap_or_else(|| {
+                let mut name = format!("{} {}", self.verb, self.path);
+                if let Some(suffix) = suffix {
+                    name.push(' ');
+                    name.push_str(suffix);
+                }
+                name
+            })
+            .to_snake_case()
+    }
+
+    /// Compute the function parameters.
+    ///
+    /// Items are `(name, type, required)` where `name` is an appropriate parameter name, and `type` is convertable into a type ident.
+    /// `required` is `true` when the item is mandatory.
+    fn function_parameters(&self) -> impl Iterator<Item = (String, R, bool)>
+    where
+        R: Clone,
+    {
+        struct ByName<R2> {
+            no_location: Option<(R2, bool)>,
+            by_location: HashMap<ParameterLocation, (R2, bool)>,
+        }
+
+        impl<R2> Default for ByName<R2> {
+            fn default() -> Self {
+                Self {
+                    no_location: Default::default(),
+                    by_location: Default::default(),
+                }
+            }
+        }
+
+        impl<R2> ByName<R2> {
+            fn len(&self) -> usize {
+                self.by_location.len() + if self.no_location.is_some() { 1 } else { 0 }
+            }
+
+            fn into_iter(self) -> impl Iterator<Item = (Option<ParameterLocation>, R2, bool)> {
+                self.by_location
+                    .into_iter()
+                    .map(|(location, (ref_, required))| (Some(location), ref_, required))
+                    .chain(
+                        self.no_location
+                            .into_iter()
+                            .map(|(ref_, required)| (None, ref_, required)),
+                    )
+            }
+        }
+
+        let mut params_by_name = HashMap::<_, ByName<R>>::new();
+        for (ParameterKey { name, location }, Parameter { required, item_ref }) in
+            self.parameters.iter()
+        {
+            let by_name = params_by_name.entry(name.clone()).or_default();
+            match location {
+                None => by_name.no_location = Some((item_ref.clone(), *required)),
+                Some(location) => {
+                    by_name
+                        .by_location
+                        .insert(*location, (item_ref.clone(), *required));
+                }
+            }
+        }
+
+        params_by_name.into_iter().flat_map(|(name, by_name)| {
+            let append_location_name = by_name.len() != 1;
+            by_name
+                .into_iter()
+                .map(move |(maybe_location, ref_, required)| {
+                    let name = if append_location_name {
+                        let location_name = maybe_location
+                            .map(|location| location.to_string())
+                            .unwrap_or_else(|| "Unknown".into());
+                        format!("{name} {location_name}")
+                    } else {
+                        name.clone()
+                    }
+                    .to_snake_case();
+
+                    (name, ref_, required)
+                })
+        })
+    }
+}
+
 impl Endpoint<Ref> {
     pub(crate) fn resolve_refs(
         self,
@@ -84,6 +210,22 @@ impl Endpoint<Ref> {
             request_body,
             response,
         })
+    }
+}
+
+impl Endpoint {
+    /// Generate an item definition for this item.
+    ///
+    /// The name resolver should be able to efficiently extract item names from references.
+    pub fn emit<'a>(
+        &self,
+        model: &ApiModel,
+        name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+    ) -> Result<TokenStream, UnknownReference> {
+        let docs = self.doc_string();
+        let docs = quote!(#[doc = #docs]);
+
+        todo!()
     }
 }
 
