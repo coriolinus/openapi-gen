@@ -65,11 +65,9 @@ pub(crate) fn convert_param_ref(
     // if the parameter is a reference, then look for that reference among the existing definitions.
     // otherwise, for an inline definition, add it from scratch.
     let item_ref = match param_ref {
-        ReferenceOr::Reference { reference } => {
-            model.get_named_reference(reference).ok_or_else(|| {
-                Error::ConvertParamRef(anyhow!("named reference '{reference}' not found"))
-            })?
-        }
+        ReferenceOr::Reference { reference } => model
+            .get_named_reference(reference)
+            .map_err(|err| Error::ConvertParamRef(err.into()))?,
 
         ReferenceOr::Item(parameter) => {
             let parameter_data = parameter.parameter_data_ref();

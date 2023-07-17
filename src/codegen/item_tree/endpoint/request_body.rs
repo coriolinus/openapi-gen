@@ -45,10 +45,7 @@ fn convert_optional_schema_ref(
                 Value::from(Scalar::Any)
             } else {
                 // internal references just reference the internal definition
-                let ref_ = model
-                    .get_named_reference(reference)
-                    .ok_or_else(|| anyhow!("unknown schema ref: {reference}"))
-                    .map_err(wrap_err)?;
+                let ref_ = model.get_named_reference(reference).map_err(wrap_err)?;
                 Value::Ref(ref_)
             };
             Ok(Item {
@@ -133,11 +130,9 @@ pub(crate) fn create_request_body_from_ref(
 ) -> Result<Ref, super::Error> {
     match body_ref {
         // reference branch is fairly straightforward: just load the reference
-        ReferenceOr::Reference { reference } => {
-            Ok(model.get_named_reference(reference).ok_or_else(|| {
-                Error::CreateRequestBody(anyhow!("named reference '{reference}' not found"))
-            })?)
-        }
+        ReferenceOr::Reference { reference } => Ok(model
+            .get_named_reference(reference)
+            .map_err(|err| Error::CreateRequestBody(err.into()))?),
 
         // item branch is a touch more complicated, but not really.
         // we just have to convert the item description, then return the ref.

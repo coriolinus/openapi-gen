@@ -38,5 +38,27 @@ pub struct Thing {
     openapi_gen::reexport::derive_more::Constructor
 )]
 pub struct PathId(pub openapi_gen::reexport::uuid::Uuid);
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde::Serialize,
+    openapi_gen::reexport::serde::Deserialize
+)]
+#[serde(untagged)]
+pub enum GetThingResponse {
+    Ok(Thing),
+}
 pub type PutThingRequest = Thing;
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde::Serialize,
+    openapi_gen::reexport::serde::Deserialize
+)]
+#[serde(untagged)]
+pub enum PutThingResponse {
+    Ok(Thing),
+}
 

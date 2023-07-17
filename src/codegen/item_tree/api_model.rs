@@ -130,7 +130,7 @@ impl<R> ApiModel<R> {
     }
 
     /// Get a reference from a named reference (`#/components/schemas/Foo`) if one exists among the definitions.
-    pub(crate) fn get_named_reference(&self, reference: &str) -> Option<R>
+    pub(crate) fn get_named_reference(&self, reference: &str) -> Result<R, Error>
     where
         R: AsBackref,
     {
@@ -138,6 +138,7 @@ impl<R> ApiModel<R> {
             .get(reference)
             .copied()
             .map(AsBackref::from_backref)
+            .ok_or_else(|| Error::UnknownReference(UnknownReference(reference.into())))
     }
 }
 

@@ -1,12 +1,14 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, Context as _};
 use heck::ToUpperCamelCase;
 use openapiv3::{ReferenceOr, Response, Responses, Schema, StatusCode};
 
 use crate::{
     codegen::{
+        find_well_known_type,
         item_tree::{api_model::Ref, one_of_enum, Item, OneOfEnum, Value},
         Scalar,
     },
+    openapi_compat::is_external,
     ApiModel,
 };
 
@@ -59,21 +61,28 @@ fn iter_status_and_content_schemas<'a>(
     base_name: &'a str,
     response: &'a Response,
 ) -> impl 'a + Iterator<Item = (String, Option<&'a ReferenceOr<Schema>>)> {
-    let append_suffix = response.content.len() != 1;
-    response
-        .content
-        .iter()
-        .map(move |(content_type, media_type)| {
-            let spec_name = if append_suffix {
-                format!("{base_name} {content_type}")
-            } else {
-                base_name.to_owned()
-            };
+    if response.content.is_empty() {
+        Box::new(std::iter::once((base_name.to_owned(), None)))
+            as Box<dyn Iterator<Item = (String, Option<&'a ReferenceOr<Schema>>)>>
+    } else {
+        let append_suffix = response.content.len() != 1;
+        Box::new(
+            response
+                .content
+                .iter()
+                .map(move |(content_type, media_type)| {
+                    let spec_name = if append_suffix {
+                        format!("{base_name} {content_type}")
+                    } else {
+                        base_name.to_owned()
+                    };
 
-            let schema = media_type.schema.as_ref();
+                    let schema = media_type.schema.as_ref();
 
-            (spec_name, schema)
-        })
+                    (spec_name, schema)
+                }),
+        )
+    }
 }
 
 /// Create a response variant.
@@ -100,21 +109,24 @@ pub(crate) fn create_response_variants(
 ) -> Result<(), Error> {
     for (spec_name, maybe_schema_ref) in iter_status_and_content_schemas(spec_name, response) {
         let rust_name = spec_name.to_upper_camel_case();
-        let definition = maybe_schema_ref
-            .and_then(|schema_ref| match schema_ref {
-                ReferenceOr::Reference { reference } => model.get_named_reference(reference),
-                ReferenceOr::Item(schema) => model
-                    .add_inline_items(&spec_name, &rust_name, reference_name, schema)
-                    .ok(),
-            })
-            .or_else(|| {
-                // a variant without a schema accepts anything
-                model
-                    .add_scalar(&spec_name, &rust_name, reference_name, Scalar::Any)
-                    .ok()
-            })
-            .ok_or(anyhow!("unable to produce variant ref for {rust_name}"))
-            .map_err(wrap_err)?;
+        let definition = match maybe_schema_ref {
+            None => {
+                // a variant without a schema produces nothing
+                model.add_scalar(&spec_name, &rust_name, reference_name, Scalar::Unit)
+            }
+            Some(ref_ @ ReferenceOr::Reference { reference }) if is_external(ref_) => {
+                // external references either produce a well-known type, or anything if they're unknown
+                let scalar = find_well_known_type(reference).unwrap_or(Scalar::Any);
+                model.add_scalar(&spec_name, &rust_name, reference_name, scalar)
+            }
+            // basic references and inline definitions have obvious implementations
+            Some(ReferenceOr::Reference { reference }) => model.get_named_reference(reference),
+            Some(ReferenceOr::Item(schema)) => {
+                model.add_inline_items(&spec_name, &rust_name, reference_name, schema)
+            }
+        }
+        .with_context(|| anyhow!("unable to produce variant ref for {rust_name}"))
+        .map_err(wrap_err)?;
         refs.extend(std::iter::once((rust_name, definition)));
     }
     Ok(())
@@ -197,10 +209,7 @@ pub(crate) fn create_responses(
         let response = match response_ref {
             ReferenceOr::Item(response) => response,
             ReferenceOr::Reference { reference } => {
-                let ref_ = model
-                    .get_named_reference(reference)
-                    .ok_or_else(|| anyhow!("unknown response ref: {reference}"))
-                    .map_err(wrap_err)?;
+                let ref_ = model.get_named_reference(reference).map_err(wrap_err)?;
                 return Ok(ref_);
             }
         };
