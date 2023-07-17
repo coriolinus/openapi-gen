@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use heck::ToUpperCamelCase;
 use openapiv3::{ReferenceOr, Schema};
 

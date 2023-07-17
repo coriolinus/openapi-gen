@@ -1,9 +1,6 @@
 use proc_macro2::Span;
 use syn::Ident;
 
-pub mod media_type;
-pub mod operation;
-
 mod item_tree;
 pub(crate) use item_tree::{well_known_types::find_well_known_type, Scalar};
 pub use item_tree::{ApiModel, Error};

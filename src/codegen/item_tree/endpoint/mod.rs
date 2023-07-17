@@ -1,6 +1,6 @@
 use heck::AsUpperCamelCase;
 use indexmap::IndexMap;
-use openapiv3::{OpenAPI, Operation};
+use openapiv3::OpenAPI;
 
 use crate::{openapi_compat::path_items, ApiModel};
 
