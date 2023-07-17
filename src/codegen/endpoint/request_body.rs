@@ -2,10 +2,7 @@ use heck::ToUpperCamelCase;
 use openapiv3::{ReferenceOr, Schema};
 
 use crate::{
-    codegen::{
-        item_tree::{one_of_enum, Item, Value},
-        Scalar,
-    },
+    codegen::{one_of_enum, Item, Scalar, Value},
     openapi_compat::is_external,
     ApiModel,
 };

@@ -3,11 +3,7 @@ use heck::ToUpperCamelCase;
 use openapiv3::{ReferenceOr, Response, Responses, Schema, StatusCode};
 
 use crate::{
-    codegen::{
-        find_well_known_type,
-        item_tree::{api_model::Ref, one_of_enum, Item, OneOfEnum, Value},
-        Scalar,
-    },
+    codegen::{api_model::Ref, find_well_known_type, one_of_enum, Item, OneOfEnum, Scalar, Value},
     openapi_compat::is_external,
     ApiModel,
 };
