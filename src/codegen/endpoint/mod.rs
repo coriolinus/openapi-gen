@@ -7,7 +7,9 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::{
-    codegen::endpoint::parameter::ParameterLocation, openapi_compat::path_items, ApiModel,
+    codegen::{endpoint::parameter::ParameterLocation, make_ident},
+    openapi_compat::path_items,
+    ApiModel,
 };
 
 use super::api_model::{Ref, Reference, UnknownReference};
@@ -219,13 +221,47 @@ impl Endpoint {
     /// The name resolver should be able to efficiently extract item names from references.
     pub fn emit<'a>(
         &self,
-        model: &ApiModel,
         name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
     ) -> Result<TokenStream, UnknownReference> {
         let docs = self.doc_string();
         let docs = quote!(#[doc = #docs]);
+        // todo: proper suffix
+        let function_name = make_ident(&self.function_name(None));
 
-        todo!()
+        let parameters = self
+            .function_parameters()
+            .map(|(name, ref_, required)| {
+                let param_name = make_ident(&name);
+                let type_name = make_ident(name_resolver(ref_)?);
+                let mut type_name = quote!(#type_name);
+                if !required {
+                    type_name = quote!(Option< #type_name >);
+                }
+                Ok(quote!(#param_name: #type_name))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let request_body = self
+            .request_body
+            .map(|ref_| {
+                let type_name = name_resolver(ref_)?;
+                let type_name = make_ident(type_name);
+
+                Ok(quote!(request_body: #type_name))
+            })
+            .transpose()?;
+
+        let response_body = make_ident(name_resolver(self.response)?);
+
+        Ok(quote! {
+            #docs
+            async fn #function_name (
+                #(
+                    #parameters,
+                )*
+                #request_body
+            ) -> #response_body;
+        })
     }
 }
 

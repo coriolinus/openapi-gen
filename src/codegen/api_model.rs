@@ -289,8 +289,24 @@ impl ApiModel {
             .map(|item| item.emit(self, &name_resolver))
             .collect::<Result<Vec<_>, _>>()?;
 
+        let endpoints = self
+            .endpoints
+            .iter()
+            .map(|endpoint| endpoint.emit(&name_resolver))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let trait_api = quote! {
+            #[openapi_gen::reexports::async_trait::async_trait]
+            pub trait Api {
+                #(
+                    #endpoints
+                )*
+            }
+        };
+
         Ok(quote! {
             #( #items )*
+            #trait_api
         })
     }
 
