@@ -61,4 +61,21 @@ pub type PutThingRequest = Thing;
 pub enum PutThingResponse {
     Ok(Thing),
 }
+#[openapi_gen::reexports::async_trait::async_trait]
+pub trait Api {
+    /**`GET /thing/{id}`
 
+Operation ID: `getThing`
+
+*/
+    async fn get_thing(id: PathId) -> GetThingResponse;
+    /**`PUT /thing/{id}`
+
+Operation ID: `putThing`
+
+*/
+    async fn put_thing(
+        id: PathId,
+        request_body: PutThingRequest,
+    ) -> PutThingResponse;
+}
