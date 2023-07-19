@@ -14,4 +14,13 @@ pub enum PostWellKnownTypesResponse {
     NoContent(NoContent),
     Default(Default),
 }
+#[openapi_gen::reexports::async_trait::async_trait]
+pub trait Api {
+    /**`POST /well-known-types`
+
+*/
+    async fn post_well_known_types(
+        request_body: PostWellKnownTypesRequest,
+    ) -> PostWellKnownTypesResponse;
+}
 
