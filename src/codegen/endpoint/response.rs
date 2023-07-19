@@ -3,12 +3,13 @@ use heck::ToUpperCamelCase;
 use openapiv3::{ReferenceOr, Response, Responses, Schema, StatusCode};
 
 use crate::{
-    codegen::{api_model::Ref, find_well_known_type, one_of_enum, Item, OneOfEnum, Scalar, Value},
+    codegen::{
+        api_model::Ref, endpoint::Error, find_well_known_type, value::one_of_enum, Item, OneOfEnum,
+        Scalar, Value,
+    },
     openapi_compat::is_external,
     ApiModel,
 };
-
-use super::Error;
 
 fn wrap_err<E: Into<anyhow::Error>>(err: E) -> Error {
     Error::CreateResponse(err.into())

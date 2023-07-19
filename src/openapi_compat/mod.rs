@@ -2,7 +2,7 @@ use openapiv3::{OpenAPI, Parameter, PathItem, ReferenceOr, RequestBody, Response
 
 use crate::resolve_trait::Resolve;
 
-mod or_scalar;
+pub(crate) mod or_scalar;
 pub(crate) use or_scalar::OrScalar;
 
 pub(crate) fn is_external<T>(ref_: &ReferenceOr<T>) -> bool {

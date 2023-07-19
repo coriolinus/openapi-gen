@@ -2,11 +2,10 @@ use anyhow::{anyhow, bail, Context};
 use heck::ToUpperCamelCase;
 use openapiv3::{OpenAPI, ParameterSchemaOrContent, ReferenceOr};
 
-use crate::{resolve_trait::Resolve, ApiModel};
-
-use super::{
-    super::api_model::{Ref, Reference, UnknownReference},
-    Error,
+use crate::{
+    codegen::{endpoint::Error, Ref, Reference, UnknownReference},
+    resolve_trait::Resolve,
+    ApiModel,
 };
 
 #[derive(

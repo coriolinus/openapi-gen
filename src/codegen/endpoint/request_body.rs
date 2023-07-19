@@ -2,12 +2,14 @@ use heck::ToUpperCamelCase;
 use openapiv3::{ReferenceOr, Schema};
 
 use crate::{
-    codegen::{one_of_enum, Item, Scalar, Value},
+    codegen::{
+        api_model::{ApiModel, Ref},
+        endpoint::Error,
+        value::one_of_enum,
+        Item, Scalar, Value,
+    },
     openapi_compat::is_external,
-    ApiModel,
 };
-
-use super::{super::api_model::Ref, Error};
 
 fn wrap_err<E: Into<anyhow::Error>>(err: E) -> Error {
     Error::CreateRequestBody(err.into())
@@ -123,7 +125,7 @@ pub(crate) fn create_request_body_from_ref(
     model: &mut ApiModel<Ref>,
     spec_name: &str,
     body_ref: &ReferenceOr<openapiv3::RequestBody>,
-) -> Result<Ref, super::Error> {
+) -> Result<Ref, Error> {
     match body_ref {
         // reference branch is fairly straightforward: just load the reference
         ReferenceOr::Reference { reference } => Ok(model

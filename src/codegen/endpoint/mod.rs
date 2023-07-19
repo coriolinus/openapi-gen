@@ -7,12 +7,12 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::{
-    codegen::{endpoint::parameter::ParameterLocation, make_ident},
+    codegen::{
+        endpoint::parameter::ParameterLocation, make_ident, Ref, Reference, UnknownReference,
+    },
     openapi_compat::path_items,
     ApiModel,
 };
-
-use super::api_model::{Ref, Reference, UnknownReference};
 
 pub(crate) mod parameter;
 use parameter::{convert_param_ref, Parameter, ParameterKey};

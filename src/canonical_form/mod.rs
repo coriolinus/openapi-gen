@@ -1,4 +1,4 @@
-mod impls;
+pub(crate) mod impls;
 
 #[derive(Debug, thiserror::Error, derive_more::From)]
 pub enum Reason {

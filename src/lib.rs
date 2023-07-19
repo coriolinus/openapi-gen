@@ -1,15 +1,15 @@
-mod canonical_form;
+pub(crate) mod canonical_form;
+pub(crate) mod codegen;
+pub(crate) mod openapi_compat;
+pub(crate) mod resolve_trait;
+pub(crate) mod well_known_types;
+
 pub use canonical_form::{
     CanonicalForm, CanonicalizeError, ConstraintViolation, Reason, ValidationError,
 };
 
-mod codegen;
-mod openapi_compat;
-mod resolve_trait;
-
 pub use codegen::{ApiModel, Error};
 
-mod well_known_types;
 #[cfg(feature = "bytes")]
 pub use well_known_types::Bytes;
 

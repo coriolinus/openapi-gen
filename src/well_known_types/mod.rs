@@ -1,4 +1,4 @@
 #[cfg(feature = "bytes")]
-mod bytes;
+pub(crate) mod bytes;
 #[cfg(feature = "bytes")]
 pub use bytes::Bytes;

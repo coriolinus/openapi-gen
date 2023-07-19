@@ -6,22 +6,22 @@ use openapiv3::{OpenAPI, ReferenceOr, Schema};
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::openapi_compat::{
-    component_inline_and_external_schemas, component_parameters, component_requests,
-    component_responses, OrScalar,
-};
-
-use super::{
-    endpoint::{
-        insert_endpoints,
-        parameter::insert_parameter,
-        request_body::create_request_body,
-        response::{create_response_variants, ResponseCollector},
-        Endpoint,
+use crate::{
+    codegen::{
+        endpoint::{
+            self, insert_endpoints,
+            parameter::insert_parameter,
+            request_body::create_request_body,
+            response::{create_response_variants, ResponseCollector},
+        },
+        item::{EmitError, ParseItemError},
+        rust_keywords::is_rust_keyword,
+        Endpoint, Item, Scalar,
     },
-    item::EmitError,
-    rust_keywords::is_rust_keyword,
-    Item, ParseItemError, Scalar,
+    openapi_compat::{
+        component_inline_and_external_schemas, component_parameters, component_requests,
+        component_responses, OrScalar,
+    },
 };
 
 /// A reference to an item definition.
@@ -474,7 +474,7 @@ pub enum Error {
         buffer: String,
     },
     #[error("parsing endpoint definition")]
-    ParseEndpoint(#[from] super::endpoint::Error),
+    ParseEndpoint(#[from] endpoint::Error),
     #[error("inserting component parameter")]
     InsertComponentParameter(#[source] anyhow::Error),
 }

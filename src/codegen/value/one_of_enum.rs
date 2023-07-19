@@ -1,6 +1,8 @@
-use crate::codegen::make_ident;
+use crate::codegen::{
+    api_model::{Ref, Reference, UnknownReference},
+    make_ident,
+};
 
-use super::api_model::{Ref, Reference, UnknownReference};
 use heck::AsUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::quote;

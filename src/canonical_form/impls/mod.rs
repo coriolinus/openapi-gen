@@ -1,7 +1,7 @@
 #[cfg(feature = "integer-restrictions")]
-mod bounded_integer;
-mod numbers;
-mod time;
+pub(crate) mod bounded_integer;
+pub(crate) mod numbers;
+pub(crate) mod time;
 
 use crate::{CanonicalForm, CanonicalizeError, Reason, ValidationError};
 

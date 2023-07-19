@@ -1,4 +1,4 @@
-use super::Scalar;
+use crate::codegen::Scalar;
 
 /// These external types are exceptions to the general rule that a schema must be entirely self-contained.
 pub const WELL_KNOWN_TYPES: &[(&str, Scalar)] = &[

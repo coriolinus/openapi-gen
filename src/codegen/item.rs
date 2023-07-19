@@ -4,12 +4,8 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use serde::Deserialize;
 
-use crate::codegen::make_ident;
-
-use super::{
-    api_model::{Ref, Reference, UnknownReference},
-    value::ValueConversionError,
-    ApiModel, Scalar, Value,
+use crate::codegen::{
+    make_ident, ApiModel, Ref, Reference, Scalar, UnknownReference, Value, ValueConversionError,
 };
 
 // note: openapiv3 intentionally ignores extensions whose name does not start with "x-".

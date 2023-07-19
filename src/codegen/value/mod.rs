@@ -1,3 +1,17 @@
+pub(crate) mod list;
+pub(crate) mod map;
+pub(crate) mod object;
+pub(crate) mod one_of_enum;
+pub(crate) mod scalar;
+pub(crate) mod set;
+pub(crate) mod string_enum;
+
+use crate::codegen::{
+    api_model::{self, Ref, Reference, UnknownReference},
+    make_ident, ApiModel, {List, Map, Object, OneOfEnum, Scalar, Set, StringEnum},
+};
+use {object::ObjectMember, one_of_enum::Variant};
+
 use heck::AsUpperCamelCase;
 use openapiv3::{
     AnySchema, ArrayType, IntegerFormat, IntegerType, NumberFormat, NumberType, ObjectType,
@@ -5,14 +19,6 @@ use openapiv3::{
 };
 use proc_macro2::TokenStream;
 use quote::quote;
-
-use crate::codegen::make_ident;
-
-use super::{
-    api_model::{self, Ref, Reference, UnknownReference},
-    one_of_enum::Variant,
-    ApiModel, List, Map, Object, ObjectMember, OneOfEnum, Scalar, Set, StringEnum,
-};
 
 /// The fundamental value type.
 ///

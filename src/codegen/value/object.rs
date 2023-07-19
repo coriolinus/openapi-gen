@@ -1,9 +1,8 @@
-use crate::codegen::make_ident;
-
-use super::{
+use crate::codegen::{
     api_model::{Ref, Reference, UnknownReference},
-    ApiModel,
+    make_ident, ApiModel,
 };
+
 use heck::AsSnakeCase;
 use indexmap::IndexMap;
 use proc_macro2::TokenStream;
