@@ -64,4 +64,6 @@ pub struct OuterStruct {
     ///this object is defined inline within `OuterStruct`
     pub defined_inline: DefinedInline,
 }
+#[openapi_gen::reexports::async_trait::async_trait]
+pub trait Api {}
 
