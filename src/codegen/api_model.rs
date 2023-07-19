@@ -14,6 +14,7 @@ use crate::openapi_compat::{
 use super::{
     endpoint::{
         insert_endpoints,
+        parameter::insert_parameter,
         request_body::create_request_body,
         response::{create_response_variants, ResponseCollector},
         Endpoint,
@@ -152,13 +153,16 @@ impl ApiModel<Ref> {
         &mut self,
         spec_name: &str,
         rust_name: &str,
+        reference_name: Option<&str>,
         schema_ref: &ReferenceOr<S>,
     ) -> Result<Ref, Error>
     where
         S: Deref<Target = Schema>,
     {
         match schema_ref {
-            ReferenceOr::Item(schema) => self.add_inline_items(spec_name, rust_name, None, schema),
+            ReferenceOr::Item(schema) => {
+                self.add_inline_items(spec_name, rust_name, reference_name, schema)
+            }
             ReferenceOr::Reference { reference } => match self.named_references.get(reference) {
                 Some(position) => Ok(Ref::Back(*position)),
                 None => Ok(Ref::Forward(reference.to_owned())),
@@ -387,18 +391,14 @@ impl TryFrom<OpenAPI> for ApiModel {
         }
 
         // component parameters
-        for (spec_name, reference_name, param) in component_parameters(&spec) {
-            let rust_name = spec_name.to_upper_camel_case();
+        for (_spec_name, reference_name, param) in component_parameters(&spec) {
             let reference_name = Some(reference_name);
             let reference_name = reference_name.as_deref();
-            let Some(schema) = param.parameter_data_ref().schema().map(|schema_ref| schema_ref.resolve(&spec)) else { continue };
-            let ref_ = model.add_inline_items(spec_name, &rust_name, reference_name, schema)?;
+            let ref_ = insert_parameter(&spec, &mut model, reference_name, param)
+                .map_err(Error::InsertComponentParameter)?;
             // all top-level component parameters are also public
             if let Some(item) = model.resolve_mut(&ref_) {
                 item.pub_typedef = true;
-                if item.docs.is_none() {
-                    item.docs = param.parameter_data_ref().description.clone();
-                }
             }
         }
 
@@ -475,4 +475,6 @@ pub enum Error {
     },
     #[error("parsing endpoint definition")]
     ParseEndpoint(#[from] super::endpoint::Error),
+    #[error("inserting component parameter")]
+    InsertComponentParameter(#[source] anyhow::Error),
 }

@@ -144,7 +144,7 @@ impl Value<Ref> {
             Some(items) => {
                 let rust_name = format!("{rust_name}Item");
                 let item = model
-                    .convert_reference_or(spec_name, &rust_name, items)
+                    .convert_reference_or(spec_name, &rust_name, None, items)
                     .map_err(ValueConversionError::from_inline(&rust_name))?;
                 if array_type.unique_items {
                     Ok(Set { item }.into())
@@ -172,7 +172,12 @@ impl Value<Ref> {
                 openapiv3::AdditionalProperties::Schema(schema_ref) => {
                     let rust_name = format!("{rust_name}Item");
                     let item = model
-                        .convert_reference_or(spec_name, &rust_name, &schema_ref.as_ref().as_ref())
+                        .convert_reference_or(
+                            spec_name,
+                            &rust_name,
+                            None,
+                            &schema_ref.as_ref().as_ref(),
+                        )
                         .map_err(ValueConversionError::from_inline(&rust_name))?;
                     Some(item)
                 }
@@ -213,7 +218,7 @@ impl Value<Ref> {
                 model.deconflict_ident(&mut rust_name);
 
                 let definition = model
-                    .convert_reference_or(member_name, &rust_name, &schema_ref.as_ref())
+                    .convert_reference_or(member_name, &rust_name, None, &schema_ref.as_ref())
                     .map_err(ValueConversionError::from_inline(&rust_name))?;
 
                 // In a perfect world, we could just set the item's `nullable` field here in the
@@ -278,7 +283,7 @@ impl Value<Ref> {
                     });
 
                 let definition = model
-                    .convert_reference_or(spec_name, rust_name, &schema_ref.as_ref())
+                    .convert_reference_or(spec_name, rust_name, None, &schema_ref.as_ref())
                     .map_err(ValueConversionError::from_inline(rust_name))?;
 
                 Ok(Variant {

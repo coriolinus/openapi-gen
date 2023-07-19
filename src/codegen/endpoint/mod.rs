@@ -311,7 +311,7 @@ pub(crate) fn insert_endpoints(spec: &OpenAPI, model: &mut ApiModel<Ref>) -> Res
                 // which lets subsequent items override earlier items.
                 path_item_params
                     .chain(operation_params)
-                    .map(|param_ref| convert_param_ref(model, param_ref))
+                    .map(|param_ref| convert_param_ref(spec, model, param_ref))
                     .collect::<Result<_, _>>()?
             };
 

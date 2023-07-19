@@ -37,7 +37,7 @@ pub struct Thing {
     Hash,
     openapi_gen::reexport::derive_more::Constructor
 )]
-pub struct PathId(pub openapi_gen::reexport::uuid::Uuid);
+pub struct Id(pub openapi_gen::reexport::uuid::Uuid);
 #[derive(
     Debug,
     Clone,
@@ -68,14 +68,12 @@ pub trait Api {
 Operation ID: `getThing`
 
 */
-    async fn get_thing(id: PathId) -> GetThingResponse;
+    async fn get_thing(id: Id) -> GetThingResponse;
     /**`PUT /thing/{id}`
 
 Operation ID: `putThing`
 
 */
-    async fn put_thing(
-        id: PathId,
-        request_body: PutThingRequest,
-    ) -> PutThingResponse;
+    async fn put_thing(id: Id, request_body: PutThingRequest) -> PutThingResponse;
 }
+

@@ -1,8 +1,8 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, bail, Context};
 use heck::ToUpperCamelCase;
-use openapiv3::{ParameterSchemaOrContent, ReferenceOr};
+use openapiv3::{OpenAPI, ParameterSchemaOrContent, ReferenceOr};
 
-use crate::ApiModel;
+use crate::{resolve_trait::Resolve, ApiModel};
 
 use super::{
     super::api_model::{Ref, Reference, UnknownReference},
@@ -57,7 +57,47 @@ impl Parameter<Ref> {
     }
 }
 
+/// Convert a `&Parameter` into a `Ref`
+pub(crate) fn insert_parameter(
+    spec: &OpenAPI,
+    model: &mut ApiModel<Ref>,
+    reference_name: Option<&str>,
+    param: &openapiv3::Parameter,
+) -> anyhow::Result<Ref> {
+    let parameter_data = param.parameter_data_ref();
+    let spec_name = parameter_data.name.clone();
+    let rust_name = spec_name.to_upper_camel_case();
+    let schema_ref = match &parameter_data.format {
+        ParameterSchemaOrContent::Schema(schema) => schema,
+        ParameterSchemaOrContent::Content(content) => {
+            // in the parameter context, this map must contain exactly one entry
+            if content.len() > 1 {
+                bail!("malformed content type: must contain exactly one value");
+            }
+            content
+                .first()
+                .and_then(|(_content_type, media_type)| media_type.schema.as_ref())
+                .ok_or_else(|| anyhow!("malformed content type: contained no values"))?
+        }
+    };
+
+    let schema = Resolve::resolve(schema_ref, spec).context("unknown schema for parameter")?;
+
+    let ref_ = model
+        .add_inline_items(&spec_name, &rust_name, reference_name, schema)
+        .context("adding parameter item")?;
+
+    if let Some(item) = model.resolve_mut(&ref_) {
+        item.nullable = !parameter_data.required;
+        if item.docs.is_none() {
+            item.docs = parameter_data.description.clone();
+        }
+    }
+    Ok(ref_)
+}
+
 pub(crate) fn convert_param_ref(
+    spec: &OpenAPI,
     model: &mut ApiModel<Ref>,
     param_ref: &ReferenceOr<openapiv3::Parameter>,
 ) -> Result<(ParameterKey, Parameter<Ref>), Error> {
@@ -70,61 +110,29 @@ pub(crate) fn convert_param_ref(
             .map_err(|err| Error::ConvertParamRef(err.into()))?,
 
         ReferenceOr::Item(parameter) => {
-            let parameter_data = parameter.parameter_data_ref();
-            let spec_name = parameter_data.name.clone();
-            let rust_name = spec_name.to_upper_camel_case();
-            let schema_ref = match &parameter_data.format {
-                ParameterSchemaOrContent::Schema(schema) => schema,
-                ParameterSchemaOrContent::Content(content) => {
-                    // in the parameter context, this map must contain exactly one entry
-                    if content.len() > 1 {
-                        return Err(Error::ConvertParamRef(anyhow!(
-                            "malformed content type: must contain exactly one value"
-                        )));
-                    }
-                    content
-                        .first()
-                        .and_then(|(_content_type, media_type)| media_type.schema.as_ref())
-                        .ok_or_else(|| {
-                            Error::ConvertParamRef(anyhow!(
-                                "malformed content type: contained no values"
-                            ))
-                        })?
-                }
-            };
-            model
-                .convert_reference_or(&spec_name, &rust_name, &schema_ref.as_ref())
-                .map_err(|err| Error::ConvertParamRef(err.into()))?
+            insert_parameter(spec, model, None, parameter).map_err(Error::ConvertParamRef)?
         }
     };
-    let item = model.resolve_mut(&item_ref).ok_or_else(|| {
+
+    let item = model.resolve(&item_ref).ok_or_else(|| {
         Error::ConvertParamRef(anyhow!(
             "unexpected forward reference converting parameter ref: {param_ref:?}"
         ))
     })?;
 
-    // we want to backfill some data here for which we need to refer back to the model
-    if item.docs.is_none() {
-        if let Some(description) = param_ref
-            .as_item()
-            .map(|param| param.parameter_data_ref().description.clone())
-        {
-            item.docs = description;
-        }
-    }
-
-    let location = param_ref.as_item().map(ParameterLocation::from);
-    let required = param_ref
-        .as_item()
-        .map(|parameter| parameter.parameter_data_ref().required)
-        .unwrap_or_default();
+    let location = Resolve::resolve(param_ref, spec)
+        .ok()
+        .map(ParameterLocation::from);
 
     let parameter_key = ParameterKey {
         name: item.rust_name.clone(),
         location,
     };
 
-    let parameter = Parameter { required, item_ref };
+    let parameter = Parameter {
+        required: !item.nullable,
+        item_ref,
+    };
 
     Ok((parameter_key, parameter))
 }
