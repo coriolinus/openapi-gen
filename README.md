@@ -171,7 +171,10 @@ responses:
   '200':
     description: "rendered PDF document"
     content:
-      "application/pdf": {}
+      "application/pdf":
+        schema:
+          type: string
+          format: binary
   '400':
     description: "it was not possible to produce a PDF given this request"
     content:
@@ -193,11 +196,14 @@ responses:
 ```
 
 ```rust
+type Ok_ = Vec<u8>;
+type ServiceUnavailable = openapi_gen::reexport::http_api_problem::HttpApiProblem;
+type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 pub enum RenderPdfResponse {
-    Ok(Vec<u8>),
+    Ok(Ok_),
     BadRequest(RenderError),
-    ServiceUnavailable(HttpApiProblem),
-    Default(HttpApiProblem),
+    ServiceUnavailable(ServiceUnavailable),
+    Default(Default_),
 }
 ```
 
