@@ -1,0 +1,30 @@
+openapi: "3.0.3" # Use older openAPI spec version due to a bug in Zally: https://github.com/zalando/zally/issues/1230
+info:
+  title: "trait Api"
+  version: "0.1.0"
+
+paths:
+  "/post-kudos":
+    post:
+      operationId: "postKudos"
+      requestBody:
+        description: request body for a freeform render request
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/PostKudo"
+        required: true
+      responses:
+        '201':
+          description: "accepted kudo"
+        default:
+          description: an error occurred; see status code and problem object for more information
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "https://opensource.zalando.com/restful-api-guidelines/models/problem-1.0.1.yaml#/Problem"
+
+
+components:
+  schemas:
+    PostKudo: {}

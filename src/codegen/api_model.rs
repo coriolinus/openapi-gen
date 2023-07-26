@@ -503,7 +503,7 @@ impl TryFrom<OpenAPI> for ApiModel {
             create_response_variants(
                 &mut model,
                 spec_name,
-                reference_name,
+                None,
                 response,
                 &mut response_collector,
             )?;

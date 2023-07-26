@@ -276,7 +276,17 @@ impl Item {
 
         let pub_ = self.is_pub().then_some(quote!(pub));
 
+        // the item definition is a multi-stage process:
+        // we first compute it from the value, but then we
+        // adjust it based on nullability and newtype options
         let mut item_def = self.value.emit_item_definition(model, name_resolver)?;
+
+        // if this is nullable but we haven't defined a wrapper, then we need to make it nullable inline
+        if self.nullable && wrapper_def.is_none() {
+            item_def = quote!(Option<#item_def>);
+        }
+
+        // adjust the item definition based on newtype options
         if self.newtype.map(|options| options.pub_).unwrap_or_default() {
             item_def = quote!(pub #item_def);
         }

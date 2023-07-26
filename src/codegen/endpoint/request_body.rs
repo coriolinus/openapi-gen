@@ -1,5 +1,6 @@
 use heck::ToUpperCamelCase;
-use openapiv3::{ReferenceOr, Schema};
+use indexmap::IndexMap;
+use openapiv3::{MediaType, ReferenceOr, Schema};
 
 use crate::{
     codegen::{
@@ -60,6 +61,25 @@ fn convert_optional_schema_ref(
     }
 }
 
+/// `true` when there is at least one content type, and all content types share the same schema, by reference.
+///
+/// If any schema is defined inline, this returns `false`.
+fn all_content_types_share_schema_def(content: &IndexMap<String, MediaType>) -> bool {
+    !content.is_empty() && {
+        let Some(first_schema) = content.first()
+                .and_then(|(_content_type, media_type)| media_type.schema.as_ref())
+                .and_then(|schema_ref| schema_ref.as_ref_str()) else {return false};
+
+        content.values().all(|value| {
+            value
+                .schema
+                .as_ref()
+                .and_then(|schema_ref| schema_ref.as_ref_str())
+                == Some(first_schema)
+        })
+    }
+}
+
 /// Insert an `openapiv3::RequestBody` into the model, producing as `Ref`.
 pub(crate) fn create_request_body(
     model: &mut ApiModel<Ref>,
@@ -68,7 +88,13 @@ pub(crate) fn create_request_body(
     request_body: &openapiv3::RequestBody,
 ) -> Result<Ref, Error> {
     let rust_name = spec_name.to_upper_camel_case();
-    let mut item = if request_body.content.len() == 1 {
+    // we elide the enumeration in two cases:
+    //
+    //  - there is only one content-type
+    //  - all content type schemas
+    let mut item = if request_body.content.len() == 1
+        || all_content_types_share_schema_def(&request_body.content)
+    {
         let optional_schema_ref = request_body
             .content
             .first()
@@ -85,12 +111,13 @@ pub(crate) fn create_request_body(
                 let mut rust_name = spec_name.to_upper_camel_case();
                 model.deconflict_member_or_variant_ident(&mut rust_name);
 
-                let variant_item = convert_optional_schema_ref(
+                let mut variant_item = convert_optional_schema_ref(
                     model,
                     spec_name,
                     rust_name,
                     media_type.schema.as_ref(),
                 )?;
+                variant_item.nullable = !request_body.required;
                 let definition = model.add_item(variant_item, None).map_err(wrap_err)?;
                 Ok(one_of_enum::Variant {
                     definition,

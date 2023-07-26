@@ -1,0 +1,69 @@
+openapi: "3.0.3" # Use older openAPI spec version due to a bug in Zally: https://github.com/zalando/zally/issues/1230
+info:
+  title: "Request Enums"
+  version: "0.1.0"
+
+paths:
+  "/multi-requests":
+    post:
+      operationId: multiRequests
+      requestBody:
+        description: request body that can accept two content types
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/JsonType"
+          "multipart/form-value":
+            schema:
+              "$ref": "$/components/schemas/FormType"
+      responses:
+        default:
+          $ref: "#/components/responses/Default"
+
+  "/optional-request-body":
+    post:
+      operationId: optionalRequestBody
+      requestBody:
+        description: request body is optional
+        # required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/JsonType"
+      responses:
+        default:
+          $ref: "#/components/responses/Default"
+
+  "/unified-request-body":
+    post:
+      operationId: sameRequest
+      requestBody:
+        description: request body that can accept two content types
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/ReqType"
+          "multipart/form-value":
+            schema:
+              "$ref": "#/components/schemas/ReqType"
+      responses:
+        default:
+          $ref: "#/components/responses/Default"
+
+components:
+  schemas:
+    JsonType: {}
+
+    FormType: {}
+
+    ReqType: {}
+
+  responses:
+    Default:
+      description: an error occurred; see status code and problem object for more information
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "https://opensource.zalando.com/restful-api-guidelines/models/problem-1.0.1.yaml#/Problem"

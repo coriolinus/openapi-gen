@@ -1,0 +1,39 @@
+openapi: "3.0.3" # Use older openAPI spec version due to a bug in Zally: https://github.com/zalando/zally/issues/1230
+info:
+  title: "Response Enums"
+  version: "0.1.0"
+
+paths:
+  "/render":
+    post:
+      operationId: renderPdf
+      responses:
+        '200':
+          description: "rendered PDF document"
+          content:
+            "application/pdf":
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: "it was not possible to produce a PDF given this request"
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "#/components/schemas/RenderError"
+        '503':
+          description: "upstream service was not available; try again later"
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "https://opensource.zalando.com/restful-api-guidelines/models/problem-1.0.1.yaml#/Problem"
+        default:
+          description: an error occurred; see status code and problem object for more information
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "https://opensource.zalando.com/restful-api-guidelines/models/problem-1.0.1.yaml#/Problem"
+
+components:
+  schemas:
+    RenderError: {}
