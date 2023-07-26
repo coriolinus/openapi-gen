@@ -141,6 +141,89 @@ impl<R> ApiModel<R> {
             .map(AsBackref::from_backref)
             .ok_or_else(|| Error::UnknownReference(UnknownReference(reference.into())))
     }
+
+    /// Insert an item definition for the last item in the items list.
+    ///
+    /// This ensures that item has a unique name.
+    ///
+    /// This errors if this would change an existing definition.
+    ///
+    /// This panics if the items list is empty.
+    ///
+    /// On success, returns the index to which the inserted name points.
+    fn insert_item_name(&mut self) -> usize {
+        let new = self
+            .definitions
+            .len()
+            .checked_sub(1)
+            .expect("definitions list is not empty");
+
+        // we need to do a little ownership dance here so that we can deconflict
+        // the name without borrow conflicts.
+        // doing this shouldn't impose much if any cost; `take` is efficient.
+        let mut name = std::mem::take(&mut self.definitions[new].rust_name);
+        self.deconflict_ident(&mut name);
+        self.definitions[new].rust_name = name.clone();
+
+        if let Some(old) = self.items.insert(name, new) {
+            // this branch is really never supposed to happen
+            panic!("encountered a item name conflict despite deconflict_ident call: old {old}, new {new}, name: {}", &self.definitions[new].rust_name);
+        }
+        new
+    }
+
+    /// Insert a named reference definition for the last item in the items list.
+    ///
+    /// This errors if it would change an existing definition.
+    ///
+    /// This panics if the items list is empty.
+    fn insert_item_named_reference(&mut self, named_reference: &str) -> Result<(), Error> {
+        let new = self
+            .definitions
+            .len()
+            .checked_sub(1)
+            .expect("definitions list is not empty");
+        if let Some(old) = self
+            .named_references
+            .insert(named_reference.to_owned(), new)
+        {
+            return Err(Error::DuplicateItemName {
+                name: named_reference.to_owned(),
+                old,
+                new,
+            });
+        }
+        Ok(())
+    }
+
+    /// Insert a new named reference definition for a given reference.
+    ///
+    /// Will error if `ref_` is not a back-reference.
+    pub(crate) fn insert_named_reference_for(
+        &mut self,
+        named_reference: &str,
+        ref_: &R,
+    ) -> Result<(), Error>
+    where
+        R: AsBackref + std::fmt::Debug,
+    {
+        let ref_ = ref_
+            .as_backref()
+            .ok_or_else(|| UnknownReference(format!("{ref_:?}")))?;
+        let previous = self
+            .named_references
+            .insert(named_reference.to_owned(), ref_);
+        if let Some(old) = previous {
+            if old != ref_ {
+                return Err(Error::DuplicateItemName {
+                    name: named_reference.to_string(),
+                    old,
+                    new: ref_,
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
 // These functions only appear when we use potentially forward references.
@@ -195,13 +278,10 @@ impl ApiModel<Ref> {
         item: Item<Ref>,
         reference_name: Option<&str>,
     ) -> Result<Ref, Error> {
-        let name = item.rust_name.clone();
-
-        let idx = self.definitions.len();
         self.definitions.push(item);
-        self.items.insert(name, idx);
+        let idx = self.insert_item_name();
         if let Some(reference_name) = reference_name {
-            self.named_references.insert(reference_name.to_owned(), idx);
+            self.insert_item_named_reference(reference_name)?;
         }
 
         Ok(Ref::Back(idx))
@@ -216,18 +296,16 @@ impl ApiModel<Ref> {
         scalar: Scalar,
     ) -> Result<Ref, Error> {
         let value = scalar.into();
-        let name = rust_name.to_owned();
         let item = Item {
             spec_name: spec_name.to_owned(),
             rust_name: rust_name.to_owned(),
             value,
             ..Default::default()
         };
-        let idx = self.definitions.len();
         self.definitions.push(item);
-        self.items.insert(name, idx);
+        let idx = self.insert_item_name();
         if let Some(reference_name) = reference_name {
-            self.named_references.insert(reference_name.to_owned(), idx);
+            self.insert_item_named_reference(reference_name)?;
         }
         Ok(Ref::Back(idx))
     }
@@ -477,4 +555,10 @@ pub enum Error {
     ParseEndpoint(#[from] endpoint::Error),
     #[error("inserting component parameter")]
     InsertComponentParameter(#[source] anyhow::Error),
+    #[error("duplicate item name: {name} (old: {old}, new: {new})")]
+    DuplicateItemName {
+        name: String,
+        old: usize,
+        new: usize,
+    },
 }

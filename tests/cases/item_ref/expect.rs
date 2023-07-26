@@ -31,18 +31,6 @@ pub struct Thing {
     Clone,
     PartialEq,
     openapi_gen::reexport::serde::Serialize,
-    openapi_gen::reexport::serde::Deserialize,
-    Copy,
-    Eq,
-    Hash,
-    openapi_gen::reexport::derive_more::Constructor
-)]
-pub struct Id(pub openapi_gen::reexport::uuid::Uuid);
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize
 )]
 #[serde(untagged)]

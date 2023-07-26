@@ -1,6 +1,6 @@
 pub type PostWellKnownTypesRequest = openapi_gen::reexport::serde_json::Value;
 type NoContent = ();
-type Default = openapi_gen::reexport::http_api_problem::HttpApiProblem;
+type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 #[derive(
     Debug,
     Clone,
@@ -12,7 +12,7 @@ type Default = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 #[serde(untagged)]
 pub enum PostWellKnownTypesResponse {
     NoContent(NoContent),
-    Default(Default),
+    Default(Default_),
 }
 #[openapi_gen::reexports::async_trait::async_trait]
 pub trait Api {

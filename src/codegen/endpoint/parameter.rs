@@ -3,7 +3,7 @@ use heck::ToUpperCamelCase;
 use openapiv3::{OpenAPI, ParameterSchemaOrContent, ReferenceOr};
 
 use crate::{
-    codegen::{endpoint::Error, Ref, Reference, UnknownReference},
+    codegen::{endpoint::Error, Item, Ref, Reference, UnknownReference, Value},
     resolve_trait::Resolve,
     ApiModel,
 };
@@ -58,7 +58,7 @@ impl Parameter<Ref> {
 
 /// Convert a `&Parameter` into a `Ref`
 pub(crate) fn insert_parameter(
-    spec: &OpenAPI,
+    _spec: &OpenAPI,
     model: &mut ApiModel<Ref>,
     reference_name: Option<&str>,
     param: &openapiv3::Parameter,
@@ -80,18 +80,44 @@ pub(crate) fn insert_parameter(
         }
     };
 
-    let schema = Resolve::resolve(schema_ref, spec).context("unknown schema for parameter")?;
-
-    let ref_ = model
-        .add_inline_items(&spec_name, &rust_name, reference_name, schema)
-        .context("adding parameter item")?;
-
-    if let Some(item) = model.resolve_mut(&ref_) {
-        item.nullable = !parameter_data.required;
-        if item.docs.is_none() {
-            item.docs = parameter_data.description.clone();
+    let ref_ = match schema_ref {
+        ReferenceOr::Reference { reference } => {
+            // if the schema is a reference to something else, we branch our behavior:
+            //
+            // If the schema is required, we can return the ref directly. Otherwise, we need
+            // to create a typedef which wraps it in an Option.
+            let inner_ref = model
+                .get_named_reference(reference)
+                .context("looking up parameter reference")?;
+            if parameter_data.required {
+                inner_ref
+            } else {
+                // so let's make a nullable wrapper just pointing to the original item
+                let wrapper = Item {
+                    docs: parameter_data.description.clone(),
+                    spec_name,
+                    rust_name,
+                    nullable: true,
+                    value: Value::Ref(inner_ref),
+                    ..Default::default()
+                };
+                model
+                    .add_item(wrapper, reference_name)
+                    .context("adding wrapper item for parameter data")?
+            }
         }
+        ReferenceOr::Item(schema) => {
+            // if we defined an inline schema, we need to add the item
+            model
+                .add_inline_items(&spec_name, &rust_name, reference_name, schema)
+                .context("adding parameter item")?
+        }
+    };
+
+    if let Some(named_reference) = reference_name {
+        model.insert_named_reference_for(named_reference, &ref_)?;
     }
+
     Ok(ref_)
 }
 
