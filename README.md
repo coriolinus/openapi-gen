@@ -244,8 +244,6 @@ pub enum PostKudosResponse {
 pub trait Api {
     async fn post_kudos(request_body: PostKudosRequest) -> PostKudosResponse;
 }
-
-
 ```
 
 ### Models
@@ -433,37 +431,50 @@ Note that the regex language is [specified](https://swagger.io/docs/specificatio
 
 #### Nulls
 
-OpenAPI 3 does not have an distinct `null` type, contrary to JSON Schema. Instead, you may set `nullable: true`. This maps neatly to Rust's `Option` type.
+OpenAPI 3 does not have an distinct `null` type, contrary to JSON Schema. Instead, there are two distinct ways to specify nullability:
+
+- setting `nullable: true` on a type definition.
+- omitting an item from the `required` list in a containing object.
+
+These have distinct and independent code generation effects, as shown.
 
 ```yaml
-title: add
-type: integer
-nullable: true
+Foo:
+  type: object
+  properties:
+    not_nullable_and_required:
+      type: integer
+    not_nullable_and_not_required:
+      type: integer
+    nullable_and_required:
+      type: integer
+      nullable: true
+    nullable_and_not_required:
+      description: note that this produces an `Option<Option<_>>`
+      type: integer
+      nullable: true
+  required:
+    - not_nullable_and_required
+    - nullable_and_required
 ```
 
 ```rust
-pub type Add = Option<i64>;
-```
+type NotNullableAndRequired = i64;
+type NotNullableAndNotRequired = i64;
+type MaybeNullableAndRequired = Option<NullableAndRequired>;
+type NullableAndRequired = i64;
+type MaybeNullableAndNotRequired = Option<NullableAndNotRequired>;
+type NullableAndNotRequired = i64;
 
-When an item is nullable, a `Maybe*` typedef is generated which handles wrapping the inner type in an `Option`.
-
-```yaml
-title: foo
-type: object
-properties:
-    bar:
-        type: integer
-    required:
-        - bar
-nullable: true
-```
-
-```rust
-struct Foo {
-    bar: i64,
+pub struct Foo {
+    pub not_nullable_and_required: NotNullableAndRequired,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub not_nullable_and_not_required: Option<NotNullableAndNotRequired>,
+    pub nullable_and_required: MaybeNullableAndRequired,
+    ///note that this produces an `Option<Option<_>>`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nullable_and_not_required: Option<MaybeNullableAndNotRequired>,
 }
-
-pub type MaybeFoo = Option<Foo>;
 ```
 
 #### Arrays
@@ -528,6 +539,8 @@ additionalProperties:
 ```rust
 pub type Foo = HashMap<String, i64>;
 ```
+
+The key type of a `HashMap` is always a `String`.
 
 Objects with both `properties` and `additionalProperties` are forbidden.
 
