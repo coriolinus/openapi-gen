@@ -118,8 +118,8 @@ requestBody:
 
 ```rust
 pub enum MultiRequestsRequest {
-    ApplicationJson(JsonType),
-    MultipartFormValue(FormType),
+    ApplicationJson(ApplicationJson),
+    MultipartFormValue(MultipartFormValue),
 }
 ```
 
