@@ -234,16 +234,18 @@ post:
 
 ```rust
 pub type PostKudosRequest = PostKudo;
-
+type Created = ();
+type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 pub enum PostKudosResponse {
-    Created,
-    Default(openapi_gen::reexport::http_api_problem::HttpApiProblem),
+    Created(Created),
+    Default(Default_),
 }
-
 #[async_trait]
 pub trait Api {
-    pub async fn post_kudos(post_kudo: PostKudosRequest) -> PostKudosResponse;
+    async fn post_kudos(request_body: PostKudosRequest) -> PostKudosResponse;
 }
+
+
 ```
 
 ### Models
