@@ -57,6 +57,16 @@ impl Variant {
             .map(|name| format!("{}", AsUpperCamelCase(name)))
             .unwrap_or_else(|| format!("Variant{idx:02}"))
     }
+
+    pub(crate) fn serde_attributes(&self, default_name: &str) -> Vec<TokenStream> {
+        let mut attributes = Vec::new();
+        if let Some(mapping) = &self.mapping_name {
+            if mapping != default_name {
+                attributes.push(quote!(rename = #mapping));
+            }
+        }
+        attributes
+    }
 }
 
 /// OpenAPI's `oneOf` type
@@ -105,9 +115,16 @@ impl OneOfEnum {
             .iter()
             .enumerate()
             .map(|(idx, variant)| {
-                let ident = make_ident(&variant.compute_variant_name(idx, &name_resolver));
+                let variant_name = variant.compute_variant_name(idx, &name_resolver);
+                let ident = make_ident(&variant_name);
                 let referent = make_ident(name_resolver(variant.definition)?);
-                Ok(quote!(#ident(#referent),))
+                let attributes = variant.serde_attributes(&variant_name);
+                let attributes =
+                    (!attributes.is_empty()).then(|| quote!(#[serde( #( #attributes)* )]));
+                Ok(quote! {
+                    #attributes
+                    #ident(#referent),
+                })
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(quote! {
