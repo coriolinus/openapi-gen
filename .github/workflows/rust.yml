@@ -21,7 +21,6 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: check
-        args: --verbose
     - name: Check (all features)
       uses: actions-rs/cargo@v1
       with:
