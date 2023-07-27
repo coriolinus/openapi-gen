@@ -1,0 +1,34 @@
+openapi: "3.0.3"
+info:
+  version: "0.1.0"
+  title: "allOf Singleton"
+  description: |
+    Test the ability to emit an `allOf` singleton.
+
+    See documentation at <https://github.com/coriolinus/openapi-gen#allof-singletons-for-property-overrides>.
+
+paths:
+
+components:
+  schemas:
+    Id:
+      type: string
+      format: uuid
+      x-newtype:
+        pub: true
+
+    Thing:
+      type: object
+      properties:
+        id:
+          readOnly: true
+          allOf:
+            - $ref: "#/components/schemas/Id"
+
+    WriteableThing:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+      required:
+        - id
