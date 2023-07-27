@@ -48,7 +48,7 @@ pub trait Resolve {
     fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output>;
 }
 
-impl Resolve for ReferenceOr<Schema> {
+impl<'o> Resolve for &'o ReferenceOr<Schema> {
     type Output = Schema;
 
     fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output> {
@@ -81,9 +81,17 @@ impl Resolve for ReferenceOr<Schema> {
     }
 }
 
+impl Resolve for ReferenceOr<Schema> {
+    type Output = Schema;
+
+    fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output> {
+        Resolve::resolve(self, spec)
+    }
+}
+
 macro_rules! impl_resolve_for {
     (ReferenceOr<$output:ident>; $getter:ident; $components_field:ident) => {
-        impl Resolve for ReferenceOr<$output> {
+        impl<'o> Resolve for &'o ReferenceOr<$output> {
             type Output = $output;
 
             fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output> {
@@ -102,6 +110,14 @@ macro_rules! impl_resolve_for {
                         item_or_err(param_ref, reference)
                     }
                 }
+            }
+        }
+
+        impl Resolve for ReferenceOr<$output> {
+            type Output = $output;
+
+            fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output> {
+                Resolve::resolve(self, spec)
             }
         }
     };
