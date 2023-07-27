@@ -1,11 +1,14 @@
 use heck::ToUpperCamelCase;
-use openapiv3::{Schema, SchemaKind, Type};
+use openapiv3::{OpenAPI, ReferenceOr, Schema, SchemaKind, Type};
 use proc_macro2::TokenStream;
 use quote::quote;
 use serde::Deserialize;
 
-use crate::codegen::{
-    make_ident, ApiModel, Ref, Reference, Scalar, UnknownReference, Value, ValueConversionError,
+use crate::{
+    codegen::{
+        make_ident, ApiModel, Ref, Reference, Scalar, UnknownReference, Value, ValueConversionError,
+    },
+    resolve_trait::Resolve,
 };
 
 // note: openapiv3 intentionally ignores extensions whose name does not start with "x-".
@@ -17,6 +20,60 @@ fn get_extension_bool(schema: &Schema, key: &str) -> bool {
     get_extension_value(schema, key)
         .and_then(serde_json::Value::as_bool)
         .unwrap_or_default()
+}
+
+/// The outer schema of the object type containing this schema, and the item name
+/// of the property identifying this schema.
+type ContainingSchema<'a> = Option<(&'a Schema, &'a str)>;
+
+/// Does this `allOf` instance follow the rules of an `allOf` property singleton?
+///
+/// The rules for an `allOf` singleton are as follows:
+///
+/// - the schema is a property sub-schema of an object type
+/// - the schema is not in the `required` list of the object type
+/// - the schema has an `allOf` definition
+/// - the `allOf` definition possesses exactly one item
+/// - the `allOf` item is a reference
+///
+/// `containing_schema` must be the tuple with the schema containing this schema, and the property name
+/// referencing this schema.
+fn is_property_singleton(
+    spec: &OpenAPI,
+    containing_schema: ContainingSchema,
+    schema: &Schema,
+) -> bool {
+    // the schema is a property sub-schema of an object type
+    let Some((containing_schema, property_name)) = containing_schema else {return false};
+    let SchemaKind::Type(Type::Object(object_type)) = &containing_schema.schema_kind else {return false};
+    if object_type
+        .properties
+        .get(property_name)
+        .and_then(|schema_ref| Resolve::resolve(&schema_ref, spec).ok())
+        != Some(schema)
+    {
+        return false;
+    }
+
+    // the schema is not in the `required` list of the object type
+    if object_type
+        .required
+        .iter()
+        .any(|required| required == property_name)
+    {
+        return false;
+    }
+
+    // the schema has an `allOf` definition
+    let SchemaKind::AllOf { all_of } = &schema.schema_kind else {return false};
+
+    // the `allOf` definition possesses exactly one item
+    if all_of.len() != 1 {
+        return false;
+    }
+
+    // the `allOf` item is a reference
+    all_of[0].as_ref_str().is_some()
 }
 
 #[derive(Default, Debug, Clone, Copy, Deserialize)]
@@ -117,10 +174,12 @@ impl Item<Ref> {
 
     /// Parse a schema, recursively adding inline items
     pub(crate) fn parse_schema(
+        spec: &OpenAPI,
         model: &mut ApiModel<Ref>,
         spec_name: &str,
         rust_name: &str,
         schema: &Schema,
+        containing_schema: ContainingSchema,
     ) -> Result<Self, ParseItemError> {
         let value: Value<Ref> = match &schema.schema_kind {
             SchemaKind::Type(Type::Boolean {}) => Value::Scalar(Scalar::Bool),
@@ -141,6 +200,12 @@ impl Item<Ref> {
             }
             SchemaKind::OneOf { one_of } => {
                 Value::parse_one_of_type(model, spec_name, rust_name, &schema.schema_data, one_of)?
+            }
+            SchemaKind::AllOf { all_of } if is_property_singleton(spec, containing_schema, schema) {
+                todo!()
+            }
+            SchemaKind::AllOf { .. } => {
+                return Err(ParseItemError::NonPropertyExtensionAllOf)
             }
             SchemaKind::AllOf { .. } | SchemaKind::AnyOf { .. } | SchemaKind::Not { .. } => {
                 return Err(ParseItemError::UnsupportedSchemaKind)
@@ -351,8 +416,10 @@ impl Item {
 pub enum ParseItemError {
     #[error("could not parse value type")]
     ValueConversion(#[from] ValueConversionError),
-    #[error("`allOf`, `anyOf`, and `not` schemas are not supported")]
+    #[error("`anyOf` and `not` schemas are not supported")]
     UnsupportedSchemaKind,
+    #[error("this `allOf` schema did not meet the requirements of a property singleton")]
+    NonPropertyExtensionAllOf,
     #[error("failed to get external documentation")]
     ExternalDocumentation(#[source] reqwest::Error),
 }
