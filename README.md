@@ -770,6 +770,98 @@ pub enum Pet {
 }
 ```
 
-#### `anyOf`, `allOf`, `not`
+#### `allOf` Singletons for Property Overrides
 
-These schema combinators are not supported. `allOf` may be supported in the future.
+OpenAPI defines [several schema properties](https://swagger.io/docs/specification/data-models/keywords/) which can apply to any schema. This means that it is possible to define a schema like:
+
+```yaml
+components:
+  schemas:
+    Thing:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+
+    WriteableThing:
+      type: object
+      properties:
+        id:
+          type: string
+      required:
+        - id
+```
+
+However, because these properties apply at the schema level instead of the object field level, we run into problems if we want to i.e. reuse a newtype. This schema is invalid:
+
+```yaml
+components:
+  schemas:
+    Id:
+      type: string
+      format: uuid
+      x-newtype:
+        pub: true
+
+    Thing:
+      type: object
+      properties:
+        # invalid! When a reference is specified, field properties are ignored
+        id:
+          readOnly: true
+          $ref: "#/components/schemas/Id"
+```
+
+We can work around this and define field-level property overrides by using an `allOf` singleton. This pattern merges certain additional properties with a referenced schema, at the field level. It looks like this:
+
+```yaml
+    Thing:
+      type: object
+      properties:
+        id:
+          readOnly: true
+          allOf:
+            - $ref: "#/components/schemas/Id"
+```
+
+The rules for an `allOf` singleton are as follows:
+
+- the schema is a property sub-schema of an object type
+- the schema is not in the `required` list of the object type
+- the schema has an `allOf` definition
+- the `allOf` definition possesses exactly one item
+- the `allOf` item is a reference
+- the schema possesses 0 or more properties from this list:
+
+  - `readOnly`
+  - `writeOnly`
+  - `title`
+  - `description`
+
+Additional properties may be supported in the future, but for now, properties outside this list are ignored.
+
+When the schema meets these rules, the `allOf` singleton is used to assign field-level properties without affecting the referenced object. The output from the (implied) schema defined above is:
+
+```rust
+pub struct Id(pub Uuid);
+
+pub struct Thing {
+    #[serde(skip_deserializing)]
+    id: Option<Id>,
+}
+
+pub struct WriteableThing {
+    id: Id,
+}
+```
+
+#### `allOf` for Merging Object Definitions
+
+This schema combinator is not currently supported, but might be supported in the future.
+
+#### `anyOf`, `not`
+
+These schema combinators are not supported and are unlikely to receive support in the future. They do not map cleanly to Rust's data model.
+
+Recommended workaround: define the schema without these combinators.
