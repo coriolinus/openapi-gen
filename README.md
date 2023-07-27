@@ -782,6 +782,7 @@ components:
       properties:
         id:
           type: string
+          format: uuid
           readOnly: true
 
     WriteableThing:
@@ -789,11 +790,12 @@ components:
       properties:
         id:
           type: string
+          format: uuid
       required:
         - id
 ```
 
-However, because these properties apply at the schema level instead of the object field level, we run into problems if we want to i.e. reuse a newtype. This schema is invalid:
+However, because these properties apply at the schema level instead of the object field level, we run into problems if we want to i.e. reuse the type to reduce duplication. This schema is invalid:
 
 ```yaml
 components:
@@ -801,8 +803,6 @@ components:
     Id:
       type: string
       format: uuid
-      x-newtype:
-        pub: true
 
     Thing:
       type: object
@@ -844,7 +844,7 @@ Additional properties may be supported in the future, but for now, properties ou
 When the schema meets these rules, the `allOf` singleton is used to assign field-level properties without affecting the referenced object. The output from the (implied) schema defined above is:
 
 ```rust
-pub struct Id(pub Uuid);
+pub type Id = Uuid;
 
 pub struct Thing {
     #[serde(skip_deserializing)]
