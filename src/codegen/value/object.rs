@@ -1,6 +1,6 @@
 use crate::codegen::{
     api_model::{Ref, Reference, UnknownReference},
-    make_ident, ApiModel,
+    make_ident, ApiModel, PropertyOverride,
 };
 
 use heck::{AsSnakeCase, AsUpperCamelCase};
@@ -52,7 +52,23 @@ impl ObjectMember {
             .as_deref()
             .map(|docs| quote!(#[doc = #docs]));
 
+        let item = model.resolve(self.definition);
+        let get_property_override = |override_value: &dyn Fn(&PropertyOverride) -> bool| -> bool {
+            item.and_then(|item| item.value.as_property_override())
+                .map(override_value)
+                .unwrap_or_default()
+        };
+        let read_only = self.read_only || get_property_override(&|prop| prop.read_only);
+        let write_only = self.write_only || get_property_override(&|prop| prop.write_only);
+
         let mut serde_attributes = Vec::new();
+
+        if read_only {
+            serde_attributes.push(quote!(skip_deserializing));
+        }
+        if write_only {
+            serde_attributes.push(quote!(skip_serializing));
+        }
 
         let mut snake_member_name = format!("{}", AsSnakeCase(member_name));
         model.deconflict_member_or_variant_ident(&mut snake_member_name);

@@ -836,8 +836,6 @@ The rules for an `allOf` singleton are as follows:
 
   - `readOnly`
   - `writeOnly`
-  - `title`
-  - `description`
 
 Additional properties may be supported in the future, but for now, properties outside this list are ignored.
 

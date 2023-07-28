@@ -268,6 +268,13 @@ impl<R> Value<R> {
             Value::StringEnum(_) | Value::OneOfEnum(_) | Value::Object(_) => true,
         }
     }
+
+    pub(crate) fn as_property_override(&self) -> Option<&PropertyOverride<R>> {
+        match self {
+            Self::PropertyOverride(property_override) => Some(property_override),
+            _ => None,
+        }
+    }
 }
 
 impl Value {
