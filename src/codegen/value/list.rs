@@ -12,6 +12,10 @@ pub struct List<Ref = Reference> {
 }
 
 impl List<Ref> {
+    pub(crate) fn new(item: Ref) -> Self {
+        Self { item }
+    }
+
     pub(crate) fn resolve_refs(
         self,
         resolver: impl Fn(&Ref) -> Result<Reference, UnknownReference>,

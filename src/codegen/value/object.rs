@@ -3,10 +3,13 @@ use crate::codegen::{
     make_ident, ApiModel,
 };
 
-use heck::AsSnakeCase;
+use heck::{AsSnakeCase, AsUpperCamelCase};
 use indexmap::IndexMap;
+use openapiv3::{ObjectType, OpenAPI};
 use proc_macro2::TokenStream;
 use quote::quote;
+
+use super::ValueConversionError;
 
 #[derive(Debug, Clone)]
 pub struct ObjectMember<Ref = Reference> {
@@ -89,6 +92,88 @@ pub struct Object<Ref = Reference> {
 }
 
 impl Object<Ref> {
+    pub(crate) fn new(
+        spec: &OpenAPI,
+        model: &mut ApiModel<Ref>,
+        _spec_name: &str,
+        rust_name: &str,
+        object_type: &ObjectType,
+    ) -> Result<Self, ValueConversionError> {
+        let members = object_type
+            .properties
+            .iter()
+            .map::<Result<_, ValueConversionError>, _>(|(member_name, schema_ref)| {
+                // TODO: should we resolve references here instead? But that kind of doesn't make sense.
+                // For now, we're only permitting inline definitions to be read/write-only.
+                let read_only = schema_ref
+                    .as_item()
+                    .map(|schema| schema.schema_data.read_only)
+                    .unwrap_or_default();
+
+                let write_only = schema_ref
+                    .as_item()
+                    .map(|schema| schema.schema_data.write_only)
+                    .unwrap_or_default();
+
+                // If a model exists for the bare property name, qualify
+                // this one with the object name.
+                //
+                // This isn't perfect, because the first member we
+                // encounter with a particular name gets to keep the
+                // bare name, while others get their names qualified,
+                // but it's still better than just appending digits.
+                let ucc_member_name = format!("{}", AsUpperCamelCase(member_name));
+                let mut rust_name = if model.ident_exists(&ucc_member_name) {
+                    format!("{rust_name}{ucc_member_name}")
+                } else {
+                    ucc_member_name
+                };
+                model.deconflict_ident(&mut rust_name);
+
+                // This is expected to be the only place where we construct a non-`None` instance of `containing_object`.
+                let containing_object = Some((object_type, member_name.as_str()));
+
+                let definition = model
+                    .convert_reference_or(
+                        spec,
+                        member_name,
+                        &rust_name,
+                        None,
+                        &schema_ref.as_ref(),
+                        containing_object,
+                    )
+                    .map_err(ValueConversionError::from_inline(&rust_name))?;
+
+                // In a perfect world, we could just set the item's `nullable` field here in the
+                // event that we've determined that the item is in fact nullable.
+                // Unfortunately, there are two obstacles to this.
+                //
+                // The first is relatively minor: the definition here might be a forward reference,
+                // in which case we don't know that it is nullable in all contexts. We can work around that.
+                //
+                // The second is a bigger problem, though: making an item nullable the "proper" way
+                // involves creating a type alias, which changes its public reference name. This doesn't
+                // invalidate past references to the item--the structure of `ApiModel` avoids that issue--
+                // but it does mean we'd need to design a single-purpose function `ApiModel::make_item_nullable`,
+                // which just feels kind of ugly.
+                //
+                // Instead, we'll just handle nullable fields inline; that's good enough.
+                let inline_option = !object_type.required.contains(member_name);
+
+                Ok((
+                    member_name.to_owned(),
+                    ObjectMember {
+                        definition,
+                        read_only,
+                        write_only,
+                        inline_option,
+                    },
+                ))
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(Object { members })
+    }
+
     pub(crate) fn resolve_refs(
         self,
         resolver: impl Fn(&Ref) -> Result<Reference, UnknownReference>,

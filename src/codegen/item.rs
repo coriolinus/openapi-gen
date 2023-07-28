@@ -12,6 +12,8 @@ use crate::{
     resolve_trait::Resolve,
 };
 
+use super::{OneOfEnum, StringEnum};
+
 // note: openapiv3 intentionally ignores extensions whose name does not start with "x-".
 fn get_extension_value<'a>(schema: &'a Schema, key: &str) -> Option<&'a serde_json::Value> {
     schema.schema_data.extensions.get(key)
@@ -188,10 +190,9 @@ impl Item<Ref> {
             SchemaKind::Type(Type::Boolean {}) => Value::Scalar(Scalar::Bool),
             SchemaKind::Type(Type::Number(number_type)) => number_type.try_into()?,
             SchemaKind::Type(Type::Integer(integer_type)) => integer_type.try_into()?,
-            SchemaKind::Any(any_schema) => {
-                Value::try_parse_string_enum_type(&schema.schema_data, any_schema)
-                    .unwrap_or(Scalar::Any.into())
-            }
+            SchemaKind::Any(any_schema) => StringEnum::new(schema, any_schema)
+                .map(Into::into)
+                .unwrap_or(Scalar::Any.into()),
             SchemaKind::Type(Type::String(string_type)) => {
                 Value::parse_string_type(string_type, &schema.schema_data)?
             }
@@ -201,14 +202,9 @@ impl Item<Ref> {
             SchemaKind::Type(Type::Object(object_type)) => {
                 Value::parse_object_type(spec, model, spec_name, rust_name, object_type)?
             }
-            SchemaKind::OneOf { one_of } => Value::parse_one_of_type(
-                spec,
-                model,
-                spec_name,
-                rust_name,
-                &schema.schema_data,
-                one_of,
-            )?,
+            SchemaKind::OneOf { one_of } => {
+                OneOfEnum::new(spec, model, spec_name, rust_name, schema, one_of)?.into()
+            }
             SchemaKind::AllOf { all_of }
                 if is_property_singleton(spec, containing_object, schema) =>
             {

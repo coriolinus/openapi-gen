@@ -11,12 +11,10 @@ use crate::codegen::{
     api_model::{self, Ref, Reference, UnknownReference},
     make_ident, ApiModel, List, Map, Object, OneOfEnum, PropertyOverride, Scalar, Set, StringEnum,
 };
-use {object::ObjectMember, one_of_enum::Variant};
 
-use heck::AsUpperCamelCase;
 use openapiv3::{
-    AnySchema, ArrayType, IntegerFormat, IntegerType, NumberFormat, NumberType, ObjectType,
-    OpenAPI, ReferenceOr, SchemaData, StringFormat, StringType, VariantOrUnknownOrEmpty,
+    ArrayType, IntegerFormat, IntegerType, NumberFormat, NumberType, ObjectType, OpenAPI,
+    SchemaData, StringFormat, StringType, VariantOrUnknownOrEmpty,
 };
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -159,9 +157,9 @@ impl Value<Ref> {
                     .convert_reference_or(spec, spec_name, &rust_name, None, items, None)
                     .map_err(ValueConversionError::from_inline(&rust_name))?;
                 if array_type.unique_items {
-                    Ok(Set { item }.into())
+                    Ok(Set::new(item).into())
                 } else {
-                    Ok(List { item }.into())
+                    Ok(List::new(item).into())
                 }
             }
         }
@@ -174,230 +172,25 @@ impl Value<Ref> {
         rust_name: &str,
         object_type: &ObjectType,
     ) -> Result<Self, ValueConversionError> {
-        if !object_type.properties.is_empty() && object_type.additional_properties.is_some() {
-            return Err(ValueConversionError::AdditionalPropertiesConflict);
+        match (
+            object_type.properties.is_empty(),
+            object_type.additional_properties.as_ref(),
+        ) {
+            (false, Some(_)) => {
+                // can't have both non-empty properties and also additional properties
+                Err(ValueConversionError::AdditionalPropertiesConflict)
+            }
+            (_, Some(additional_properties)) => {
+                // string->item mapping
+                let map = Map::new(spec, model, spec_name, rust_name, additional_properties)?;
+                Ok(map.into())
+            }
+            (_, None) => {
+                // object
+                let object = Object::new(spec, model, spec_name, rust_name, object_type)?;
+                Ok(object.into())
+            }
         }
-
-        // string->item mapping
-        if let Some(additional_properties) = object_type.additional_properties.as_ref() {
-            let value_type = match additional_properties {
-                openapiv3::AdditionalProperties::Any(_) => None,
-                openapiv3::AdditionalProperties::Schema(schema_ref) => {
-                    let rust_name = format!("{rust_name}Item");
-                    let item = model
-                        .convert_reference_or(
-                            spec,
-                            spec_name,
-                            &rust_name,
-                            None,
-                            &schema_ref.as_ref().as_ref(),
-                            None,
-                        )
-                        .map_err(ValueConversionError::from_inline(&rust_name))?;
-                    Some(item)
-                }
-            };
-            return Ok(Value::Map(Map { value_type }));
-        }
-
-        // object
-        let members = object_type
-            .properties
-            .iter()
-            .map::<Result<_, ValueConversionError>, _>(|(member_name, schema_ref)| {
-                // TODO: should we resolve references here instead? But that kind of doesn't make sense.
-                // For now, we're only permitting inline definitions to be read/write-only.
-                let read_only = schema_ref
-                    .as_item()
-                    .map(|schema| schema.schema_data.read_only)
-                    .unwrap_or_default();
-
-                let write_only = schema_ref
-                    .as_item()
-                    .map(|schema| schema.schema_data.write_only)
-                    .unwrap_or_default();
-
-                // If a model exists for the bare property name, qualify
-                // this one with the object name.
-                //
-                // This isn't perfect, because the first member we
-                // encounter with a particular name gets to keep the
-                // bare name, while others get their names qualified,
-                // but it's still better than just appending digits.
-                let ucc_member_name = format!("{}", AsUpperCamelCase(member_name));
-                let mut rust_name = if model.ident_exists(&ucc_member_name) {
-                    format!("{rust_name}{ucc_member_name}")
-                } else {
-                    ucc_member_name
-                };
-                model.deconflict_ident(&mut rust_name);
-
-                // This is expected to be the only place where we construct a non-`None` instance of `containing_object`.
-                let containing_object = Some((object_type, member_name.as_str()));
-
-                let definition = model
-                    .convert_reference_or(
-                        spec,
-                        member_name,
-                        &rust_name,
-                        None,
-                        &schema_ref.as_ref(),
-                        containing_object,
-                    )
-                    .map_err(ValueConversionError::from_inline(&rust_name))?;
-
-                // In a perfect world, we could just set the item's `nullable` field here in the
-                // event that we've determined that the item is in fact nullable.
-                // Unfortunately, there are two obstacles to this.
-                //
-                // The first is relatively minor: the definition here might be a forward reference,
-                // in which case we don't know that it is nullable in all contexts. We can work around that.
-                //
-                // The second is a bigger problem, though: making an item nullable the "proper" way
-                // involves creating a type alias, which changes its public reference name. This doesn't
-                // invalidate past references to the item--the structure of `ApiModel` avoids that issue--
-                // but it does mean we'd need to design a single-purpose function `ApiModel::make_item_nullable`,
-                // which just feels kind of ugly.
-                //
-                // Instead, we'll just handle nullable fields inline; that's good enough.
-                let inline_option = !object_type.required.contains(member_name);
-
-                Ok((
-                    member_name.to_owned(),
-                    ObjectMember {
-                        definition,
-                        read_only,
-                        write_only,
-                        inline_option,
-                    },
-                ))
-            })
-            .collect::<Result<_, _>>()?;
-        Ok(Value::Object(Object { members }))
-    }
-
-    pub(crate) fn parse_one_of_type(
-        spec: &OpenAPI,
-        model: &mut ApiModel<Ref>,
-        spec_name: &str,
-        rust_name: &str,
-        schema_data: &SchemaData,
-        variants: &[ReferenceOr<openapiv3::Schema>],
-    ) -> Result<Self, ValueConversionError> {
-        let discriminant = schema_data
-            .discriminator
-            .as_ref()
-            .map(|discriminant| discriminant.property_name.clone());
-
-        let variants = variants
-            .iter()
-            .map(|schema_ref| {
-                let mapping_name = schema_data
-                    .discriminator
-                    .as_ref()
-                    .and_then(|discriminator| {
-                        discriminator.mapping.iter().find_map(|(name, reference)| {
-                            // it might seem incomplete to just pull out the `ref` variant of the
-                            // `schema_ref` here, but that's actually per the docs:
-                            //
-                            // <https://docs.rs/openapiv3-extended/latest/openapiv3/struct.Discriminator.html>
-                            //
-                            // > When using the discriminator, inline schemas will not be considered.
-                            (schema_ref.as_ref_str() == Some(reference.as_str()))
-                                .then(|| name.to_owned())
-                        })
-                    });
-
-                let definition = model
-                    .convert_reference_or(
-                        spec,
-                        spec_name,
-                        rust_name,
-                        None,
-                        &schema_ref.as_ref(),
-                        None,
-                    )
-                    .map_err(ValueConversionError::from_inline(rust_name))?;
-
-                Ok(Variant {
-                    definition,
-                    mapping_name,
-                })
-            })
-            .collect::<Result<_, _>>()?;
-
-        Ok(Value::OneOfEnum(OneOfEnum {
-            discriminant,
-            variants,
-        }))
-    }
-
-    /// OpenAPI has a somewhat silly rule: to define a nullable enum, you must explicitly include `null` among the
-    /// stated enum variants. The OpenAPI schema model we're using doesn't handle that case well; see
-    /// <https://github.com/kurtbuilds/openapiv3/issues/3>.
-    ///
-    /// This function tries to work around that problem.
-    pub(crate) fn try_parse_string_enum_type(
-        schema_data: &SchemaData,
-        any_schema: &AnySchema,
-    ) -> Option<Self> {
-        use serde_json::Value;
-
-        // This function is implemented as a giant `Option` combinator.
-        //
-        // It's formed of two branches, each of which is of the form
-        // `condition.then(|| make_a_some_variant())`.
-
-        (schema_data.nullable
-            && any_schema.typ.as_deref() == Some("string")
-            && any_schema
-                .enumeration
-                .iter()
-                .any(|enum_item| matches!(enum_item, Value::Null))
-            && any_schema.enumeration.iter().all(|enum_item| {
-                matches!(enum_item, Value::Null) || matches!(enum_item, Value::String(_))
-            }))
-        .then(|| {
-            Self::StringEnum(StringEnum {
-                variants: any_schema
-                    .enumeration
-                    .iter()
-                    .filter_map(Value::as_str)
-                    .map(ToOwned::to_owned)
-                    .collect(),
-                extensible: false,
-            })
-        })
-        .or_else(|| {
-            const X_EXTENSIBLE_ENUM: &str = "x-extensible-enum";
-            (schema_data.nullable
-                && any_schema.typ.as_deref() == Some("string")
-                && schema_data
-                    .extensions
-                    .get(X_EXTENSIBLE_ENUM)
-                    .and_then(Value::as_array)
-                    .map(|array| {
-                        array.iter().any(|value| matches!(value, Value::Null))
-                            && array.iter().all(|value| {
-                                matches!(value, Value::Null) || matches!(value, Value::String(_))
-                            })
-                    })
-                    .unwrap_or_default())
-            .then(|| {
-                Self::StringEnum(StringEnum {
-                    variants: schema_data
-                        .extensions
-                        .get(X_EXTENSIBLE_ENUM)
-                        .and_then(Value::as_array)
-                        .into_iter()
-                        .flatten()
-                        .filter_map(Value::as_str)
-                        .map(ToOwned::to_owned)
-                        .collect(),
-                    extensible: true,
-                })
-            })
-        })
     }
 }
 
