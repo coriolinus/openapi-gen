@@ -6,7 +6,8 @@ use serde::Deserialize;
 
 use crate::{
     codegen::{
-        make_ident, ApiModel, Ref, Reference, Scalar, UnknownReference, Value, ValueConversionError,
+        make_ident, ApiModel, PropertyOverride, Ref, Reference, Scalar, UnknownReference, Value,
+        ValueConversionError,
     },
     resolve_trait::Resolve,
 };
@@ -211,7 +212,13 @@ impl Item<Ref> {
             SchemaKind::AllOf { all_of }
                 if is_property_singleton(spec, containing_object, schema) =>
             {
-                todo!()
+                // `unwrap` and direct indexing are safe because `is_property_singleton` ensures we have
+                // the right state for them.
+                let reference = all_of[0].as_ref_str().unwrap();
+                let ref_ = model
+                    .get_named_reference(reference)
+                    .map_err(|err| ParseItemError::AllOfSingleton(err.into()))?;
+                PropertyOverride::new(schema, ref_).into()
             }
             SchemaKind::AllOf { .. } => return Err(ParseItemError::NonPropertyExtensionAllOf),
             SchemaKind::AnyOf { .. } | SchemaKind::Not { .. } => {
@@ -281,7 +288,8 @@ impl Item {
                 | Value::Set(_)
                 | Value::List(_)
                 | Value::Map(_)
-                | Value::Ref(_) => true,
+                | Value::Ref(_)
+                | Value::PropertyOverride(_) => true,
                 Value::StringEnum(_) | Value::OneOfEnum(_) | Value::Object(_) => false,
             }
     }
@@ -429,6 +437,8 @@ pub enum ParseItemError {
     NonPropertyExtensionAllOf,
     #[error("failed to get external documentation")]
     ExternalDocumentation(#[source] reqwest::Error),
+    #[error("failed to construct `allOf` singleton")]
+    AllOfSingleton(#[source] anyhow::Error),
 }
 
 #[derive(Debug, thiserror::Error)]

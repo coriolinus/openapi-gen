@@ -2,13 +2,14 @@ pub(crate) mod list;
 pub(crate) mod map;
 pub(crate) mod object;
 pub(crate) mod one_of_enum;
+pub(crate) mod property_override_ref;
 pub(crate) mod scalar;
 pub(crate) mod set;
 pub(crate) mod string_enum;
 
 use crate::codegen::{
     api_model::{self, Ref, Reference, UnknownReference},
-    make_ident, ApiModel, {List, Map, Object, OneOfEnum, Scalar, Set, StringEnum},
+    make_ident, ApiModel, List, Map, Object, OneOfEnum, PropertyOverride, Scalar, Set, StringEnum,
 };
 use {object::ObjectMember, one_of_enum::Variant};
 
@@ -35,6 +36,7 @@ pub enum Value<Ref = Reference> {
     Map(Map<Ref>),
     #[from(ignore)]
     Ref(Ref),
+    PropertyOverride(PropertyOverride<Ref>),
 }
 
 impl<R> Default for Value<R> {
@@ -59,6 +61,9 @@ impl Value<Ref> {
             Value::Object(object) => Ok(Value::Object(object.resolve_refs(resolver)?)),
             Value::Map(map) => Ok(Value::Map(map.resolve_refs(resolver)?)),
             Value::Ref(ref_) => Ok(Value::Ref(resolver(&ref_)?)),
+            Value::PropertyOverride(property_override) => Ok(Value::PropertyOverride(
+                property_override.resolve_refs(resolver)?,
+            )),
         }
     }
 
@@ -445,7 +450,12 @@ impl<R> Value<R> {
     /// What kind of item keyword does this value type use?
     pub fn item_keyword(&self) -> TokenStream {
         match self {
-            Value::Scalar(_) | Value::List(_) | Value::Set(_) | Value::Map(_) | Value::Ref(_) => {
+            Value::Scalar(_)
+            | Value::List(_)
+            | Value::Set(_)
+            | Value::Map(_)
+            | Value::Ref(_)
+            | Value::PropertyOverride(_) => {
                 quote!(type)
             }
             Value::StringEnum(_) | Value::OneOfEnum(_) => quote!(enum),
@@ -456,9 +466,12 @@ impl<R> Value<R> {
     /// `true` when this is a struct or enum.
     pub fn is_struct_or_enum(&self) -> bool {
         match self {
-            Value::Scalar(_) | Value::List(_) | Value::Set(_) | Value::Map(_) | Value::Ref(_) => {
-                false
-            }
+            Value::Scalar(_)
+            | Value::List(_)
+            | Value::Set(_)
+            | Value::Map(_)
+            | Value::Ref(_)
+            | Value::PropertyOverride(_) => false,
             Value::StringEnum(_) | Value::OneOfEnum(_) | Value::Object(_) => true,
         }
     }
@@ -487,6 +500,10 @@ impl Value {
                 .resolve(*ref_)
                 .map(|item| item.value.impls_eq(model))
                 .unwrap_or_default(),
+            Value::PropertyOverride(property_override) => model
+                .resolve(property_override.ref_)
+                .map(|item| item.value.impls_eq(model))
+                .unwrap_or_default(),
         }
     }
 
@@ -505,6 +522,10 @@ impl Value {
                 .all(|member| model[member.definition].value.impls_copy(model)),
             Value::Ref(ref_) => model
                 .resolve(*ref_)
+                .map(|item| item.value.impls_copy(model))
+                .unwrap_or_default(),
+            Value::PropertyOverride(property_override) => model
+                .resolve(property_override.ref_)
                 .map(|item| item.value.impls_copy(model))
                 .unwrap_or_default(),
         }
@@ -526,6 +547,10 @@ impl Value {
                 .all(|member| model[member.definition].value.impls_hash(model)),
             Value::Ref(ref_) => model
                 .resolve(*ref_)
+                .map(|item| item.value.impls_hash(model))
+                .unwrap_or_default(),
+            Value::PropertyOverride(property_override) => model
+                .resolve(property_override.ref_)
                 .map(|item| item.value.impls_hash(model))
                 .unwrap_or_default(),
         }
@@ -551,6 +576,11 @@ impl Value {
             Value::Object(object) => object.emit_definition(model, name_resolver),
             Value::Ref(ref_) => {
                 let name = name_resolver(*ref_)?;
+                let ident = make_ident(name);
+                Ok(quote!(#ident))
+            }
+            Value::PropertyOverride(property_override) => {
+                let name = name_resolver(property_override.ref_)?;
                 let ident = make_ident(name);
                 Ok(quote!(#ident))
             }
