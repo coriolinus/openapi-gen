@@ -24,6 +24,8 @@ use crate::{
     },
 };
 
+use super::item::ContainingObject;
+
 /// A reference to an item definition.
 ///
 /// This can be dereferenced by an [`ApiModel`].
@@ -234,18 +236,25 @@ impl ApiModel<Ref> {
     /// Otherwise, the reference is simply converted to an appropriate `Ref`.
     pub fn convert_reference_or<S>(
         &mut self,
+        spec: &OpenAPI,
         spec_name: &str,
         rust_name: &str,
         reference_name: Option<&str>,
         schema_ref: &ReferenceOr<S>,
+        containing_object: ContainingObject,
     ) -> Result<Ref, Error>
     where
         S: Deref<Target = Schema>,
     {
         match schema_ref {
-            ReferenceOr::Item(schema) => {
-                self.add_inline_items(spec_name, rust_name, reference_name, schema)
-            }
+            ReferenceOr::Item(schema) => self.add_inline_items(
+                spec,
+                spec_name,
+                rust_name,
+                reference_name,
+                schema,
+                containing_object,
+            ),
             ReferenceOr::Reference { reference } => match self.named_references.get(reference) {
                 Some(position) => Ok(Ref::Back(*position)),
                 None => Ok(Ref::Forward(reference.to_owned())),
@@ -260,12 +269,14 @@ impl ApiModel<Ref> {
     /// External item definitions are permitted to be forward references.
     pub fn add_inline_items(
         &mut self,
+        spec: &OpenAPI,
         spec_name: &str,
         rust_name: &str,
         reference_name: Option<&str>,
         schema: &Schema,
+        containing_object: ContainingObject,
     ) -> Result<Ref, Error> {
-        let item = Item::parse_schema(self, spec_name, rust_name, schema)?;
+        let item = Item::parse_schema(spec, self, spec_name, rust_name, schema, containing_object)?;
         self.add_item(item, reference_name)
     }
 
@@ -455,9 +466,14 @@ impl TryFrom<OpenAPI> for ApiModel {
             let reference_name = Some(reference_name);
             let reference_name = reference_name.as_deref();
             let ref_ = match schema_or_scalar {
-                OrScalar::Item(schema) => {
-                    model.add_inline_items(spec_name, &rust_name, reference_name, schema)?
-                }
+                OrScalar::Item(schema) => model.add_inline_items(
+                    &spec,
+                    spec_name,
+                    &rust_name,
+                    reference_name,
+                    schema,
+                    None,
+                )?,
                 OrScalar::Scalar(scalar) => {
                     model.add_scalar(spec_name, &rust_name, reference_name, scalar)?
                 }
@@ -484,7 +500,8 @@ impl TryFrom<OpenAPI> for ApiModel {
         for (spec_name, reference_name, request_body) in component_requests(&spec) {
             let reference_name = Some(reference_name);
             let reference_name = reference_name.as_deref();
-            let ref_ = create_request_body(&mut model, spec_name, reference_name, request_body)?;
+            let ref_ =
+                create_request_body(&spec, &mut model, spec_name, reference_name, request_body)?;
             // all top-level component parameters are also public
             if let Some(item) = model.resolve_mut(&ref_) {
                 item.pub_typedef = true;
@@ -501,6 +518,7 @@ impl TryFrom<OpenAPI> for ApiModel {
             let reference_name = reference_name.as_deref();
             let mut response_collector = ResponseCollector::default();
             create_response_variants(
+                &spec,
                 &mut model,
                 spec_name,
                 None,

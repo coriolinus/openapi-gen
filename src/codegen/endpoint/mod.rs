@@ -325,7 +325,9 @@ pub(crate) fn insert_endpoints(spec: &OpenAPI, model: &mut ApiModel<Ref>) -> Res
                     .as_ref()
                     .filter(|_request_body| verb.request_body_is_legal())
                     .map(|body_ref| {
-                        request_body::create_request_body_from_ref(model, &spec_name, body_ref)
+                        request_body::create_request_body_from_ref(
+                            spec, model, &spec_name, body_ref,
+                        )
                     })
                     .transpose()?
             };
@@ -333,7 +335,7 @@ pub(crate) fn insert_endpoints(spec: &OpenAPI, model: &mut ApiModel<Ref>) -> Res
             let response = {
                 let spec_name =
                     make_operation_spec_name(operation_id.as_deref(), "Response", verb, path);
-                response::create_responses(model, &spec_name, &operation.responses)?
+                response::create_responses(spec, model, &spec_name, &operation.responses)?
             };
 
             let endpoint = Endpoint::<Ref> {

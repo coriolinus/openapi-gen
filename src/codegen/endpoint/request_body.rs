@@ -1,6 +1,6 @@
 use heck::ToUpperCamelCase;
 use indexmap::IndexMap;
-use openapiv3::{MediaType, ReferenceOr, Schema};
+use openapiv3::{MediaType, OpenAPI, ReferenceOr, Schema};
 
 use crate::{
     codegen::{
@@ -24,6 +24,7 @@ fn wrap_err<E: Into<anyhow::Error>>(err: E) -> Error {
 /// - `Some(ReferenceOr::Reference)` => `Value::Ref(_)`
 /// - `Some(ReferenceOr::Item(schema))` => Item::parse_schema`
 fn convert_optional_schema_ref(
+    spec: &OpenAPI,
     model: &mut ApiModel<Ref>,
     spec_name: String,
     rust_name: String,
@@ -56,7 +57,7 @@ fn convert_optional_schema_ref(
             })
         }
         Some(ReferenceOr::Item(schema)) => {
-            Item::parse_schema(model, &spec_name, &rust_name, schema).map_err(wrap_err)
+            Item::parse_schema(spec, model, &spec_name, &rust_name, schema, None).map_err(wrap_err)
         }
     }
 }
@@ -82,6 +83,7 @@ fn all_content_types_share_schema_def(content: &IndexMap<String, MediaType>) -> 
 
 /// Insert an `openapiv3::RequestBody` into the model, producing as `Ref`.
 pub(crate) fn create_request_body(
+    spec: &OpenAPI,
     model: &mut ApiModel<Ref>,
     spec_name: &str,
     reference_name: Option<&str>,
@@ -99,7 +101,13 @@ pub(crate) fn create_request_body(
             .content
             .first()
             .and_then(|(_content_type, media_type)| media_type.schema.as_ref());
-        convert_optional_schema_ref(model, spec_name.to_owned(), rust_name, optional_schema_ref)?
+        convert_optional_schema_ref(
+            spec,
+            model,
+            spec_name.to_owned(),
+            rust_name,
+            optional_schema_ref,
+        )?
     } else {
         // someone had the ill grace to produce several different request types differentiated by the `content_type`.
         // this means we can't emit a simple item, but have to turn this into a `OneOf` enum.
@@ -112,6 +120,7 @@ pub(crate) fn create_request_body(
                 model.deconflict_member_or_variant_ident(&mut rust_name);
 
                 let mut variant_item = convert_optional_schema_ref(
+                    spec,
                     model,
                     spec_name,
                     rust_name,
@@ -149,6 +158,7 @@ pub(crate) fn create_request_body(
 
 /// Convert a `ReferenceOr<openapiv3::RequestBody>` into a `Ref`.
 pub(crate) fn create_request_body_from_ref(
+    spec: &OpenAPI,
     model: &mut ApiModel<Ref>,
     spec_name: &str,
     body_ref: &ReferenceOr<openapiv3::RequestBody>,
@@ -162,7 +172,7 @@ pub(crate) fn create_request_body_from_ref(
         // item branch is a touch more complicated, but not really.
         // we just have to convert the item description, then return the ref.
         ReferenceOr::Item(request_body) => {
-            create_request_body(model, spec_name, None, request_body)
+            create_request_body(spec, model, spec_name, None, request_body)
         }
     }
 }

@@ -1,5 +1,5 @@
 use heck::ToUpperCamelCase;
-use openapiv3::{OpenAPI, ReferenceOr, Schema, SchemaKind, Type};
+use openapiv3::{ObjectType, OpenAPI, Schema, SchemaKind, Type};
 use proc_macro2::TokenStream;
 use quote::quote;
 use serde::Deserialize;
@@ -22,9 +22,9 @@ fn get_extension_bool(schema: &Schema, key: &str) -> bool {
         .unwrap_or_default()
 }
 
-/// The outer schema of the object type containing this schema, and the item name
+/// The object type containing this schema, and the item name
 /// of the property identifying this schema.
-type ContainingSchema<'a> = Option<(&'a Schema, &'a str)>;
+pub(crate) type ContainingObject<'a> = Option<(&'a ObjectType, &'a str)>;
 
 /// Does this `allOf` instance follow the rules of an `allOf` property singleton?
 ///
@@ -36,26 +36,25 @@ type ContainingSchema<'a> = Option<(&'a Schema, &'a str)>;
 /// - the `allOf` definition possesses exactly one item
 /// - the `allOf` item is a reference
 ///
-/// `containing_schema` must be the tuple with the schema containing this schema, and the property name
+/// `containing_object` must be the tuple with the object schema containing this schema, and the property name
 /// referencing this schema.
 fn is_property_singleton(
     spec: &OpenAPI,
-    containing_schema: ContainingSchema,
+    containing_object: ContainingObject,
     schema: &Schema,
 ) -> bool {
     // the schema is a property sub-schema of an object type
-    let Some((containing_schema, property_name)) = containing_schema else {return false};
-    let SchemaKind::Type(Type::Object(object_type)) = &containing_schema.schema_kind else {return false};
+    let Some((object_type, property_name)) = containing_object else {return false};
     if object_type
         .properties
         .get(property_name)
-        .and_then(|schema_ref| Resolve::resolve(&schema_ref, spec).ok())
+        .and_then(|schema_ref| Resolve::resolve(schema_ref, spec).ok())
         != Some(schema)
     {
         return false;
     }
 
-    // the schema is not in the `required` list of the object type
+    // the schema is not in the `required` list of the containing object type
     if object_type
         .required
         .iter()
@@ -173,13 +172,16 @@ impl Item<Ref> {
     }
 
     /// Parse a schema, recursively adding inline items
+    ///
+    /// `containing_object` is relevant only in the case that this schema is a property of an object type.
+    /// In all other cases, it is fine to pass `None` for that parameter.
     pub(crate) fn parse_schema(
         spec: &OpenAPI,
         model: &mut ApiModel<Ref>,
         spec_name: &str,
         rust_name: &str,
         schema: &Schema,
-        containing_schema: ContainingSchema,
+        containing_object: ContainingObject,
     ) -> Result<Self, ParseItemError> {
         let value: Value<Ref> = match &schema.schema_kind {
             SchemaKind::Type(Type::Boolean {}) => Value::Scalar(Scalar::Bool),
@@ -193,21 +195,26 @@ impl Item<Ref> {
                 Value::parse_string_type(string_type, &schema.schema_data)?
             }
             SchemaKind::Type(Type::Array(array_type)) => {
-                Value::parse_array_type(model, spec_name, rust_name, array_type)?
+                Value::parse_array_type(spec, model, spec_name, rust_name, array_type)?
             }
             SchemaKind::Type(Type::Object(object_type)) => {
-                Value::parse_object_type(model, spec_name, rust_name, object_type)?
+                Value::parse_object_type(spec, model, spec_name, rust_name, object_type)?
             }
-            SchemaKind::OneOf { one_of } => {
-                Value::parse_one_of_type(model, spec_name, rust_name, &schema.schema_data, one_of)?
-            }
-            SchemaKind::AllOf { all_of } if is_property_singleton(spec, containing_schema, schema) {
+            SchemaKind::OneOf { one_of } => Value::parse_one_of_type(
+                spec,
+                model,
+                spec_name,
+                rust_name,
+                &schema.schema_data,
+                one_of,
+            )?,
+            SchemaKind::AllOf { all_of }
+                if is_property_singleton(spec, containing_object, schema) =>
+            {
                 todo!()
             }
-            SchemaKind::AllOf { .. } => {
-                return Err(ParseItemError::NonPropertyExtensionAllOf)
-            }
-            SchemaKind::AllOf { .. } | SchemaKind::AnyOf { .. } | SchemaKind::Not { .. } => {
+            SchemaKind::AllOf { .. } => return Err(ParseItemError::NonPropertyExtensionAllOf),
+            SchemaKind::AnyOf { .. } | SchemaKind::Not { .. } => {
                 return Err(ParseItemError::UnsupportedSchemaKind)
             }
         };

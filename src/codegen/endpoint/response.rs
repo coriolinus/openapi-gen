@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context as _};
 use heck::ToUpperCamelCase;
-use openapiv3::{ReferenceOr, Response, Responses, Schema, StatusCode};
+use openapiv3::{OpenAPI, ReferenceOr, Response, Responses, Schema, StatusCode};
 
 use crate::{
     codegen::{
@@ -98,6 +98,7 @@ fn iter_status_and_content_schemas<'a>(
 ///
 /// So we require a return parameter which is able to accept various `Ref`s.
 pub(crate) fn create_response_variants(
+    spec: &OpenAPI,
     model: &mut ApiModel<Ref>,
     spec_name: &str,
     reference_name: Option<&str>,
@@ -119,7 +120,7 @@ pub(crate) fn create_response_variants(
             // basic references and inline definitions have obvious implementations
             Some(ReferenceOr::Reference { reference }) => model.get_named_reference(reference),
             Some(ReferenceOr::Item(schema)) => {
-                model.add_inline_items(&spec_name, &rust_name, reference_name, schema)
+                model.add_inline_items(spec, &spec_name, &rust_name, reference_name, schema, None)
             }
         }
         .with_context(|| anyhow!("unable to produce variant ref for {rust_name}"))
@@ -193,6 +194,7 @@ impl ResponseCollector {
 ///
 /// This will always produce an enum, no matter how many responses are included.
 pub(crate) fn create_responses(
+    spec: &OpenAPI,
     model: &mut ApiModel<Ref>,
     spec_name: &str,
     responses: &Responses,
@@ -211,7 +213,14 @@ pub(crate) fn create_responses(
             }
         };
 
-        create_response_variants(model, &status_code, None, response, &mut response_collector)?;
+        create_response_variants(
+            spec,
+            model,
+            &status_code,
+            None,
+            response,
+            &mut response_collector,
+        )?;
     }
 
     let rust_name = spec_name.to_upper_camel_case();

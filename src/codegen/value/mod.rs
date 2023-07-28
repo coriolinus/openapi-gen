@@ -15,7 +15,7 @@ use {object::ObjectMember, one_of_enum::Variant};
 use heck::AsUpperCamelCase;
 use openapiv3::{
     AnySchema, ArrayType, IntegerFormat, IntegerType, NumberFormat, NumberType, ObjectType,
-    ReferenceOr, SchemaData, StringFormat, StringType, VariantOrUnknownOrEmpty,
+    OpenAPI, ReferenceOr, SchemaData, StringFormat, StringType, VariantOrUnknownOrEmpty,
 };
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -140,6 +140,7 @@ impl Value<Ref> {
     }
 
     pub(crate) fn parse_array_type(
+        spec: &OpenAPI,
         model: &mut ApiModel<Ref>,
         spec_name: &str,
         rust_name: &str,
@@ -150,7 +151,7 @@ impl Value<Ref> {
             Some(items) => {
                 let rust_name = format!("{rust_name}Item");
                 let item = model
-                    .convert_reference_or(spec_name, &rust_name, None, items)
+                    .convert_reference_or(spec, spec_name, &rust_name, None, items, None)
                     .map_err(ValueConversionError::from_inline(&rust_name))?;
                 if array_type.unique_items {
                     Ok(Set { item }.into())
@@ -162,6 +163,7 @@ impl Value<Ref> {
     }
 
     pub(crate) fn parse_object_type(
+        spec: &OpenAPI,
         model: &mut ApiModel<Ref>,
         spec_name: &str,
         rust_name: &str,
@@ -179,10 +181,12 @@ impl Value<Ref> {
                     let rust_name = format!("{rust_name}Item");
                     let item = model
                         .convert_reference_or(
+                            spec,
                             spec_name,
                             &rust_name,
                             None,
                             &schema_ref.as_ref().as_ref(),
+                            None,
                         )
                         .map_err(ValueConversionError::from_inline(&rust_name))?;
                     Some(item)
@@ -223,8 +227,18 @@ impl Value<Ref> {
                 };
                 model.deconflict_ident(&mut rust_name);
 
+                // This is expected to be the only place where we construct a non-`None` instance of `containing_object`.
+                let containing_object = Some((object_type, member_name.as_str()));
+
                 let definition = model
-                    .convert_reference_or(member_name, &rust_name, None, &schema_ref.as_ref())
+                    .convert_reference_or(
+                        spec,
+                        member_name,
+                        &rust_name,
+                        None,
+                        &schema_ref.as_ref(),
+                        containing_object,
+                    )
                     .map_err(ValueConversionError::from_inline(&rust_name))?;
 
                 // In a perfect world, we could just set the item's `nullable` field here in the
@@ -258,6 +272,7 @@ impl Value<Ref> {
     }
 
     pub(crate) fn parse_one_of_type(
+        spec: &OpenAPI,
         model: &mut ApiModel<Ref>,
         spec_name: &str,
         rust_name: &str,
@@ -289,7 +304,14 @@ impl Value<Ref> {
                     });
 
                 let definition = model
-                    .convert_reference_or(spec_name, rust_name, None, &schema_ref.as_ref())
+                    .convert_reference_or(
+                        spec,
+                        spec_name,
+                        rust_name,
+                        None,
+                        &schema_ref.as_ref(),
+                        None,
+                    )
                     .map_err(ValueConversionError::from_inline(rust_name))?;
 
                 Ok(Variant {
