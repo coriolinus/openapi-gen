@@ -1,9 +1,7 @@
 //! This module is temporary; we want to use https://github.com/kurtbuilds/openapiv3/pull/5 once it is merged.
 
 use anyhow::{anyhow, bail, Result};
-use openapiv3::{
-    Header, OpenAPI, Parameter, ReferenceOr, RequestBody, Response, Schema, SchemaReference,
-};
+use openapiv3::{OpenAPI, ReferenceOr, Schema, SchemaReference};
 
 fn schema_reference_from_str(reference: &str) -> Result<SchemaReference> {
     // limit to 7 items taken here, because that's all we need to know whether a components section
@@ -48,36 +46,40 @@ pub trait Resolve {
     fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output>;
 }
 
-impl<'o> Resolve for &'o ReferenceOr<Schema> {
+fn resolve_schema<'a>(schema: &'a ReferenceOr<Schema>, spec: &'a OpenAPI) -> Result<&'a Schema> {
+    let reference = match schema {
+        ReferenceOr::Item(item) => return Ok(item),
+        ReferenceOr::Reference { reference } => reference,
+    };
+    let schema_ref = schema_reference_from_str(reference)?;
+    let get_schema = |schema: &str| -> Result<&Schema> {
+        let schema_ref = spec
+            .schemas()
+            .get(schema)
+            .ok_or_else(|| anyhow!("{reference} not found in OpenAPI spec"))?;
+        item_or_err(schema_ref, reference)
+    };
+    match &schema_ref {
+        SchemaReference::Schema { schema } => get_schema(schema),
+        SchemaReference::Property {
+            schema: schema_name,
+            property,
+        } => {
+            let schema = get_schema(schema_name)?;
+            let schema_ref = schema
+                .properties()
+                .ok_or_else(|| anyhow!("tried to resolve reference {reference}, but {schema_name} is not an object with properties"))?
+                .get(property).ok_or_else(|| anyhow!("schema {schema_name} lacks property {property}"))?;
+            Resolve::resolve(schema_ref, spec)
+        }
+    }
+}
+
+impl Resolve for &'_ ReferenceOr<Schema> {
     type Output = Schema;
 
     fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output> {
-        let reference = match self {
-            ReferenceOr::Item(item) => return Ok(item),
-            ReferenceOr::Reference { reference } => reference,
-        };
-        let schema_ref = schema_reference_from_str(reference)?;
-        let get_schema = |schema: &str| -> Result<&Schema> {
-            let schema_ref = spec
-                .schemas()
-                .get(schema)
-                .ok_or_else(|| anyhow!("{reference} not found in OpenAPI spec"))?;
-            item_or_err(schema_ref, reference)
-        };
-        match &schema_ref {
-            SchemaReference::Schema { schema } => get_schema(schema),
-            SchemaReference::Property {
-                schema: schema_name,
-                property,
-            } => {
-                let schema = get_schema(schema_name)?;
-                let schema_ref = schema
-                    .properties()
-                    .ok_or_else(|| anyhow!("tried to resolve reference {reference}, but {schema_name} is not an object with properties"))?
-                    .get(property).ok_or_else(|| anyhow!("schema {schema_name} lacks property {property}"))?;
-                Resolve::resolve(schema_ref, spec)
-            }
-        }
+        resolve_schema(self, spec)
     }
 }
 
@@ -85,17 +87,29 @@ impl Resolve for ReferenceOr<Schema> {
     type Output = Schema;
 
     fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output> {
-        Resolve::resolve(self, spec)
+        resolve_schema(self, spec)
     }
 }
 
+/// Warning: this macro can't be used outside this module without substantial rework.
+/// It makes several simplifying assumptions about its usage and caller, which are not
+/// portable. It is quite good for saving work _within_ the module, but it really should
+/// not be moved or used elsewhere.
 macro_rules! impl_resolve_for {
     (ReferenceOr<$output:ident>; $getter:ident; $components_field:ident) => {
-        impl<'o> Resolve for &'o ReferenceOr<$output> {
-            type Output = $output;
+        mod $components_field {
+            use super::$getter;
+            use openapiv3::$output;
 
-            fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output> {
-                match self {
+            use super::{item_or_err, Resolve};
+            use anyhow::{anyhow, Result};
+            use openapiv3::{OpenAPI, ReferenceOr};
+
+            fn resolve<'a>(
+                ref_: &'a ReferenceOr<$output>,
+                spec: &'a OpenAPI,
+            ) -> Result<&'a $output> {
+                match ref_ {
                     ReferenceOr::Item(item) => Ok(item),
                     ReferenceOr::Reference { reference } => {
                         let name = $getter(reference)?;
@@ -111,13 +125,21 @@ macro_rules! impl_resolve_for {
                     }
                 }
             }
-        }
 
-        impl Resolve for ReferenceOr<$output> {
-            type Output = $output;
+            impl Resolve for &'_ ReferenceOr<$output> {
+                type Output = $output;
 
-            fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output> {
-                Resolve::resolve(self, spec)
+                fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output> {
+                    resolve(self, spec)
+                }
+            }
+
+            impl Resolve for ReferenceOr<$output> {
+                type Output = $output;
+
+                fn resolve<'a>(&'a self, spec: &'a OpenAPI) -> Result<&'a Self::Output> {
+                    resolve(self, spec)
+                }
             }
         }
     };
