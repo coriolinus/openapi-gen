@@ -1,3 +1,4 @@
+#![allow(non_camel_case_types)]
 pub type PostWellKnownTypesRequest = openapi_gen::reexport::serde_json::Value;
 type NoContent = ();
 type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;

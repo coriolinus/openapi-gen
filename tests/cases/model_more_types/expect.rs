@@ -1,3 +1,4 @@
+#![allow(non_camel_case_types)]
 pub type IsAwesome = bool;
 ///arbitrary JSON captured in a `serde_json::Value`
 #[derive(

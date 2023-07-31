@@ -1,3 +1,4 @@
+#![allow(non_camel_case_types)]
 type NotNullableAndRequired = i64;
 type NotNullableAndNotRequired = i64;
 type MaybeNullableAndRequired = Option<NullableAndRequired>;

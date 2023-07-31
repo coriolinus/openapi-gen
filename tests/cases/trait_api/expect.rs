@@ -1,3 +1,4 @@
+#![allow(non_camel_case_types)]
 pub type PostKudo = openapi_gen::reexport::serde_json::Value;
 ///request body for a freeform render request
 pub type PostKudosRequest = PostKudo;

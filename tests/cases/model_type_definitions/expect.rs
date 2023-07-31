@@ -1,3 +1,4 @@
+#![allow(non_camel_case_types)]
 ///should be `pub type Count = u64`
 pub type Count = u64;
 ///should be `pub struct FirstBar(pub String);`

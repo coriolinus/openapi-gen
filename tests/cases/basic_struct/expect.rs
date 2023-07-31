@@ -1,3 +1,4 @@
+#![allow(non_camel_case_types)]
 ///unsigned integer
 type Foo = u64;
 type Bar = String;

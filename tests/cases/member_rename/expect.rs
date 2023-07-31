@@ -1,3 +1,4 @@
+#![allow(non_camel_case_types)]
 ///who this gift is for
 type For = String;
 /**who this gift is from.

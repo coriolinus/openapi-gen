@@ -1,3 +1,4 @@
+#![allow(non_camel_case_types)]
 pub type RenderError = openapi_gen::reexport::serde_json::Value;
 type Ok_ = Vec<u8>;
 type ServiceUnavailable = openapi_gen::reexport::http_api_problem::HttpApiProblem;

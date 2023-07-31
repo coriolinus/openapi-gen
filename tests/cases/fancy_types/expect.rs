@@ -1,3 +1,4 @@
+#![allow(non_camel_case_types)]
 type Number = f64;
 type NumberFloat = f32;
 type NumberDouble = f64;
