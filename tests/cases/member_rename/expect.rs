@@ -21,6 +21,7 @@ type Message = String;
     Hash,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct GiftTag {
     ///who this gift is for
     #[serde(rename = "for")]

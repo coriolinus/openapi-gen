@@ -387,11 +387,15 @@ impl Value {
         }
     }
 
-    pub fn serde_container_attributes(&self) -> Vec<TokenStream> {
-        match self {
-            Value::OneOfEnum(one_of_enum) => one_of_enum.serde_container_attributes(),
-            _ => Vec::new(),
+    pub fn serde_container_attributes(&self, is_typedef: bool) -> Vec<TokenStream> {
+        let mut out = Vec::new();
+        if !is_typedef {
+            out.push(quote!(crate = "openapi_gen::reexport::serde"));
         }
+        if let Value::OneOfEnum(one_of_enum) = self {
+            out.extend(one_of_enum.serde_container_attributes());
+        }
+        out
     }
 }
 

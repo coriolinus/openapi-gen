@@ -9,6 +9,7 @@
     Hash,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Id(pub openapi_gen::reexport::uuid::Uuid);
 type Foo = f64;
 type Bar = String;
@@ -20,6 +21,7 @@ type Bar = String;
     openapi_gen::reexport::serde::Deserialize,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Thing {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub foo: Option<Foo>,
@@ -33,7 +35,7 @@ pub struct Thing {
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize
 )]
-#[serde(untagged)]
+#[serde(crate = "openapi_gen::reexport::serde", untagged)]
 pub enum GetThingResponse {
     Ok(Thing),
 }
@@ -45,7 +47,7 @@ pub type PutThingRequest = Thing;
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize
 )]
-#[serde(untagged)]
+#[serde(crate = "openapi_gen::reexport::serde", untagged)]
 pub enum PutThingResponse {
     Ok(Thing),
 }

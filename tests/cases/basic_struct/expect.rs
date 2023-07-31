@@ -12,6 +12,7 @@ type Bar = String;
     Hash,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct InnerStruct {
     ///unsigned integer
     pub foo: Foo,
@@ -38,6 +39,7 @@ type Bat = i64;
     Hash,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct DefinedInline {
     /**even given compatible names and types, distinct inline types are distinguished.
 the software makes no attempt to unify the types, because that would violate the
@@ -58,6 +60,7 @@ for type unification, use a reference.
     Hash,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct OuterStruct {
     ///this object is defined separately, intended to be used within a reference
     pub inner: InnerStruct,

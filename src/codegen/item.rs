@@ -346,7 +346,7 @@ impl Item {
                 }
             });
 
-        let serde_container_attributes = self.value.serde_container_attributes();
+        let serde_container_attributes = self.value.serde_container_attributes(self.is_typedef());
         let serde_container_attributes = (!serde_container_attributes.is_empty())
             .then(move || quote!(#[serde( #( #serde_container_attributes ),*)]));
 
