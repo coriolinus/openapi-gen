@@ -389,7 +389,7 @@ impl ApiModel {
             .collect::<Result<Vec<_>, _>>()?;
 
         let trait_api = quote! {
-            #[openapi_gen::reexports::async_trait::async_trait]
+            #[openapi_gen::reexport::async_trait::async_trait]
             pub trait Api {
                 #(
                     #endpoints

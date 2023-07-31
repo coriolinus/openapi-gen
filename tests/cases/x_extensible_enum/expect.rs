@@ -13,6 +13,6 @@ pub enum DeliveryMethod {
     Email,
     Other(String),
 }
-#[openapi_gen::reexports::async_trait::async_trait]
+#[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {}
 

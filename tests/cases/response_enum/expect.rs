@@ -16,7 +16,7 @@ pub enum RenderPdfResponse {
     ServiceUnavailable(ServiceUnavailable),
     Default(Default_),
 }
-#[openapi_gen::reexports::async_trait::async_trait]
+#[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
     /**`POST /render`
 

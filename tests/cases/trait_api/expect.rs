@@ -16,7 +16,7 @@ pub enum PostKudosResponse {
     Created(Created),
     Default(Default_),
 }
-#[openapi_gen::reexports::async_trait::async_trait]
+#[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
     /**`POST /post-kudos`
 
