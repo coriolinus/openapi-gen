@@ -25,6 +25,6 @@ pub struct Foo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nullable_and_not_required: Option<MaybeNullableAndNotRequired>,
 }
-#[openapi_gen::reexports::async_trait::async_trait]
+#[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {}
 

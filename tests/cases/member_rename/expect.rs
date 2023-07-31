@@ -39,6 +39,6 @@ default casing is unexpected.
     #[serde(rename = "Message", skip_serializing_if = "Option::is_none")]
     pub message: Option<Message>,
 }
-#[openapi_gen::reexports::async_trait::async_trait]
+#[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {}
 

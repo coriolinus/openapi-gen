@@ -34,6 +34,6 @@ pub struct Foo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub first_bar: Option<FirstBar>,
 }
-#[openapi_gen::reexports::async_trait::async_trait]
+#[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {}
 

@@ -32,7 +32,7 @@ pub enum MultiRequestsRequest {
 ///request body is optional
 pub type OptionalRequestBodyRequest = Option<JsonType>;
 pub type SameRequestRequest = ReqType;
-#[openapi_gen::reexports::async_trait::async_trait]
+#[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
     /**`POST /multi-requests`
 
