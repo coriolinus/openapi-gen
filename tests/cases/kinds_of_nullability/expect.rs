@@ -16,6 +16,7 @@ type NullableAndNotRequired = i64;
     Hash,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Foo {
     pub not_nullable_and_required: NotNullableAndRequired,
     #[serde(skip_serializing_if = "Option::is_none")]

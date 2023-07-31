@@ -9,6 +9,7 @@
     Hash,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Id(pub openapi_gen::reexport::uuid::Uuid);
 type ThingId = Id;
 #[derive(
@@ -22,6 +23,7 @@ type ThingId = Id;
     Hash,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Thing {
     #[serde(skip_deserializing, skip_serializing_if = "Option::is_none")]
     pub id: Option<ThingId>,
@@ -37,6 +39,7 @@ pub struct Thing {
     Hash,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct WriteableThing {
     pub id: Id,
 }

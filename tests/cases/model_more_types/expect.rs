@@ -8,6 +8,7 @@ pub type IsAwesome = bool;
     openapi_gen::reexport::serde::Deserialize,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct ArbitraryJson(openapi_gen::reexport::serde_json::Value);
 #[derive(
     Debug,
@@ -17,6 +18,7 @@ pub struct ArbitraryJson(openapi_gen::reexport::serde_json::Value);
     openapi_gen::reexport::serde::Deserialize,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Thing {
     pub awesomeness: IsAwesome,
     ///arbitrary JSON captured in a `serde_json::Value`
@@ -37,6 +39,7 @@ pub type Map = std::collections::HashMap<String, Thing>;
     Eq,
     Hash
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub enum Ordering {
     Asc,
     Desc,
@@ -52,6 +55,7 @@ type MaybeColor = Option<Color>;
     Eq,
     Hash
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub enum Color {
     Red,
     Green,
@@ -65,7 +69,7 @@ pub enum Color {
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize
 )]
-#[serde(tag = "type")]
+#[serde(crate = "openapi_gen::reexport::serde", tag = "type")]
 pub enum Collection {
     List(List),
     Set(Set),
@@ -81,7 +85,7 @@ so ensure they are distinguishable
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize
 )]
-#[serde(untagged)]
+#[serde(crate = "openapi_gen::reexport::serde", untagged)]
 pub enum UntaggedEnum {
     Thing(Thing),
     Ordering(Ordering),

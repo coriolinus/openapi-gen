@@ -9,7 +9,7 @@ type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize
 )]
-#[serde(untagged)]
+#[serde(crate = "openapi_gen::reexport::serde", untagged)]
 pub enum RenderPdfResponse {
     Ok(Ok_),
     BadRequest(RenderError),

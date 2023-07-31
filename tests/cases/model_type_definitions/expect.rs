@@ -15,6 +15,7 @@ pub type Count = u64;
     openapi_gen::reexport::derive_more::DerefMut,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct FirstBar(pub String);
 #[derive(
     Debug,
@@ -26,6 +27,7 @@ pub struct FirstBar(pub String);
     Hash,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Foo {
     ///should be `pub type Count = u64`
     #[serde(skip_serializing_if = "Option::is_none")]

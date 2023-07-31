@@ -11,7 +11,7 @@ type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
     openapi_gen::reexport::serde::Deserialize,
     Eq
 )]
-#[serde(untagged)]
+#[serde(crate = "openapi_gen::reexport::serde", untagged)]
 pub enum Default_1 {
     Default(Default_),
 }
@@ -24,7 +24,7 @@ pub type MultipartFormValue = openapi_gen::reexport::serde_json::Value;
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize
 )]
-#[serde(untagged)]
+#[serde(crate = "openapi_gen::reexport::serde", untagged)]
 pub enum MultiRequestsRequest {
     ApplicationJson(ApplicationJson),
     MultipartFormValue(MultipartFormValue),

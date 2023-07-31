@@ -7,6 +7,7 @@
     Eq,
     Hash
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub enum DeliveryMethod {
     Parcel,
     Letter,

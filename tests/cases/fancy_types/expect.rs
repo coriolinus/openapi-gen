@@ -71,6 +71,7 @@ type StringUnrecognized = String;
     openapi_gen::reexport::serde::Deserialize,
     openapi_gen::reexport::derive_more::Constructor
 )]
+#[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Container {
     pub number: Number,
     pub number_float: NumberFloat,
