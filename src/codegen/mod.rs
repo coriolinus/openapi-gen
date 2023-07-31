@@ -16,7 +16,7 @@ pub use {
     item::Item,
     value::{
         list::List, map::Map, object::Object, one_of_enum::OneOfEnum,
-        property_override_ref::PropertyOverride, scalar::Scalar, set::Set, string_enum::StringEnum,
+        property_override::PropertyOverride, scalar::Scalar, set::Set, string_enum::StringEnum,
         Value, ValueConversionError,
     },
     well_known_types::find_well_known_type,

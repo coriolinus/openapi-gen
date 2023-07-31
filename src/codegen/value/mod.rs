@@ -2,7 +2,7 @@ pub(crate) mod list;
 pub(crate) mod map;
 pub(crate) mod object;
 pub(crate) mod one_of_enum;
-pub(crate) mod property_override_ref;
+pub(crate) mod property_override;
 pub(crate) mod scalar;
 pub(crate) mod set;
 pub(crate) mod string_enum;
