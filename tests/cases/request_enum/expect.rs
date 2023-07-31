@@ -1,3 +1,4 @@
+#![allow(non_camel_case_types)]
 pub type JsonType = openapi_gen::reexport::serde_json::Value;
 pub type FormType = openapi_gen::reexport::serde_json::Value;
 pub type ReqType = openapi_gen::reexport::serde_json::Value;

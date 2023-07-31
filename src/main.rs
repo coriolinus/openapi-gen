@@ -31,13 +31,19 @@ struct Args {
     /// when `--debug-spec` or `--debug-model` is used.
     #[arg(long)]
     emit_rust: bool,
+
+    /// skip emitting module documentation header
+    ///
+    /// this is most useful when generating test cases
+    #[arg(long, hide = true)]
+    no_emit_docs: bool,
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
 
     let reader = {
-        let file = std::fs::File::open(args.path).context("reading file")?;
+        let file = std::fs::File::open(&args.path).context("reading file")?;
         std::io::BufReader::new(file)
     };
     let spec: OpenAPI = serde_yaml::from_reader(reader).context("parsing yaml")?;
@@ -45,13 +51,13 @@ fn main() -> Result<()> {
         dbg!(&spec);
     }
 
-    let model = ApiModel::try_from(spec).context("converting to api model")?;
+    let model = ApiModel::new(&spec, Some(&args.path)).context("converting to api model")?;
     if args.debug_model {
         dbg!(&model);
     }
 
     let pretty = model
-        .emit_items()
+        .emit_items(!args.no_emit_docs)
         .map_err(|err| {
             if let Error::CodegenParse { buffer, .. } = &err {
                 eprintln!("==== invalid rust code follows ====");

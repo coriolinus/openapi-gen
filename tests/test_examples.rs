@@ -132,6 +132,7 @@ impl Outcome {
 
 struct Case {
     name: String,
+    definition_path: PathBuf,
     definition: OpenAPI,
     expect: syn::File,
 }
@@ -141,8 +142,9 @@ impl Case {
         let path = path.as_ref();
 
         let name = path.file_name()?.to_string_lossy().into_owned();
+        let path = path.join("definition.yaml");
 
-        let definition = std::fs::read_to_string(path.join("definition.yaml")).ok()?;
+        let definition = std::fs::read_to_string(&path).ok()?;
         let definition = serde_yaml::from_str(&definition).ok()?;
 
         let expect = std::fs::read_to_string(path.join("expect.rs")).ok()?;
@@ -151,15 +153,19 @@ impl Case {
         Some(Case {
             name,
             definition,
+            definition_path: path,
             expect,
         })
     }
 
     fn execute(&self) -> Outcome {
-        fn execute_inner(definition: OpenAPI) -> Result<syn::File, (anyhow::Error, String)> {
-            let model =
-                ApiModel::try_from(definition).map_err(|err| (err.into(), String::new()))?;
-            let pretty = model.emit_items().map_err(|err| {
+        fn execute_inner(
+            definition: OpenAPI,
+            path: impl AsRef<Path>,
+        ) -> Result<syn::File, (anyhow::Error, String)> {
+            let model = ApiModel::new(&definition, Some(path))
+                .map_err(|err| (err.into(), String::new()))?;
+            let pretty = model.emit_items(false).map_err(|err| {
                 let buffer = if let Error::CodegenParse { buffer, .. } = &err {
                     buffer.clone()
                 } else {
@@ -171,7 +177,9 @@ impl Case {
             Ok(file)
         }
 
-        let generated = match std::panic::catch_unwind(|| execute_inner(self.definition.clone())) {
+        let generated = match std::panic::catch_unwind(|| {
+            execute_inner(self.definition.clone(), &self.definition_path)
+        }) {
             Ok(Ok(generated)) => generated,
             Ok(Err((err, generated_code))) => {
                 return Outcome::Error {
@@ -254,7 +262,7 @@ fn cases() {
                 dbg!(&case.definition);
             }
             if env_is_set("DBG_MODEL") {
-                if let Ok(model) = ApiModel::try_from(case.definition) {
+                if let Ok(model) = ApiModel::new(&case.definition, Some(case.definition_path)) {
                     dbg!(model);
                 } else {
                     eprintln!("failed to parse ApiModel from OpenAPI definition");
