@@ -1,12 +1,18 @@
 use heck::ToUpperCamelCase;
-use openapiv3::{Schema, SchemaKind, Type};
+use openapiv3::{ObjectType, OpenAPI, Schema, SchemaKind, Type};
 use proc_macro2::TokenStream;
 use quote::quote;
 use serde::Deserialize;
 
-use crate::codegen::{
-    make_ident, ApiModel, Ref, Reference, Scalar, UnknownReference, Value, ValueConversionError,
+use crate::{
+    codegen::{
+        make_ident, ApiModel, PropertyOverride, Ref, Reference, Scalar, UnknownReference, Value,
+        ValueConversionError,
+    },
+    resolve_trait::Resolve,
 };
+
+use super::{OneOfEnum, StringEnum};
 
 // note: openapiv3 intentionally ignores extensions whose name does not start with "x-".
 fn get_extension_value<'a>(schema: &'a Schema, key: &str) -> Option<&'a serde_json::Value> {
@@ -17,6 +23,59 @@ fn get_extension_bool(schema: &Schema, key: &str) -> bool {
     get_extension_value(schema, key)
         .and_then(serde_json::Value::as_bool)
         .unwrap_or_default()
+}
+
+/// The object type containing this schema, and the item name
+/// of the property identifying this schema.
+pub(crate) type ContainingObject<'a> = Option<(&'a ObjectType, &'a str)>;
+
+/// Does this `allOf` instance follow the rules of an `allOf` property singleton?
+///
+/// The rules for an `allOf` singleton are as follows:
+///
+/// - the schema is a property sub-schema of an object type
+/// - the schema is not in the `required` list of the object type
+/// - the schema has an `allOf` definition
+/// - the `allOf` definition possesses exactly one item
+/// - the `allOf` item is a reference
+///
+/// `containing_object` must be the tuple with the object schema containing this schema, and the property name
+/// referencing this schema.
+fn is_property_singleton(
+    spec: &OpenAPI,
+    containing_object: ContainingObject,
+    schema: &Schema,
+) -> bool {
+    // the schema is a property sub-schema of an object type
+    let Some((object_type, property_name)) = containing_object else {return false};
+    if object_type
+        .properties
+        .get(property_name)
+        .and_then(|schema_ref| Resolve::resolve(schema_ref, spec).ok())
+        != Some(schema)
+    {
+        return false;
+    }
+
+    // the schema is not in the `required` list of the containing object type
+    if object_type
+        .required
+        .iter()
+        .any(|required| required == property_name)
+    {
+        return false;
+    }
+
+    // the schema has an `allOf` definition
+    let SchemaKind::AllOf { all_of } = &schema.schema_kind else {return false};
+
+    // the `allOf` definition possesses exactly one item
+    if all_of.len() != 1 {
+        return false;
+    }
+
+    // the `allOf` item is a reference
+    all_of[0].as_ref_str().is_some()
 }
 
 #[derive(Default, Debug, Clone, Copy, Deserialize)]
@@ -116,33 +175,49 @@ impl Item<Ref> {
     }
 
     /// Parse a schema, recursively adding inline items
+    ///
+    /// `containing_object` is relevant only in the case that this schema is a property of an object type.
+    /// In all other cases, it is fine to pass `None` for that parameter.
     pub(crate) fn parse_schema(
+        spec: &OpenAPI,
         model: &mut ApiModel<Ref>,
         spec_name: &str,
         rust_name: &str,
         schema: &Schema,
+        containing_object: ContainingObject,
     ) -> Result<Self, ParseItemError> {
         let value: Value<Ref> = match &schema.schema_kind {
             SchemaKind::Type(Type::Boolean {}) => Value::Scalar(Scalar::Bool),
             SchemaKind::Type(Type::Number(number_type)) => number_type.try_into()?,
             SchemaKind::Type(Type::Integer(integer_type)) => integer_type.try_into()?,
-            SchemaKind::Any(any_schema) => {
-                Value::try_parse_string_enum_type(&schema.schema_data, any_schema)
-                    .unwrap_or(Scalar::Any.into())
-            }
+            SchemaKind::Any(any_schema) => StringEnum::new(schema, any_schema)
+                .map(Into::into)
+                .unwrap_or(Scalar::Any.into()),
             SchemaKind::Type(Type::String(string_type)) => {
                 Value::parse_string_type(string_type, &schema.schema_data)?
             }
             SchemaKind::Type(Type::Array(array_type)) => {
-                Value::parse_array_type(model, spec_name, rust_name, array_type)?
+                Value::parse_array_type(spec, model, spec_name, rust_name, array_type)?
             }
             SchemaKind::Type(Type::Object(object_type)) => {
-                Value::parse_object_type(model, spec_name, rust_name, object_type)?
+                Value::parse_object_type(spec, model, spec_name, rust_name, object_type)?
             }
             SchemaKind::OneOf { one_of } => {
-                Value::parse_one_of_type(model, spec_name, rust_name, &schema.schema_data, one_of)?
+                OneOfEnum::new(spec, model, spec_name, rust_name, schema, one_of)?.into()
             }
-            SchemaKind::AllOf { .. } | SchemaKind::AnyOf { .. } | SchemaKind::Not { .. } => {
+            SchemaKind::AllOf { all_of }
+                if is_property_singleton(spec, containing_object, schema) =>
+            {
+                // `unwrap` and direct indexing are safe because `is_property_singleton` ensures we have
+                // the right state for them.
+                let reference = all_of[0].as_ref_str().unwrap();
+                let ref_ = model
+                    .get_named_reference(reference)
+                    .map_err(|err| ParseItemError::AllOfSingleton(err.into()))?;
+                PropertyOverride::new(schema, ref_).into()
+            }
+            SchemaKind::AllOf { .. } => return Err(ParseItemError::NonPropertyExtensionAllOf),
+            SchemaKind::AnyOf { .. } | SchemaKind::Not { .. } => {
                 return Err(ParseItemError::UnsupportedSchemaKind)
             }
         };
@@ -209,7 +284,8 @@ impl Item {
                 | Value::Set(_)
                 | Value::List(_)
                 | Value::Map(_)
-                | Value::Ref(_) => true,
+                | Value::Ref(_)
+                | Value::PropertyOverride(_) => true,
                 Value::StringEnum(_) | Value::OneOfEnum(_) | Value::Object(_) => false,
             }
     }
@@ -351,10 +427,14 @@ impl Item {
 pub enum ParseItemError {
     #[error("could not parse value type")]
     ValueConversion(#[from] ValueConversionError),
-    #[error("`allOf`, `anyOf`, and `not` schemas are not supported")]
+    #[error("`anyOf` and `not` schemas are not supported")]
     UnsupportedSchemaKind,
+    #[error("this `allOf` schema did not meet the requirements of a property singleton")]
+    NonPropertyExtensionAllOf,
     #[error("failed to get external documentation")]
     ExternalDocumentation(#[source] reqwest::Error),
+    #[error("failed to construct `allOf` singleton")]
+    AllOfSingleton(#[source] anyhow::Error),
 }
 
 #[derive(Debug, thiserror::Error)]

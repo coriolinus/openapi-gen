@@ -12,6 +12,10 @@ pub struct Set<Ref = Reference> {
 }
 
 impl Set<Ref> {
+    pub(crate) fn new(item: Ref) -> Self {
+        Self { item }
+    }
+
     pub(crate) fn resolve_refs(
         self,
         resolver: impl Fn(&Ref) -> Result<Reference, UnknownReference>,

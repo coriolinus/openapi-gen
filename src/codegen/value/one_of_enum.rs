@@ -1,11 +1,17 @@
-use crate::codegen::{
-    api_model::{Ref, Reference, UnknownReference},
-    make_ident,
+use crate::{
+    codegen::{
+        api_model::{Ref, Reference, UnknownReference},
+        make_ident,
+    },
+    ApiModel,
 };
 
 use heck::AsUpperCamelCase;
+use openapiv3::{OpenAPI, ReferenceOr, Schema};
 use proc_macro2::TokenStream;
 use quote::quote;
+
+use super::ValueConversionError;
 
 #[derive(Debug, Clone)]
 pub struct Variant<Ref = Reference> {
@@ -86,6 +92,64 @@ impl<R> Default for OneOfEnum<R> {
 }
 
 impl OneOfEnum<Ref> {
+    pub(crate) fn new(
+        spec: &OpenAPI,
+        model: &mut ApiModel<Ref>,
+        spec_name: &str,
+        rust_name: &str,
+        schema: &Schema,
+        variants: &[ReferenceOr<openapiv3::Schema>],
+    ) -> Result<Self, ValueConversionError> {
+        let schema_data = &schema.schema_data;
+
+        let discriminant = schema_data
+            .discriminator
+            .as_ref()
+            .map(|discriminant| discriminant.property_name.clone());
+
+        let variants = variants
+            .iter()
+            .map(|schema_ref| {
+                let mapping_name = schema_data
+                    .discriminator
+                    .as_ref()
+                    .and_then(|discriminator| {
+                        discriminator.mapping.iter().find_map(|(name, reference)| {
+                            // it might seem incomplete to just pull out the `ref` variant of the
+                            // `schema_ref` here, but that's actually per the docs:
+                            //
+                            // <https://docs.rs/openapiv3-extended/latest/openapiv3/struct.Discriminator.html>
+                            //
+                            // > When using the discriminator, inline schemas will not be considered.
+                            (schema_ref.as_ref_str() == Some(reference.as_str()))
+                                .then(|| name.to_owned())
+                        })
+                    });
+
+                let definition = model
+                    .convert_reference_or(
+                        spec,
+                        spec_name,
+                        rust_name,
+                        None,
+                        &schema_ref.as_ref(),
+                        None,
+                    )
+                    .map_err(ValueConversionError::from_inline(rust_name))?;
+
+                Ok(Variant {
+                    definition,
+                    mapping_name,
+                })
+            })
+            .collect::<Result<_, _>>()?;
+
+        Ok(Self {
+            discriminant,
+            variants,
+        })
+    }
+
     pub(crate) fn resolve_refs(
         self,
         resolver: impl Fn(&Ref) -> Result<Reference, UnknownReference>,

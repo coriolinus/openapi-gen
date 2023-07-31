@@ -58,7 +58,7 @@ impl Parameter<Ref> {
 
 /// Convert a `&Parameter` into a `Ref`
 pub(crate) fn insert_parameter(
-    _spec: &OpenAPI,
+    spec: &OpenAPI,
     model: &mut ApiModel<Ref>,
     reference_name: Option<&str>,
     param: &openapiv3::Parameter,
@@ -109,7 +109,7 @@ pub(crate) fn insert_parameter(
         ReferenceOr::Item(schema) => {
             // if we defined an inline schema, we need to add the item
             model
-                .add_inline_items(&spec_name, &rust_name, reference_name, schema)
+                .add_inline_items(spec, &spec_name, &rust_name, reference_name, schema, None)
                 .context("adding parameter item")?
         }
     };
