@@ -1,4 +1,4 @@
-use openapiv3::{OpenAPI, Parameter, PathItem, ReferenceOr, RequestBody, Response, Schema};
+use openapiv3::{Header, OpenAPI, Parameter, PathItem, ReferenceOr, RequestBody, Response, Schema};
 
 use crate::resolve_trait::Resolve;
 
@@ -116,6 +116,24 @@ pub(crate) fn component_responses(
                     name.as_str(),
                     format!("#/components/responses/{name}"),
                     response,
+                )
+            })
+        })
+}
+
+/// Iterate over all named headers from the `components` section of the spec.
+///
+/// Items are `(spec_name, reference_name, header)`.
+pub(crate) fn component_headers(spec: &OpenAPI) -> impl Iterator<Item = (&str, String, &Header)> {
+    spec.components
+        .iter()
+        .flat_map(|components| components.headers.iter())
+        .filter_map(|(name, header_ref)| {
+            Resolve::resolve(header_ref, spec).ok().map(|header| {
+                (
+                    name.as_str(),
+                    format!("#/components/headers/{name}"),
+                    header,
                 )
             })
         })

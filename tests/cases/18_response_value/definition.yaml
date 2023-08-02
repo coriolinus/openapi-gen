@@ -1,0 +1,77 @@
+openapi: "3.0.3" # Use older openAPI spec version due to a bug in Zally: https://github.com/zalando/zally/issues/1230
+info:
+  title: "Response Values"
+  description: |
+    Ensure that we generate appropriate resposne values every time.
+  version: "0.1.0"
+
+
+paths:
+  "/natural-persons":
+    post:
+      operationId: createNaturalPersonIdentification
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/NaturalPersonIdentification"
+      responses:
+        '201':
+          description: identification for natural person was created
+          headers:
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/NaturalPersonIdentification"
+        default:
+          $ref: "#/components/responses/Default"
+
+components:
+  schemas:
+    IdentificationId:
+      type: string
+      format: uuid
+      x-newtype:
+        pub: true
+
+    PersonId:
+      type: string
+      format: uuid
+      x-newtype:
+        pub: true
+
+    AdditionalInformation:
+      type: array
+      items:
+        type: string
+
+    NaturalPersonIdentification:
+      type: object
+      properties:
+        id:
+          readOnly: true
+          allOf:
+            - $ref: "#/components/schemas/IdentificationId"
+        person_id:
+          $ref: "#/components/schemas/PersonId"
+
+      required:
+        - person_id
+
+
+  responses:
+    Default:
+      description: an error occurred; see status code and problem object for more information
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "https://opensource.zalando.com/restful-api-guidelines/models/problem-1.0.1.yaml#/Problem"
+
+  headers:
+    Location:
+      schema:
+        type: string
+        format: path

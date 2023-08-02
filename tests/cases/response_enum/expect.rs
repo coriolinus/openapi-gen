@@ -10,10 +10,13 @@ type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize
 )]
-#[serde(crate = "openapi_gen::reexport::serde", untagged)]
+#[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum RenderPdfResponse {
+    #[serde(rename = "OK")]
     Ok(Ok_),
+    #[serde(rename = "Bad Request")]
     BadRequest(RenderError),
+    #[serde(rename = "Service Unavailable")]
     ServiceUnavailable(ServiceUnavailable),
     Default(Default_),
 }

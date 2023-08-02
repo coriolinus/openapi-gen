@@ -14,6 +14,8 @@ use crate::{
     ApiModel,
 };
 
+pub(crate) mod header;
+
 pub(crate) mod parameter;
 use parameter::{convert_param_ref, Parameter, ParameterKey};
 

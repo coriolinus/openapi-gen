@@ -6,6 +6,7 @@ use crate::{
     codegen::{
         api_model::{ApiModel, Ref},
         endpoint::Error,
+        find_well_known_type,
         value::one_of_enum,
         Item, Scalar, Value,
     },
@@ -23,7 +24,9 @@ fn wrap_err<E: Into<anyhow::Error>>(err: E) -> Error {
 /// - `None` => `Scalar::Any`
 /// - `Some(ReferenceOr::Reference)` => `Value::Ref(_)`
 /// - `Some(ReferenceOr::Item(schema))` => Item::parse_schema`
-fn convert_optional_schema_ref(
+///
+/// NOTE: this does not add the returned item to the model
+pub(crate) fn convert_optional_schema_ref(
     spec: &OpenAPI,
     model: &mut ApiModel<Ref>,
     spec_name: String,
@@ -40,9 +43,11 @@ fn convert_optional_schema_ref(
         }),
         Some(&ref_ @ ReferenceOr::Reference { reference }) => {
             let value = if is_external(ref_) {
-                // external references map to `Any`.
+                // external references are either a well known type, or map to `Any`.
                 // todo: warn, in this event.
-                Value::from(Scalar::Any)
+                find_well_known_type(reference)
+                    .unwrap_or(Scalar::Any)
+                    .into()
             } else {
                 // internal references just reference the internal definition
                 let ref_ = model.get_named_reference(reference).map_err(wrap_err)?;
