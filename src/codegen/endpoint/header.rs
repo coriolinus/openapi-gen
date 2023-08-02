@@ -16,9 +16,8 @@ pub(crate) fn create_header(
 ) -> Result<Ref, Error> {
     let mut rust_name = spec_name.to_upper_camel_case();
     model.deconflict_ident(&mut rust_name);
-    let model_err = |context: &str| {
-        let context = context.to_owned();
-        move |err| Error::ModifyModel(spec_name.to_owned(), context, Box::new(err))
+    let model_err = |context: &'static str| {
+        move |err| Error::ModifyModel(spec_name.to_owned(), context.to_owned(), Box::new(err))
     };
 
     let maybe_schema_ref = match &header.format {
