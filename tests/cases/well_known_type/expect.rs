@@ -10,8 +10,9 @@ type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
     openapi_gen::reexport::serde::Deserialize,
     Eq
 )]
-#[serde(crate = "openapi_gen::reexport::serde", untagged)]
+#[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum PostWellKnownTypesResponse {
+    #[serde(rename = "No Content")]
     NoContent(NoContent),
     Default(Default_),
 }

@@ -12,7 +12,7 @@ type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
     openapi_gen::reexport::serde::Deserialize,
     Eq
 )]
-#[serde(crate = "openapi_gen::reexport::serde", untagged)]
+#[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum PostKudosResponse {
     Created(Created),
     Default(Default_),

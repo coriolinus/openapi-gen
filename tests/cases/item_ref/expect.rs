@@ -36,8 +36,9 @@ pub struct Thing {
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize
 )]
-#[serde(crate = "openapi_gen::reexport::serde", untagged)]
+#[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum GetThingResponse {
+    #[serde(rename = "OK")]
     Ok(Thing),
 }
 pub type PutThingRequest = Thing;
@@ -48,8 +49,9 @@ pub type PutThingRequest = Thing;
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize
 )]
-#[serde(crate = "openapi_gen::reexport::serde", untagged)]
+#[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum PutThingResponse {
+    #[serde(rename = "OK")]
     Ok(Thing),
 }
 #[openapi_gen::reexport::async_trait::async_trait]
