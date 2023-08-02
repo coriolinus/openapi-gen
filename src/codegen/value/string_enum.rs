@@ -82,8 +82,12 @@ impl StringEnum {
             .variants
             .iter()
             .map(|variant| {
-                let ident = make_ident(&variant.to_upper_camel_case());
-                quote!(#[serde(rename = #variant)] #ident)
+                let ucc_name = variant.to_upper_camel_case();
+                let ident = make_ident(&ucc_name);
+
+                let rename = (variant != &ucc_name).then(|| quote!(#[serde(rename = #variant)]));
+
+                quote!(#rename #ident)
             })
             .collect::<Vec<_>>();
         if self.extensible {
