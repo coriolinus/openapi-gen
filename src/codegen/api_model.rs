@@ -16,22 +16,26 @@ const OPENAPI_GEN_GIT_SHA: &str = env!("VERGEN_GIT_SHA");
 use crate::{
     codegen::{
         endpoint::{
-            self, insert_endpoints,
-            parameter::insert_parameter,
-            request_body::create_request_body,
-            response::{create_response_variants, ResponseCollector},
+            self, insert_endpoints, parameter::insert_parameter, request_body::create_request_body,
+            response::create_response_variants,
         },
         item::{EmitError, ParseItemError},
         rust_keywords::is_rust_keyword,
         Endpoint, Item, Scalar,
     },
     openapi_compat::{
-        component_inline_and_external_schemas, component_parameters, component_requests,
-        component_responses, OrScalar,
+        component_headers, component_inline_and_external_schemas, component_parameters,
+        component_requests, component_responses, OrScalar,
     },
 };
 
-use super::item::ContainingObject;
+use super::{
+    endpoint::{
+        header::{self, create_header},
+        response::ResponseVariants,
+    },
+    item::ContainingObject,
+};
 
 /// A reference to an item definition.
 ///
@@ -94,6 +98,13 @@ pub struct ApiModel<Ref = Reference> {
     named_references: HashMap<String, usize>,
     /// Api endpoints. These will be used later to generate `trait Api`.
     pub(crate) endpoints: Vec<Endpoint<Ref>>,
+    /// Response variants by reference name.
+    ///
+    /// This is used to minimize duplication when merging variants from predefined response objects.
+    ///
+    /// Keys here are the qualified path to the reference name:
+    /// `#/components/schemas/Foo`.
+    pub(crate) response_variants: HashMap<String, ResponseVariants<Ref>>,
 }
 
 impl<R> Default for ApiModel<R> {
@@ -104,6 +115,7 @@ impl<R> Default for ApiModel<R> {
             items: Default::default(),
             named_references: Default::default(),
             endpoints: Default::default(),
+            response_variants: Default::default(),
         }
     }
 }
@@ -339,6 +351,7 @@ impl ApiModel<Ref> {
             items,
             named_references,
             endpoints,
+            response_variants,
         } = self;
 
         let resolver = |ref_: &Ref| match ref_ {
@@ -360,12 +373,24 @@ impl ApiModel<Ref> {
             .map(|endpoint| endpoint.resolve_refs(resolver))
             .collect::<Result<_, _>>()?;
 
+        let response_variants = response_variants
+            .into_iter()
+            .map(|(name, variants)| -> Result<_, UnknownReference> {
+                let variants = variants
+                    .into_iter()
+                    .map(|variant| variant.resolve_refs(resolver))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok((name, variants))
+            })
+            .collect::<Result<HashMap<_, _>, _>>()?;
+
         Ok(ApiModel {
             input_file,
             definitions,
             items,
             named_references,
             endpoints,
+            response_variants,
         })
     }
 }
@@ -597,34 +622,20 @@ impl ApiModel {
 
         // component responses
         for (spec_name, reference_name, response) in component_responses(spec) {
+            let variants = create_response_variants(spec, &mut model, spec_name, None, response)?;
+            model.response_variants.insert(reference_name, variants);
+        }
+
+        // component headers
+        for (spec_name, reference_name, header) in component_headers(spec) {
             let reference_name = Some(reference_name);
             let reference_name = reference_name.as_deref();
-            let mut response_collector = ResponseCollector::default();
-            create_response_variants(
-                spec,
-                &mut model,
-                spec_name,
-                None,
-                response,
-                &mut response_collector,
-            )?;
-            let rust_name = spec_name.to_upper_camel_case();
-            let ref_ = response_collector.add_as_item(
-                &mut model,
-                spec_name,
-                &rust_name,
-                reference_name,
-            )?;
+            let ref_ = create_header(spec, &mut model, spec_name, reference_name, header)?;
             // all top-level component parameters are also public
             if let Some(item) = model.resolve_mut(&ref_) {
                 item.pub_typedef = true;
-                if item.docs.is_none() {
-                    item.docs = Some(response.description.clone());
-                }
             }
         }
-
-        // todo: component headers
 
         insert_endpoints(spec, &mut model)?;
 
@@ -662,4 +673,6 @@ pub enum Error {
         old: usize,
         new: usize,
     },
+    #[error("inserting component headers")]
+    InsertHeader(#[from] header::Error),
 }

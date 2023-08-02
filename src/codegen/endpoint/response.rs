@@ -1,11 +1,14 @@
 use anyhow::{anyhow, Context as _};
-use heck::ToUpperCamelCase;
-use openapiv3::{OpenAPI, ReferenceOr, Response, Responses, Schema, StatusCode};
+use heck::{AsUpperCamelCase, ToUpperCamelCase};
+use openapiv3::{Header, OpenAPI, ReferenceOr, Response, Responses, Schema, StatusCode};
 
 use crate::{
     codegen::{
-        api_model::Ref, endpoint::Error, find_well_known_type, value::one_of_enum, Item, OneOfEnum,
-        Scalar, Value,
+        api_model::Ref,
+        endpoint::{header::create_header, Error},
+        find_well_known_type,
+        value::{object::ObjectMember, one_of_enum},
+        Item, Object, OneOfEnum, Reference, Scalar, UnknownReference,
     },
     openapi_compat::is_external,
     ApiModel,
@@ -82,112 +85,161 @@ fn iter_status_and_content_schemas<'a>(
     }
 }
 
-/// Create a response variant.
+/// Every response is composed of some number of response variants.
+#[derive(Debug, Clone)]
+pub(crate) struct ResponseVariant<Ref = Reference> {
+    /// Variant name within the response enum
+    spec_name: String,
+    /// Reference to the item definition for this response variant.
+    ///
+    /// Depending on the nature of the response, this might be a bare object for the content type,
+    /// or it might be a container object with fields for each of the headers, as well as the response body.
+    definition: Ref,
+}
+
+impl ResponseVariant<Ref> {
+    pub(crate) fn resolve_refs(
+        self,
+        resolver: impl Fn(&Ref) -> Result<Reference, UnknownReference>,
+    ) -> Result<ResponseVariant<Reference>, UnknownReference> {
+        let ResponseVariant {
+            spec_name,
+            definition,
+        } = self;
+
+        let definition = resolver(&definition)?;
+
+        Ok(ResponseVariant {
+            spec_name,
+            definition,
+        })
+    }
+}
+
+/// These response variants are the variants associated with a particular resposne.
+pub(crate) type ResponseVariants<Ref = Reference> = Vec<ResponseVariant<Ref>>;
+
+/// Make a response object which has fields for each header, and a field for the body.
+fn make_response_object_with_headers_and_body<'a>(
+    spec: &OpenAPI,
+    model: &mut ApiModel<Ref>,
+    rust_name: String,
+    body: Ref,
+    headers: impl Iterator<Item = (&'a String, &'a ReferenceOr<Header>)>,
+) -> Result<Ref, Error> {
+    let mut object = Object::<Ref>::default();
+
+    for (header_name, header_ref) in headers {
+        let definition = match header_ref {
+            ReferenceOr::Reference { reference } => {
+                model.get_named_reference(reference).map_err(wrap_err)?
+            }
+            ReferenceOr::Item(header) => {
+                create_header(spec, model, header_name, None, header).map_err(wrap_err)?
+            }
+        };
+
+        object
+            .members
+            .insert(header_name.to_owned(), ObjectMember::new(definition));
+    }
+
+    if object.members.contains_key("body") {
+        return Err(wrap_err(anyhow!("invalid header name: `body`")));
+    }
+
+    object
+        .members
+        .insert("body".to_owned(), ObjectMember::new(body));
+
+    let ref_ = model
+        .add_item(
+            Item {
+                rust_name,
+                value: object.into(),
+                ..Default::default()
+            },
+            None,
+        )
+        .context("adding computed response item")
+        .map_err(wrap_err)?;
+
+    Ok(ref_)
+}
+
+/// Create response variants from a `Response`, adding each variant to the model.
 ///
-/// This function is called from two distinct code paths:
+/// A response variant takes one of two forms:
 ///
-/// - populating `#/components/responses/*`
-/// - creating a variant of a `Responses` enum inline
+/// - If the variant defines no headers, it is just the body content.
+/// - Otherwise, it is a struct with a field for each header, and a field for the content.
 ///
-/// This influences its return type: in the first case, the set of responses is
-/// fixed, but in the second, they might be part of a larger enumeration across
-/// various statuses.
-///
-/// At the same time, we don't want to create an iterator: that iterator would
-/// own mutable access to `model` for its entire lifetime, which is suboptimal.
-///
-/// So we require a return parameter which is able to accept various `Ref`s.
+/// This returns a list of response variants. It does _not_ adjust the model to add them anywhere.
 pub(crate) fn create_response_variants(
     spec: &OpenAPI,
     model: &mut ApiModel<Ref>,
     spec_name: &str,
-    reference_name: Option<&str>,
+    operation_name: Option<&str>,
     response: &Response,
-    refs: &mut impl Extend<(String, Ref)>,
-) -> Result<(), Error> {
-    for (spec_name, maybe_schema_ref) in iter_status_and_content_schemas(spec_name, response) {
-        let rust_name = spec_name.to_upper_camel_case();
-        let definition = match maybe_schema_ref {
+) -> Result<ResponseVariants<Ref>, Error> {
+    let mut variants = Vec::new();
+
+    for (status_name, maybe_schema_ref) in iter_status_and_content_schemas(spec_name, response) {
+        let mut rust_name = status_name.to_upper_camel_case();
+        model.deconflict_member_or_variant_ident(&mut rust_name);
+
+        let content = match maybe_schema_ref {
             None => {
                 // a variant without a schema produces nothing
-                model.add_scalar(&spec_name, &rust_name, reference_name, Scalar::Unit)
+                model.add_scalar(&status_name, &rust_name, None, Scalar::Unit)
             }
             Some(ref_ @ ReferenceOr::Reference { reference }) if is_external(ref_) => {
                 // external references either produce a well-known type, or anything if they're unknown
                 let scalar = find_well_known_type(reference).unwrap_or(Scalar::Any);
-                model.add_scalar(&spec_name, &rust_name, reference_name, scalar)
+                model.add_scalar(&status_name, &rust_name, None, scalar)
             }
             // basic references and inline definitions have obvious implementations
             Some(ReferenceOr::Reference { reference }) => model.get_named_reference(reference),
             Some(ReferenceOr::Item(schema)) => {
-                model.add_inline_items(spec, &spec_name, &rust_name, reference_name, schema, None)
+                model.add_inline_items(spec, &status_name, &rust_name, None, schema, None)
             }
         }
         .with_context(|| anyhow!("unable to produce variant ref for {rust_name}"))
         .map_err(wrap_err)?;
-        refs.extend(std::iter::once((rust_name, definition)));
-    }
-    Ok(())
-}
 
-#[derive(Debug, Default, Clone)]
-pub(crate) struct ResponseCollector {
-    one_of_enum: OneOfEnum<Ref>,
-    definition_buffer: Vec<(String, Ref)>,
-}
-
-impl Extend<(String, Ref)> for ResponseCollector {
-    fn extend<T: IntoIterator<Item = (String, Ref)>>(&mut self, iter: T) {
-        let iter = iter.into_iter();
-        let min_items = iter.size_hint().0;
-        self.definition_buffer.clear();
-        self.definition_buffer.reserve(min_items);
-
-        self.definition_buffer.extend(iter);
-
-        self.one_of_enum
-            .variants
-            .reserve(self.definition_buffer.len());
-        self.one_of_enum
-            .variants
-            .extend(self.definition_buffer.drain(..).map(|(name, definition)| {
-                one_of_enum::Variant {
-                    definition,
-                    mapping_name: Some(name),
-                }
-            }));
-    }
-}
-
-impl From<ResponseCollector> for OneOfEnum<Ref> {
-    fn from(value: ResponseCollector) -> Self {
-        value.one_of_enum
-    }
-}
-
-impl From<ResponseCollector> for Value<Ref> {
-    fn from(value: ResponseCollector) -> Self {
-        value.one_of_enum.into()
-    }
-}
-
-impl ResponseCollector {
-    /// convert this `ResponseCollector` into an `Item` and add it to the model, returning a `Ref`.
-    pub(crate) fn add_as_item(
-        self,
-        model: &mut ApiModel<Ref>,
-        spec_name: &str,
-        rust_name: &str,
-        reference_name: Option<&str>,
-    ) -> Result<Ref, Error> {
-        let item = Item {
-            value: self.into(),
-            spec_name: spec_name.to_owned(),
-            rust_name: rust_name.to_owned(),
-            ..Default::default()
+        // If a response header is defined with the name “Content-Type”, it SHALL be ignored.
+        let valid_headers = || {
+            response
+                .headers
+                .iter()
+                .filter(|(key, _value)| !key.eq_ignore_ascii_case("content-type"))
         };
-        model.add_item(item, reference_name).map_err(wrap_err)
+
+        let definition = if valid_headers().count() == 0 {
+            content
+        } else {
+            let mut rust_name = format!(
+                "{}{status_name}",
+                AsUpperCamelCase(operation_name.unwrap_or_default())
+            );
+            model.deconflict_ident(&mut rust_name);
+
+            make_response_object_with_headers_and_body(
+                spec,
+                model,
+                rust_name,
+                content,
+                valid_headers(),
+            )?
+        };
+
+        variants.push(ResponseVariant {
+            spec_name: status_name,
+            definition,
+        });
     }
+
+    Ok(variants)
 }
 
 /// Create a responses enum.
@@ -199,30 +251,54 @@ pub(crate) fn create_responses(
     spec_name: &str,
     responses: &Responses,
 ) -> Result<Ref, Error> {
-    let mut response_collector = ResponseCollector::default();
+    let mut out = OneOfEnum {
+        discriminant: Some("status".into()),
+        ..Default::default()
+    };
 
     for (status_code, response_ref) in named_response_items(responses) {
-        let mut rust_name = spec_name.to_upper_camel_case();
-        model.deconflict_member_or_variant_ident(&mut rust_name);
-
-        let response = match response_ref {
-            ReferenceOr::Item(response) => response,
+        // we only need this owned binding in one branch of the following match,
+        // but in that case, we need it here for the lifetime
+        let variants_owned;
+        let variants = match response_ref {
             ReferenceOr::Reference { reference } => {
-                let ref_ = model.get_named_reference(reference).map_err(wrap_err)?;
-                return Ok(ref_);
+                // if the response is predefined, then we should already have its variants defined in the spec
+                model
+                    .response_variants
+                    .get(reference)
+                    .ok_or_else(|| wrap_err(anyhow!("unable to get variants for {reference}")))?
+            }
+            ReferenceOr::Item(response) => {
+                variants_owned =
+                    create_response_variants(spec, model, &status_code, Some(spec_name), response)?;
+                &variants_owned
             }
         };
 
-        create_response_variants(
-            spec,
-            model,
-            &status_code,
-            None,
-            response,
-            &mut response_collector,
-        )?;
+        for ResponseVariant {
+            spec_name,
+            definition,
+        } in variants
+        {
+            let definition = definition.clone();
+            let mapping_name = Some(spec_name.clone());
+            out.variants.push(one_of_enum::Variant {
+                definition,
+                mapping_name,
+            });
+        }
     }
 
     let rust_name = spec_name.to_upper_camel_case();
-    response_collector.add_as_item(model, spec_name, &rust_name, None)
+    model
+        .add_item(
+            Item {
+                spec_name: spec_name.to_owned(),
+                rust_name,
+                value: out.into(),
+                ..Default::default()
+            },
+            None,
+        )
+        .map_err(wrap_err)
 }

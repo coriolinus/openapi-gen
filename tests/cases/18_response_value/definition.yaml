@@ -9,10 +9,6 @@ info:
 paths:
   "/natural-persons":
     post:
-      description: |
-        Create a new natural person identification.
-
-        An identification is a snapshot in time of the data available to identify a person.
       operationId: createNaturalPersonIdentification
       requestBody:
         required: true
@@ -36,14 +32,12 @@ paths:
 components:
   schemas:
     IdentificationId:
-      description: an identifier for this particular identification process
       type: string
       format: uuid
       x-newtype:
         pub: true
 
     PersonId:
-      description: the FINVIA PersonId for this individual
       type: string
       format: uuid
       x-newtype:
@@ -65,7 +59,7 @@ components:
           $ref: "#/components/schemas/PersonId"
 
       required:
-        - person-id
+        - person_id
 
 
   responses:
@@ -79,10 +73,5 @@ components:
   headers:
     Location:
       schema:
-        description: |
-          The path at which the new resource can be found.
-
-          This is absolute in that it starts with a `/`, and describes the complete path.
-          It is relative in that it does not name the server, transport method, port, or other URL-specific data.
         type: string
         format: path

@@ -20,6 +20,15 @@ pub struct ObjectMember<Ref = Reference> {
 }
 
 impl ObjectMember<Ref> {
+    pub(crate) fn new(definition: Ref) -> Self {
+        Self {
+            definition,
+            read_only: false,
+            write_only: false,
+            inline_option: false,
+        }
+    }
+
     pub(crate) fn resolve_refs(
         self,
         resolver: impl Fn(&Ref) -> Result<Reference, UnknownReference>,
@@ -105,6 +114,14 @@ impl ObjectMember {
 #[derive(Debug, Clone)]
 pub struct Object<Ref = Reference> {
     pub members: IndexMap<String, ObjectMember<Ref>>,
+}
+
+impl<R> Default for Object<R> {
+    fn default() -> Self {
+        Self {
+            members: Default::default(),
+        }
+    }
 }
 
 impl Object<Ref> {
