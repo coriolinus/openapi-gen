@@ -384,13 +384,24 @@ impl Item {
 
     /// The list of derives which should attach to this item.
     pub fn derives(&self, model: &ApiModel) -> Vec<TokenStream> {
-        let mut derives = vec![
-            quote!(Debug),
-            quote!(Clone),
-            quote!(PartialEq),
-            quote!(openapi_gen::reexport::serde::Serialize),
-            quote!(openapi_gen::reexport::serde::Deserialize),
-        ];
+        let mut derives = vec![quote!(Debug), quote!(Clone), quote!(PartialEq)];
+
+        // extensible string enums require special de/serialization handling.
+        // all other types can just derive standard serde stuff.
+        match &self.value {
+            Value::StringEnum(string_enum) if string_enum.extensible => {
+                derives.push(quote!(
+                    openapi_gen::reexport::serde_enum_str::Serialize_enum_str
+                ));
+                derives.push(quote!(
+                    openapi_gen::reexport::serde_enum_str::Deserialize_enum_str
+                ));
+            }
+            _ => {
+                derives.push(quote!(openapi_gen::reexport::serde::Serialize));
+                derives.push(quote!(openapi_gen::reexport::serde::Deserialize));
+            }
+        }
 
         if self.value.impls_copy(model) {
             derives.push(quote!(Copy));

@@ -3,8 +3,8 @@
     Debug,
     Clone,
     PartialEq,
-    openapi_gen::reexport::serde::Serialize,
-    openapi_gen::reexport::serde::Deserialize,
+    openapi_gen::reexport::serde_enum_str::Serialize_enum_str,
+    openapi_gen::reexport::serde_enum_str::Deserialize_enum_str,
     Eq,
     Hash
 )]
