@@ -130,6 +130,7 @@ impl Outcome {
     }
 }
 
+#[derive(Debug)]
 struct Case {
     name: String,
     definition_path: PathBuf,
@@ -142,9 +143,9 @@ impl Case {
         let path = path.as_ref();
 
         let name = path.file_name()?.to_string_lossy().into_owned();
-        let path = path.join("definition.yaml");
+        let definition_path = path.join("definition.yaml");
 
-        let definition = std::fs::read_to_string(&path).ok()?;
+        let definition = std::fs::read_to_string(&definition_path).ok()?;
         let definition = serde_yaml::from_str(&definition).ok()?;
 
         let expect = std::fs::read_to_string(path.join("expect.rs")).ok()?;
@@ -153,7 +154,7 @@ impl Case {
         Some(Case {
             name,
             definition,
-            definition_path: path,
+            definition_path,
             expect,
         })
     }
@@ -242,9 +243,12 @@ fn cases() {
     let mut stdout = StandardStream::stdout(choice);
 
     let mut all_ok = true;
+    let mut cases_run = 0;
 
     // later we can parallelize this, but for now, straight iteration should be totally fine
     for case in find_cases() {
+        cases_run += 1;
+
         let _ = write!(&mut stdout, "{} ... ", &case.name);
         let _ = stdout.flush();
 
@@ -273,5 +277,8 @@ fn cases() {
 
     if !all_ok {
         panic!("not all cases passed")
+    }
+    if cases_run == 0 {
+        panic!("no test cases discovered")
     }
 }
