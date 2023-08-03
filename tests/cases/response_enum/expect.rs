@@ -27,6 +27,6 @@ pub trait Api {
 Operation ID: `renderPdf`
 
 */
-    async fn render_pdf() -> RenderPdfResponse;
+    async fn render_pdf(&self) -> RenderPdfResponse;
 }
 

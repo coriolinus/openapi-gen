@@ -85,6 +85,7 @@ Operation ID: `createNaturalPersonIdentification`
 
 */
     async fn create_natural_person_identification(
+        &self,
         request_body: CreateNaturalPersonIdentificationRequest,
     ) -> CreateNaturalPersonIdentificationResponse;
 }

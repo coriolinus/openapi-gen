@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use heck::{AsUpperCamelCase, ToSnakeCase};
 use indexmap::IndexMap;
 use openapiv3::OpenAPI;
@@ -114,7 +112,7 @@ impl<R> Endpoint<R> {
     {
         struct ByName<R2> {
             no_location: Option<(R2, bool)>,
-            by_location: HashMap<ParameterLocation, (R2, bool)>,
+            by_location: IndexMap<ParameterLocation, (R2, bool)>,
         }
 
         impl<R2> Default for ByName<R2> {
@@ -143,7 +141,7 @@ impl<R> Endpoint<R> {
             }
         }
 
-        let mut params_by_name = HashMap::<_, ByName<R>>::new();
+        let mut params_by_name = IndexMap::<_, ByName<R>>::new();
         for (ParameterKey { name, location }, Parameter { required, item_ref }) in
             self.parameters.iter()
         {
@@ -258,6 +256,7 @@ impl Endpoint {
         Ok(quote! {
             #docs
             async fn #function_name (
+                &self,
                 #(
                     #parameters,
                 )*
