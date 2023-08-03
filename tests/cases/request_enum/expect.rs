@@ -63,13 +63,17 @@ pub trait Api {
 Operation ID: `multiRequests`
 
 */
-    async fn multi_requests(request_body: MultiRequestsRequest) -> MultiRequestsResponse;
+    async fn multi_requests(
+        &self,
+        request_body: MultiRequestsRequest,
+    ) -> MultiRequestsResponse;
     /**`POST /optional-request-body`
 
 Operation ID: `optionalRequestBody`
 
 */
     async fn optional_request_body(
+        &self,
         request_body: OptionalRequestBodyRequest,
     ) -> OptionalRequestBodyResponse;
     /**`POST /unified-request-body`
@@ -77,6 +81,9 @@ Operation ID: `optionalRequestBody`
 Operation ID: `sameRequest`
 
 */
-    async fn same_request(request_body: SameRequestRequest) -> SameRequestResponse;
+    async fn same_request(
+        &self,
+        request_body: SameRequestRequest,
+    ) -> SameRequestResponse;
 }
 

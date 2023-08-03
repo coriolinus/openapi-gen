@@ -61,12 +61,12 @@ pub trait Api {
 Operation ID: `getThing`
 
 */
-    async fn get_thing(id: Id) -> GetThingResponse;
+    async fn get_thing(&self, id: Id) -> GetThingResponse;
     /**`PUT /thing/{id}`
 
 Operation ID: `putThing`
 
 */
-    async fn put_thing(id: Id, request_body: PutThingRequest) -> PutThingResponse;
+    async fn put_thing(&self, id: Id, request_body: PutThingRequest) -> PutThingResponse;
 }
 

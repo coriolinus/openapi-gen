@@ -22,6 +22,7 @@ pub trait Api {
 
 */
     async fn post_well_known_types(
+        &self,
         request_body: PostWellKnownTypesRequest,
     ) -> PostWellKnownTypesResponse;
 }

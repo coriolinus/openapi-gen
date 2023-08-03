@@ -24,6 +24,6 @@ pub trait Api {
 Operation ID: `postKudos`
 
 */
-    async fn post_kudos(request_body: PostKudosRequest) -> PostKudosResponse;
+    async fn post_kudos(&self, request_body: PostKudosRequest) -> PostKudosResponse;
 }
 
