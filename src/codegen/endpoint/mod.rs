@@ -258,6 +258,7 @@ impl Endpoint {
         Ok(quote! {
             #docs
             async fn #function_name (
+                &self,
                 #(
                     #parameters,
                 )*
