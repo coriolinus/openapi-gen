@@ -16,6 +16,9 @@ pub use codegen::{ApiModel, Error};
 #[cfg(feature = "bytes")]
 pub use well_known_types::Bytes;
 
+#[cfg(feature = "axum-support")]
+pub mod axum_compat;
+
 /// Reexport crates used by generated code.
 ///
 /// This makes it much easier to keep the types in sync between the generated code and your own types.

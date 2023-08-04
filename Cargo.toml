@@ -8,6 +8,7 @@ build = "build.rs"
 [dependencies]
 anyhow = { version = "1.0.71" }
 async-trait = "0.1.68"
+axum = { version = "0.6.20", optional = true }
 base64 = { version = "0.21.0", optional = true }
 bounded-integer = { version = "0.5.6", features = ["std", "types", "serde1", "num-traits02"], optional = true }
 clap = { version = "4.2.7", features = ["derive"], optional = true }
@@ -44,6 +45,7 @@ termcolor = "1.2.0"
 [features]
 default = []
 api-problem = ["http-api-problem"]
+axum-support = ["axum"]
 cli = ["clap", "serde_yaml"]
 bytes = ["base64", "serde_with"]
 integer-restrictions = ["bounded-integer"]
