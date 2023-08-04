@@ -1,8 +1,11 @@
+pub(crate) mod as_status_code;
 pub(crate) mod canonical_form;
 pub(crate) mod codegen;
 pub(crate) mod openapi_compat;
 pub(crate) mod resolve_trait;
 pub(crate) mod well_known_types;
+
+pub use as_status_code::AsStatusCode;
 
 pub use canonical_form::{
     CanonicalForm, CanonicalizeError, ConstraintViolation, Reason, ValidationError,
