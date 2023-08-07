@@ -276,6 +276,7 @@ impl ApiModel<Ref> {
                 reference_name,
                 schema,
                 containing_object,
+                None,
             ),
             ReferenceOr::Reference { reference } => match self.named_references.get(reference) {
                 Some(position) => Ok(Ref::Back(*position)),
@@ -297,8 +298,17 @@ impl ApiModel<Ref> {
         reference_name: Option<&str>,
         schema: &Schema,
         containing_object: ContainingObject,
+        content_type: Option<String>,
     ) -> Result<Ref, Error> {
-        let item = Item::parse_schema(spec, self, spec_name, rust_name, schema, containing_object)?;
+        let item = Item::parse_schema(
+            spec,
+            self,
+            spec_name,
+            rust_name,
+            schema,
+            containing_object,
+            content_type,
+        )?;
         self.add_item(item, reference_name)
     }
 
@@ -580,6 +590,7 @@ impl ApiModel {
                     &rust_name,
                     reference_name,
                     schema,
+                    None,
                     None,
                 )?,
                 OrScalar::Scalar(scalar) => {

@@ -24,10 +24,13 @@ pub mod axum_compat;
 /// This makes it much easier to keep the types in sync between the generated code and your own types.
 pub mod reexport {
     pub use async_trait;
+    #[cfg(feature = "axum-support")]
+    pub use axum;
     #[cfg(feature = "integer-restrictions")]
     pub use bounded_integer;
     pub use derive_more;
     pub use heck;
+    pub use http;
     #[cfg(feature = "api-problem")]
     pub use http_api_problem;
     #[cfg(feature = "string-pattern")]

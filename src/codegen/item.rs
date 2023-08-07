@@ -129,6 +129,14 @@ pub struct Item<Ref = Reference> {
     pub nullable: bool,
     /// What value this item contains
     pub value: Value<Ref>,
+    /// The `content-type` MIME type known to be associated with this item.
+    ///
+    /// Not all items have a known MIME type. The most common case where this is set are
+    /// direct `*Request` and `*Response` items.
+    ///
+    /// For items defined in `components/schemas` and defined inline within other item definitions,
+    /// this should be unset.
+    pub content_type: Option<String>,
 }
 
 impl<R> Default for Item<R> {
@@ -142,6 +150,7 @@ impl<R> Default for Item<R> {
             pub_typedef: Default::default(),
             nullable: Default::default(),
             value: Default::default(),
+            content_type: Default::default(),
         }
     }
 }
@@ -160,6 +169,7 @@ impl Item<Ref> {
             pub_typedef,
             nullable,
             value,
+            content_type,
         } = self;
         let value = value.resolve_refs(resolver)?;
         Ok(Item {
@@ -171,6 +181,7 @@ impl Item<Ref> {
             pub_typedef,
             nullable,
             value,
+            content_type,
         })
     }
 
@@ -185,6 +196,7 @@ impl Item<Ref> {
         rust_name: &str,
         schema: &Schema,
         containing_object: ContainingObject,
+        content_type: Option<String>,
     ) -> Result<Self, ParseItemError> {
         let value: Value<Ref> = match &schema.schema_kind {
             SchemaKind::Type(Type::Boolean {}) => Value::Scalar(Scalar::Bool),
@@ -269,6 +281,7 @@ impl Item<Ref> {
             pub_typedef,
             nullable,
             value,
+            content_type,
         })
     }
 }

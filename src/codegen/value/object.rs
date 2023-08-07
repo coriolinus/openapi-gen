@@ -11,6 +11,8 @@ use quote::quote;
 
 use super::ValueConversionError;
 
+pub(crate) const BODY_IDENT: &str = "body";
+
 #[derive(Debug, Clone)]
 pub struct ObjectMember<Ref = Reference> {
     pub definition: Ref,
@@ -114,12 +116,23 @@ impl ObjectMember {
 #[derive(Debug, Clone)]
 pub struct Object<Ref = Reference> {
     pub members: IndexMap<String, ObjectMember<Ref>>,
+    /// When `true`, this object is a generated response. It may or may not contain a body member. If it does,
+    /// it is named `BODY_IDENT`. All other members are assumed to be headers.
+    ///
+    /// This gets used when generating framework-specific code, to transform the response enum into an appropriate
+    /// `(status, headers, body)` tuple. It is necessary because when the code generator notices that there are no
+    /// defined headers in a response, it uses the body object as the only return value of the appropriate trait method.
+    ///
+    /// This means that when this is `false`, we can just return that value as the body. When it is `true`, we must
+    /// generate code to unpack the struct appropriately.
+    pub is_generated_body_and_headers: bool,
 }
 
 impl<R> Default for Object<R> {
     fn default() -> Self {
         Self {
             members: Default::default(),
+            is_generated_body_and_headers: Default::default(),
         }
     }
 }
@@ -204,19 +217,30 @@ impl Object<Ref> {
                 ))
             })
             .collect::<Result<_, _>>()?;
-        Ok(Object { members })
+        Ok(Object {
+            members,
+            ..Default::default()
+        })
     }
 
     pub(crate) fn resolve_refs(
         self,
         resolver: impl Fn(&Ref) -> Result<Reference, UnknownReference>,
     ) -> Result<Object<Reference>, UnknownReference> {
-        let Self { members } = self;
+        let Self {
+            members,
+            is_generated_body_and_headers,
+        } = self;
+
         let members = members
             .into_iter()
             .map(|(name, member)| member.resolve_refs(&resolver).map(|member| (name, member)))
             .collect::<Result<_, _>>()?;
-        Ok(Object { members })
+
+        Ok(Object {
+            members,
+            is_generated_body_and_headers,
+        })
     }
 }
 

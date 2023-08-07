@@ -62,7 +62,8 @@ pub(crate) fn convert_optional_schema_ref(
             })
         }
         Some(ReferenceOr::Item(schema)) => {
-            Item::parse_schema(spec, model, &spec_name, &rust_name, schema, None).map_err(wrap_err)
+            Item::parse_schema(spec, model, &spec_name, &rust_name, schema, None, None)
+                .map_err(wrap_err)
         }
     }
 }

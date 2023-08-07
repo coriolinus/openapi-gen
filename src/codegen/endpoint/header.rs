@@ -65,7 +65,15 @@ pub(crate) fn create_header(
         Some(ReferenceOr::Item(schema)) => {
             // if we defined an inline schema, we need to add the item
             model
-                .add_inline_items(spec, spec_name, &rust_name, reference_name, schema, None)
+                .add_inline_items(
+                    spec,
+                    spec_name,
+                    &rust_name,
+                    reference_name,
+                    schema,
+                    None,
+                    None,
+                )
                 .map_err(model_err("adding parameter item"))?
         }
     };
