@@ -42,7 +42,9 @@ pub type Map = std::collections::HashMap<String, Thing>;
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub enum Ordering {
+    #[serde(rename = "asc")]
     Asc,
+    #[serde(rename = "desc")]
     Desc,
 }
 type MaybeColor = Option<Color>;
@@ -58,8 +60,11 @@ type MaybeColor = Option<Color>;
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub enum Color {
+    #[serde(rename = "red")]
     Red,
+    #[serde(rename = "green")]
     Green,
+    #[serde(rename = "blue")]
     Blue,
 }
 ///discriminated collection types
