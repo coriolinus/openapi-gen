@@ -302,10 +302,8 @@ pub(crate) fn create_responses(
         {
             let definition = definition.clone();
             let mapping_name = Some(spec_name.clone());
-            out.variants.push(one_of_enum::Variant {
-                definition,
-                mapping_name,
-            });
+            out.variants
+                .push(one_of_enum::Variant::new(definition, mapping_name));
         }
     }
 

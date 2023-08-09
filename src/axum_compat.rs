@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use axum::{
     response::{IntoResponse, Response},
     Json,
@@ -8,10 +10,7 @@ use quote::quote;
 use serde::Serialize;
 
 use crate::{
-    codegen::{
-        endpoint::verb::Verb, make_ident, value::object::BODY_IDENT, Object, Reference,
-        UnknownReference, Value,
-    },
+    codegen::{make_ident, value::object::BODY_IDENT, Object, Reference, UnknownReference, Value},
     ApiModel, AsStatusCode,
 };
 
@@ -56,11 +55,11 @@ macro_rules! header_value_of {
 //     }
 // }
 
-/// Implement `IntoResponse` for a response type.
+/// Implement a single `match` arm of `IntoResponse`.
 ///
 /// This implementation handles extracting response headers and appropriate status codes from the response enum, which in turn
 /// means that the response enum becomes a valid return value for a handler. This substantially simplifies handler generation.
-pub(crate) fn impl_into_response(
+fn impl_into_response_for_response_type(
     model: &ApiModel,
     response: &Reference,
     response_name: &str,
@@ -68,8 +67,12 @@ pub(crate) fn impl_into_response(
 ) -> Result<TokenStream, Error> {
     let item = model
         .resolve(*response)
-        .ok_or_else(|| UnknownReference(format!("response reference: {response:?}")))
-        .map_err(Error::context("getting response item"))?;
+        .ok_or_else(|| {
+            UnknownReference(format!(
+                "response variant reference: {response:?} ({response_name})"
+            ))
+        })
+        .map_err(Error::context("getting response variant item"))?;
 
     let response_ident = make_ident(response_name);
     let variant_ident = make_ident(variant_name);
@@ -101,16 +104,22 @@ pub(crate) fn impl_into_response(
         headers.push((key, value));
     }
 
+    let mut unpack_object = None;
+    let body;
+
     if let Value::Object(Object {
         is_generated_body_and_headers: true,
         members,
     }) = &item.value
     {
+        // the identifier for the body is constant in this case
+        body = make_ident("body");
+
         // unpack the object
         let member_idents = members.keys().map(|member| make_ident(member));
-        let unpack_object = quote! {
-            let #item_ident = { #( #member_idents ),* } = #variant_binding;
-        };
+        unpack_object = Some(quote! {
+            let #item_ident { #( #member_idents ),* } = #variant_binding;
+        });
 
         // transform headers
         for header_name in members.keys() {
@@ -129,9 +138,10 @@ pub(crate) fn impl_into_response(
 
             headers.push((key, value));
         }
-
-        for (header_key_expr, header_value_expr) in headers {}
-        todo!()
+    } else {
+        // don't panic, this was just a non-object value which got passed through because there were no headers
+        // all we need to do here is ensure `body` is defined
+        body = variant_binding.clone();
     }
 
     let define_header_map = (!headers.is_empty()).then(|| {
@@ -148,16 +158,73 @@ pub(crate) fn impl_into_response(
     });
     let header_map_ident_comma = (!headers.is_empty()).then_some(quote!(header_map,));
 
-    // todo: the rest of the owl
-    let _ = quote! {
+    let into_response = quote! {
         (
             openapi_gen::reexport::http::status::StatusCode::#status_ident,
             #header_map_ident_comma
-            body,
+            openapi_gen::reexport::axum::Json(#body),
         ).into_response()
     };
 
-    todo!()
+    Ok(quote! {
+        #response_ident::#variant_ident(#variant_binding) => {
+            #unpack_object
+            #define_header_map
+            #into_response
+        }
+    })
+}
+
+/// Implement a single `match` arm of `IntoResponse`.
+///
+/// This implementation handles extracting response headers and appropriate status codes from the response enum, which in turn
+/// means that the response enum becomes a valid return value for a handler. This substantially simplifies handler generation.
+pub(crate) fn impl_into_response(
+    model: &ApiModel,
+    response_enum: &Reference,
+    response_name: &str,
+) -> Result<TokenStream, Error> {
+    let response_ident = make_ident(response_name);
+
+    let item = model
+        .resolve(*response_enum)
+        .ok_or_else(|| {
+            UnknownReference(format!(
+                "response reference: {response_enum:?} ({response_name})"
+            ))
+        })
+        .map_err(Error::context("getting response item"))?;
+
+    let Value::OneOfEnum(oo_enum) = &item.value else {
+        let err = Error::new(format!("response reference: {response_enum:?} ({response_name})"));
+        return Err(Error::context("expected response variant to be OneOfEnum")(err));
+    };
+
+    let mut branches = Vec::new();
+
+    for variant in &oo_enum.variants {
+        let variant_name = variant.computed_name().ok_or_else(|| {
+            let err = Error::new("failed to get computed variant name for response variant");
+            Error::context("computing branches within `impl_into_response`")(err)
+        })?;
+
+        branches.push(impl_into_response_for_response_type(
+            model,
+            &variant.definition,
+            response_name,
+            variant_name,
+        )?);
+    }
+
+    Ok(quote! {
+        impl openapi_gen::reexport::axum::response::IntoResponse for #response_ident {
+            fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
+                match self {
+                    #( #branches )*
+                }
+            }
+        }
+    })
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -165,17 +232,23 @@ pub(crate) fn impl_into_response(
 pub struct Error {
     context: String,
     #[source]
-    inner: Box<dyn std::error::Error>,
+    inner: Option<Box<dyn std::error::Error>>,
 }
 
 impl Error {
+    fn new<'a>(msg: impl Into<Cow<'a, str>>) -> Self {
+        let context = msg.into().into_owned();
+        let inner = None;
+        Self { context, inner }
+    }
+
     fn context<'a, E>(context: &'a str) -> impl 'a + Fn(E) -> Self
     where
         E: 'static + std::error::Error,
     {
         |err| {
             let context = context.into();
-            let inner = Box::new(err) as _;
+            let inner = Some(Box::new(err) as _);
             Self { context, inner }
         }
     }

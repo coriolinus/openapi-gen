@@ -1,3 +1,5 @@
+use std::cell::OnceCell;
+
 use crate::{
     codegen::{
         api_model::{Ref, Reference, UnknownReference},
@@ -17,6 +19,27 @@ use super::ValueConversionError;
 pub struct Variant<Ref = Reference> {
     pub definition: Ref,
     pub mapping_name: Option<String>,
+    computed_name: OnceCell<String>,
+}
+
+impl<R> Variant<R> {
+    pub(crate) fn new(definition: R, mapping_name: Option<String>) -> Self {
+        Self {
+            definition,
+            mapping_name,
+            computed_name: OnceCell::new(),
+        }
+    }
+
+    /// Get the computed name of this variant if it exists.
+    ///
+    /// The final computed name for this variant is determined at `emit_definition`,
+    /// when the name resolver is available. In general, code which requires access to the computed
+    /// name of the variant should only run after its definition has been emitted.
+    // TODO: can we improve on that, compute it earlier somehow?
+    pub(crate) fn computed_name(&self) -> Option<&str> {
+        self.computed_name.get().map(String::as_str)
+    }
 }
 
 impl Variant<Ref> {
@@ -27,11 +50,13 @@ impl Variant<Ref> {
         let Self {
             definition,
             mapping_name,
+            computed_name,
         } = self;
         let definition = resolver(&definition)?;
         Ok(Variant {
             definition,
             mapping_name,
+            computed_name,
         })
     }
 }
@@ -55,13 +80,17 @@ impl Variant {
         &self,
         idx: usize,
         name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
-    ) -> String {
-        self.mapping_name
-            .as_deref()
-            .map(strip_slash_if_present)
-            .or_else(|| name_resolver(self.definition).ok())
-            .map(|name| format!("{}", AsUpperCamelCase(name)))
-            .unwrap_or_else(|| format!("Variant{idx:02}"))
+    ) -> &str {
+        self.computed_name
+            .get_or_init(|| {
+                self.mapping_name
+                    .as_deref()
+                    .map(strip_slash_if_present)
+                    .or_else(|| name_resolver(self.definition).ok())
+                    .map(|name| format!("{}", AsUpperCamelCase(name)))
+                    .unwrap_or_else(|| format!("Variant{idx:02}"))
+            })
+            .as_str()
     }
 
     pub(crate) fn serde_attributes(&self, default_name: &str) -> Vec<TokenStream> {
@@ -137,10 +166,7 @@ impl OneOfEnum<Ref> {
                     )
                     .map_err(ValueConversionError::from_inline(rust_name))?;
 
-                Ok(Variant {
-                    definition,
-                    mapping_name,
-                })
+                Ok(Variant::new(definition, mapping_name))
             })
             .collect::<Result<_, _>>()?;
 
