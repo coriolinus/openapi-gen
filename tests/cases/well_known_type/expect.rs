@@ -8,7 +8,7 @@ type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
     PartialEq,
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize,
-    Eq,
+    Eq
 )]
 #[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum PostWellKnownTypesResponse {
@@ -20,7 +20,7 @@ pub enum PostWellKnownTypesResponse {
 pub trait Api {
     /**`POST /well-known-types`
 
-    */
+*/
     async fn post_well_known_types(
         &self,
         request_body: PostWellKnownTypesRequest,
@@ -30,7 +30,8 @@ impl openapi_gen::reexport::axum::response::IntoResponse for PostWellKnownTypesR
     fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
         match self {
             PostWellKnownTypesResponse::NoContent(no_content) => {
-                openapi_gen::reexport::http::status::StatusCode::NO_CONTENT.into_response()
+                (openapi_gen::reexport::http::status::StatusCode::NO_CONTENT, no_content)
+                    .into_response()
             }
             PostWellKnownTypesResponse::Default(default) => {
                 openapi_gen::axum_compat::default_response(default)
@@ -38,3 +39,4 @@ impl openapi_gen::reexport::axum::response::IntoResponse for PostWellKnownTypesR
         }
     }
 }
+

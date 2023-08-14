@@ -10,7 +10,7 @@ type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
     PartialEq,
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize,
-    Eq,
+    Eq
 )]
 #[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum PostKudosResponse {
@@ -21,16 +21,17 @@ pub enum PostKudosResponse {
 pub trait Api {
     /**`POST /post-kudos`
 
-    Operation ID: `postKudos`
+Operation ID: `postKudos`
 
-    */
+*/
     async fn post_kudos(&self, request_body: PostKudosRequest) -> PostKudosResponse;
 }
 impl openapi_gen::reexport::axum::response::IntoResponse for PostKudosResponse {
     fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
         match self {
             PostKudosResponse::Created(created) => {
-                openapi_gen::reexport::http::status::StatusCode::CREATED.into_response()
+                (openapi_gen::reexport::http::status::StatusCode::CREATED, created)
+                    .into_response()
             }
             PostKudosResponse::Default(default) => {
                 openapi_gen::axum_compat::default_response(default)
@@ -38,3 +39,4 @@ impl openapi_gen::reexport::axum::response::IntoResponse for PostKudosResponse {
         }
     }
 }
+

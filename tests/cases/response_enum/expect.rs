@@ -8,7 +8,7 @@ type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
     Clone,
     PartialEq,
     openapi_gen::reexport::serde::Serialize,
-    openapi_gen::reexport::serde::Deserialize,
+    openapi_gen::reexport::serde::Deserialize
 )]
 #[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum RenderPdfResponse {
@@ -24,41 +24,46 @@ pub enum RenderPdfResponse {
 pub trait Api {
     /**`POST /render`
 
-    Operation ID: `renderPdf`
+Operation ID: `renderPdf`
 
-    */
+*/
     async fn render_pdf(&self) -> RenderPdfResponse;
 }
 impl openapi_gen::reexport::axum::response::IntoResponse for RenderPdfResponse {
     fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
         match self {
             RenderPdfResponse::Ok(ok) => {
-                let mut header_map =
-                    openapi_gen::reexport::http::header::HeaderMap::with_capacity(1usize);
-                header_map.insert(
-                    openapi_gen::reexport::http::header::CONTENT_TYPE,
-                    openapi_gen::reexport::http::HeaderValue::from_static("application/pdf"),
+                let mut header_map = openapi_gen::reexport::http::header::HeaderMap::with_capacity(
+                    1usize,
                 );
+                header_map
+                    .insert(
+                        openapi_gen::reexport::http::header::CONTENT_TYPE,
+                        openapi_gen::reexport::http::HeaderValue::from_static(
+                            "application/pdf",
+                        ),
+                    );
+                (openapi_gen::reexport::http::status::StatusCode::OK, header_map, ok)
+                    .into_response()
+            }
+            RenderPdfResponse::BadRequest(bad_request) => {
                 (
-                    openapi_gen::reexport::http::status::StatusCode::OK,
-                    header_map,
-                    ok,
+                    openapi_gen::reexport::http::status::StatusCode::BAD_REQUEST,
+                    openapi_gen::reexport::axum::Json(bad_request),
                 )
                     .into_response()
             }
-            RenderPdfResponse::BadRequest(bad_request) => (
-                openapi_gen::reexport::http::status::StatusCode::BAD_REQUEST,
-                openapi_gen::reexport::axum::Json(bad_request),
-            )
-                .into_response(),
-            RenderPdfResponse::ServiceUnavailable(service_unavailable) => (
-                openapi_gen::reexport::http::status::StatusCode::SERVICE_UNAVAILABLE,
-                openapi_gen::reexport::axum::Json(service_unavailable),
-            )
-                .into_response(),
+            RenderPdfResponse::ServiceUnavailable(service_unavailable) => {
+                (
+                    openapi_gen::reexport::http::status::StatusCode::SERVICE_UNAVAILABLE,
+                    openapi_gen::reexport::axum::Json(service_unavailable),
+                )
+                    .into_response()
+            }
             RenderPdfResponse::Default(default) => {
                 openapi_gen::axum_compat::default_response(default)
             }
         }
     }
 }
+

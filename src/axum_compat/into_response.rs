@@ -156,11 +156,26 @@ fn impl_into_response_for_response_type(
     });
     let header_map_ident_comma = (!headers.is_empty()).then_some(quote!(header_map,));
 
+    // wrap the body in a JSON wrapper if it is not a unit type, and
+    // the item content-type ends with "json"
+    let wrap_with_json = !matches!(&item.value, Value::Scalar(crate::codegen::Scalar::Unit))
+        && item
+            .content_type
+            .as_deref()
+            .unwrap_or("json")
+            .eq_ignore_ascii_case("json");
+
+    let body = if wrap_with_json {
+        quote!(openapi_gen::reexport::axum::Json(#body))
+    } else {
+        quote!(#body)
+    };
+
     let into_response = quote! {
         (
             openapi_gen::reexport::http::status::StatusCode::#status_ident,
             #header_map_ident_comma
-            openapi_gen::reexport::axum::Json(#body),
+            #body,
         ).into_response()
     };
 
