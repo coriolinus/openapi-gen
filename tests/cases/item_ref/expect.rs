@@ -69,4 +69,30 @@ Operation ID: `putThing`
 */
     async fn put_thing(&self, id: Id, request_body: PutThingRequest) -> PutThingResponse;
 }
+impl openapi_gen::reexport::axum::response::IntoResponse for GetThingResponse {
+    fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
+        match self {
+            GetThingResponse::Ok(ok) => {
+                (
+                    openapi_gen::reexport::http::status::StatusCode::OK,
+                    openapi_gen::reexport::axum::Json(ok),
+                )
+                    .into_response()
+            }
+        }
+    }
+}
+impl openapi_gen::reexport::axum::response::IntoResponse for PutThingResponse {
+    fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
+        match self {
+            PutThingResponse::Ok(ok) => {
+                (
+                    openapi_gen::reexport::http::status::StatusCode::OK,
+                    openapi_gen::reexport::axum::Json(ok),
+                )
+                    .into_response()
+            }
+        }
+    }
+}
 

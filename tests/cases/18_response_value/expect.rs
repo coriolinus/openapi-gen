@@ -60,7 +60,6 @@ pub type CreateNaturalPersonIdentificationRequest = NaturalPersonIdentification;
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct CreateNaturalPersonIdentificationResponseCreated {
-    #[serde(rename = "Location")]
     pub location: Location,
     pub body: NaturalPersonIdentification,
 }
@@ -88,5 +87,37 @@ Operation ID: `createNaturalPersonIdentification`
         &self,
         request_body: CreateNaturalPersonIdentificationRequest,
     ) -> CreateNaturalPersonIdentificationResponse;
+}
+impl openapi_gen::reexport::axum::response::IntoResponse
+for CreateNaturalPersonIdentificationResponse {
+    fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
+        match self {
+            CreateNaturalPersonIdentificationResponse::Created(created) => {
+                let CreateNaturalPersonIdentificationResponseCreated {
+                    location,
+                    body,
+                } = created;
+                let mut header_map = openapi_gen::reexport::http::header::HeaderMap::with_capacity(
+                    1usize,
+                );
+                header_map
+                    .insert(
+                        openapi_gen::reexport::http::header::HeaderName::from_static(
+                            "location",
+                        ),
+                        openapi_gen::header_value_of!(& location),
+                    );
+                (
+                    openapi_gen::reexport::http::status::StatusCode::CREATED,
+                    header_map,
+                    openapi_gen::reexport::axum::Json(body),
+                )
+                    .into_response()
+            }
+            CreateNaturalPersonIdentificationResponse::Default(default) => {
+                openapi_gen::axum_compat::default_response(default)
+            }
+        }
+    }
 }
 

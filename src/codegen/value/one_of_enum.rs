@@ -206,9 +206,9 @@ impl OneOfEnum {
             .enumerate()
             .map(|(idx, variant)| {
                 let variant_name = variant.compute_variant_name(idx, &name_resolver);
-                let ident = make_ident(&variant_name);
+                let ident = make_ident(variant_name);
                 let referent = make_ident(name_resolver(variant.definition)?);
-                let attributes = variant.serde_attributes(&variant_name);
+                let attributes = variant.serde_attributes(variant_name);
                 let attributes =
                     (!attributes.is_empty()).then(|| quote!(#[serde( #( #attributes)* )]));
                 Ok(quote! {

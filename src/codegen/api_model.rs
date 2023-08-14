@@ -13,6 +13,9 @@ use quote::quote;
 const OPENAPI_GEN_VERSION: &str = env!("CARGO_PKG_VERSION");
 const OPENAPI_GEN_GIT_SHA: &str = env!("VERGEN_GIT_SHA");
 
+#[cfg(feature = "axum-support")]
+use crate::axum_compat;
+
 use crate::{
     codegen::{
         endpoint::{
@@ -512,10 +515,16 @@ Your changes may be overwritten without notice.
             }
         };
 
+        #[cfg(not(feature = "axum-support"))]
+        let axum = TokenStream::default();
+        #[cfg(feature = "axum-support")]
+        let axum = axum_compat::axum_items(self)?;
+
         Ok(quote! {
             #header
             #( #items )*
             #trait_api
+            #axum
         })
     }
 
@@ -686,4 +695,7 @@ pub enum Error {
     },
     #[error("inserting component headers")]
     InsertHeader(#[from] header::Error),
+    #[cfg(feature = "axum-support")]
+    #[error("implementing axum compatibility")]
+    AxumCompat(#[from] axum_compat::Error),
 }

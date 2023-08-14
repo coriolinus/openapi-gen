@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context as _};
-use heck::{AsUpperCamelCase, ToUpperCamelCase};
+use heck::{AsUpperCamelCase, ToSnakeCase, ToUpperCamelCase};
 use openapiv3::{Header, OpenAPI, ReferenceOr, Response, Responses, Schema, StatusCode};
 
 use crate::{
@@ -148,9 +148,12 @@ fn make_response_object_with_headers_and_body<'a>(
             }
         };
 
+        let mut field_name = header_name.to_snake_case();
+        model.deconflict_member_or_variant_ident(&mut field_name);
+
         object
             .members
-            .insert(header_name.to_owned(), ObjectMember::new(definition));
+            .insert(field_name, ObjectMember::new(definition));
     }
 
     if object.members.contains_key(BODY_IDENT) {

@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use axum::{
     response::{IntoResponse, Response},
     Json,
@@ -175,25 +173,23 @@ fn impl_into_response_for_response_type(
     })
 }
 
-/// Implement a single `match` arm of `IntoResponse`.
+// TODO rm response_name from this function
+
+/// Implement `IntoResponse` for a response type.
 ///
 /// This implementation handles extracting response headers and appropriate status codes from the response enum, which in turn
 /// means that the response enum becomes a valid return value for a handler. This substantially simplifies handler generation.
 pub(crate) fn impl_into_response(
     model: &ApiModel,
     response_enum: &Reference,
-    response_name: &str,
 ) -> Result<TokenStream, Error> {
-    let response_ident = make_ident(response_name);
-
     let item = model
         .resolve(*response_enum)
-        .ok_or_else(|| {
-            UnknownReference(format!(
-                "response reference: {response_enum:?} ({response_name})"
-            ))
-        })
+        .ok_or_else(|| UnknownReference(format!("response reference: {response_enum:?}")))
         .map_err(Error::context("getting response item"))?;
+
+    let response_name = &item.rust_name;
+    let response_ident = make_ident(response_name);
 
     let Value::OneOfEnum(oo_enum) = &item.value else {
         let err = Error::new(format!("response reference: {response_enum:?} ({response_name})"));
@@ -228,28 +224,29 @@ pub(crate) fn impl_into_response(
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("{context}")]
+#[error("{msg}")]
 pub struct Error {
-    context: String,
+    msg: String,
     #[source]
-    inner: Option<Box<dyn std::error::Error>>,
+    inner: Option<Box<dyn 'static + std::error::Error + Send + Sync>>,
 }
 
 impl Error {
-    fn new<'a>(msg: impl Into<Cow<'a, str>>) -> Self {
-        let context = msg.into().into_owned();
+    fn new(msg: impl Into<String>) -> Self {
+        let msg = msg.into();
         let inner = None;
-        Self { context, inner }
+        Self { msg, inner }
     }
 
-    fn context<'a, E>(context: &'a str) -> impl 'a + Fn(E) -> Self
+    fn context<C, E>(context: C) -> impl FnOnce(E) -> Self
     where
-        E: 'static + std::error::Error,
+        C: Into<String>,
+        Box<dyn 'static + std::error::Error + Send + Sync>: From<E>,
     {
-        |err| {
-            let context = context.into();
-            let inner = Some(Box::new(err) as _);
-            Self { context, inner }
+        move |err| {
+            let msg = context.into();
+            let inner = Some(err.into());
+            Self { msg, inner }
         }
     }
 }
