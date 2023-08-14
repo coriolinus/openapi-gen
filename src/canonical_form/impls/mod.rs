@@ -8,8 +8,9 @@ use crate::{CanonicalForm, CanonicalizeError, Reason, ValidationError};
 macro_rules! canonical_form_transparent {
     ($t:ty) => {
         impl CanonicalForm for $t {
+            type ParseableFrom = $t;
             type JsonRepresentation = $t;
-            fn validate(from: &Self::JsonRepresentation) -> Result<Self, ValidationError> {
+            fn validate(from: &$t) -> Result<Self, ValidationError> {
                 Ok(from.to_owned())
             }
             fn canonicalize(&self) -> Result<$t, CanonicalizeError> {
@@ -25,8 +26,9 @@ canonical_form_transparent!(String);
 macro_rules! canonical_form_display_fromstr {
     ($t:path) => {
         impl CanonicalForm for $t {
+            type ParseableFrom = str;
             type JsonRepresentation = String;
-            fn validate(from: &String) -> Result<Self, ValidationError> {
+            fn validate(from: &str) -> Result<Self, ValidationError> {
                 from.parse()
                     .map_err(|err| ValidationError::reason::<Self>(Reason::from_err(err)))
             }
