@@ -11,18 +11,27 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::{axum_compat::into_response::impl_into_response, ApiModel};
+use crate::{
+    axum_compat::{header::impl_header, into_response::impl_into_response},
+    ApiModel,
+};
 
+mod header;
 mod into_response;
 
 pub use into_response::default_response;
 
 pub(crate) fn axum_items(model: &ApiModel) -> Result<TokenStream, Error> {
-    // TODO: implement header_impls
-    let header_impls = Vec::<TokenStream>::new();
+    let mut header_impls = Vec::new();
+
+    for header_item in model.iter_items().filter_map(|ref_| {
+        let item = model.resolve(ref_)?;
+        item.impl_header.then_some(item)
+    }) {
+        header_impls.push(impl_header(model, header_item)?);
+    }
 
     let mut into_response_impls = Vec::with_capacity(model.endpoints.len());
-
     for endpoint in model.endpoints.iter() {
         let reference = endpoint.response;
 

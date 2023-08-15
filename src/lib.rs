@@ -29,6 +29,8 @@ pub mod reexport {
     #[cfg(feature = "integer-restrictions")]
     pub use bounded_integer;
     pub use derive_more;
+    #[cfg(feature = "axum-support")]
+    pub use headers;
     pub use heck;
     pub use http;
     #[cfg(feature = "api-problem")]

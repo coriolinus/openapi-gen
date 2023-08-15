@@ -12,6 +12,7 @@
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Id(pub openapi_gen::reexport::uuid::Uuid);
+openapi_gen::newtype_derive_canonical_form!(Id, openapi_gen::reexport::uuid::Uuid);
 type ThingId = Id;
 #[derive(
     Debug,

@@ -12,6 +12,9 @@
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct IdentificationId(pub openapi_gen::reexport::uuid::Uuid);
+openapi_gen::newtype_derive_canonical_form!(
+    IdentificationId, openapi_gen::reexport::uuid::Uuid
+);
 #[derive(
     Debug,
     Clone,
@@ -25,6 +28,7 @@ pub struct IdentificationId(pub openapi_gen::reexport::uuid::Uuid);
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct PersonId(pub openapi_gen::reexport::uuid::Uuid);
+openapi_gen::newtype_derive_canonical_form!(PersonId, openapi_gen::reexport::uuid::Uuid);
 type AdditionalInformationItem = String;
 pub type AdditionalInformation = Vec<AdditionalInformationItem>;
 type Id = IdentificationId;
@@ -46,7 +50,19 @@ pub struct NaturalPersonIdentification {
     pub person_id: PersonId,
 }
 type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
-pub type Location = String;
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde::Serialize,
+    openapi_gen::reexport::serde::Deserialize,
+    Eq,
+    Hash,
+    openapi_gen::reexport::derive_more::Constructor
+)]
+#[serde(crate = "openapi_gen::reexport::serde")]
+pub struct Location(pub String);
+openapi_gen::newtype_derive_canonical_form!(Location, String);
 pub type CreateNaturalPersonIdentificationRequest = NaturalPersonIdentification;
 #[derive(
     Debug,
@@ -87,6 +103,40 @@ Operation ID: `createNaturalPersonIdentification`
         &self,
         request_body: CreateNaturalPersonIdentificationRequest,
     ) -> CreateNaturalPersonIdentificationResponse;
+}
+impl openapi_gen::reexport::headers::Header for Location {
+    fn name() -> &'static openapi_gen::reexport::headers::HeaderName {
+        static NAME: openapi_gen::reexport::headers::HeaderName = openapi_gen::reexport::headers::HeaderName::from_static(
+            "location",
+        );
+        &NAME
+    }
+    fn decode<'i, I>(
+        values: &mut I,
+    ) -> Result<Self, openapi_gen::reexport::headers::Error>
+    where
+        Self: Sized,
+        I: Iterator<Item = &'i openapi_gen::reexport::headers::HeaderValue>,
+    {
+        let value = values
+            .next()
+            .ok_or_else(openapi_gen::reexport::headers::Error::invalid)?;
+        let value_str = value
+            .to_str()
+            .map_err(|_| openapi_gen::reexport::headers::Error::invalid())?;
+        openapi_gen::CanonicalForm::validate(value_str)
+            .map_err(|_| openapi_gen::reexport::headers::Error::invalid())
+    }
+    fn encode<E>(&self, values: &mut E)
+    where
+        E: ::std::iter::Extend<openapi_gen::reexport::headers::HeaderValue>,
+    {
+        let value = openapi_gen::CanonicalForm::canonicalize(self)
+            .expect("header encoding must be infallible");
+        let header_value = openapi_gen::reexport::headers::HeaderValue::from_str(&value)
+            .expect("header canonical form must include only visible ascii");
+        values.extend(::std::iter::once(header_value));
+    }
 }
 impl openapi_gen::reexport::axum::response::IntoResponse
 for CreateNaturalPersonIdentificationResponse {

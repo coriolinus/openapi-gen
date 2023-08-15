@@ -37,6 +37,10 @@ impl<R> Variant<R> {
     /// when the name resolver is available. In general, code which requires access to the computed
     /// name of the variant should only run after its definition has been emitted.
     // TODO: can we improve on that, compute it earlier somehow?
+    //
+    // This function is not currently called from all feature sets, so it might erroneously trigger
+    // a dead code warning without this annotation.
+    #[allow(dead_code)]
     pub(crate) fn computed_name(&self) -> Option<&str> {
         self.computed_name.get().map(String::as_str)
     }

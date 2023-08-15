@@ -11,6 +11,9 @@ pub type IsAwesome = bool;
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct ArbitraryJson(openapi_gen::reexport::serde_json::Value);
+openapi_gen::newtype_derive_canonical_form!(
+    ArbitraryJson, openapi_gen::reexport::serde_json::Value
+);
 #[derive(
     Debug,
     Clone,

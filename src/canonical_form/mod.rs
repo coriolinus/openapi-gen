@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-
 pub(crate) mod impls;
 
 #[derive(Debug, thiserror::Error, derive_more::From)]

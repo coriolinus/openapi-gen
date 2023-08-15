@@ -18,6 +18,7 @@ pub type Count = u64;
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct FirstBar(pub String);
+openapi_gen::newtype_derive_canonical_form!(FirstBar, String);
 #[derive(
     Debug,
     Clone,

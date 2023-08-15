@@ -8,6 +8,7 @@ use quote::quote;
 use serde::Serialize;
 
 use crate::{
+    axum_compat::Error,
     codegen::{make_ident, value::object::BODY_IDENT, Object, Reference, UnknownReference, Value},
     ApiModel, AsStatusCode,
 };
@@ -35,23 +36,6 @@ macro_rules! header_value_of {
         }
     };
 }
-
-// impl IntoResponse for CreateNaturalPersonIdentificationResponse {
-//     fn into_response(self) -> axum::response::Response {
-//         match self {
-//             CreateNaturalPersonIdentificationResponse::Created(created) => {
-//                 let CreateNaturalPersonIdentificationResponseCreated { location, body } = created;
-//                 let mut header_map = HeaderMap::with_capacity(1);
-//                 let location = header_value_of!(&location);
-//                 header_map.insert(LOCATION, location);
-//                 (StatusCode::CREATED, header_map, Json(body)).into_response()
-//             }
-//             CreateNaturalPersonIdentificationResponse::Default(default) => {
-//                 default_response(default)
-//             }
-//         }
-//     }
-// }
 
 /// Implement a single `match` arm of `IntoResponse`.
 ///
@@ -188,8 +172,6 @@ fn impl_into_response_for_response_type(
     })
 }
 
-// TODO rm response_name from this function
-
 /// Implement `IntoResponse` for a response type.
 ///
 /// This implementation handles extracting response headers and appropriate status codes from the response enum, which in turn
@@ -236,32 +218,4 @@ pub(crate) fn impl_into_response(
             }
         }
     })
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error("{msg}")]
-pub struct Error {
-    msg: String,
-    #[source]
-    inner: Option<Box<dyn 'static + std::error::Error + Send + Sync>>,
-}
-
-impl Error {
-    fn new(msg: impl Into<String>) -> Self {
-        let msg = msg.into();
-        let inner = None;
-        Self { msg, inner }
-    }
-
-    fn context<C, E>(context: C) -> impl FnOnce(E) -> Self
-    where
-        C: Into<String>,
-        Box<dyn 'static + std::error::Error + Send + Sync>: From<E>,
-    {
-        move |err| {
-            let msg = context.into();
-            let inner = Some(err.into());
-            Self { msg, inner }
-        }
-    }
 }

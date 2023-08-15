@@ -251,6 +251,18 @@ impl<R> ApiModel<R> {
         }
         Ok(())
     }
+
+    /// Iterate references over all currently-known items.
+    //
+    // This function is not currently called from all feature sets, so it might erroneously trigger
+    // a dead code warning without this annotation.
+    #[allow(dead_code)]
+    pub(crate) fn iter_items(&self) -> impl '_ + Iterator<Item = R>
+    where
+        R: AsBackref,
+    {
+        (0..self.items.len()).map(R::from_backref)
+    }
 }
 
 // These functions only appear when we use potentially forward references.
@@ -293,6 +305,9 @@ impl ApiModel<Ref> {
     /// All inline item definitions are added in topographic order.
     ///
     /// External item definitions are permitted to be forward references.
+    //
+    // Unfortunatley I think we're stuck with this argument count.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_inline_items(
         &mut self,
         spec: &OpenAPI,

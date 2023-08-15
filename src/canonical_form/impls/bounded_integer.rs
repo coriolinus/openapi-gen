@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-
 use crate::{CanonicalForm, CanonicalizeError, ValidationError};
 use bounded_integer::{BoundedI32, BoundedI64};
 use serde_json::Number;

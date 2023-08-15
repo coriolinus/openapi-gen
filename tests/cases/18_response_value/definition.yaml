@@ -75,3 +75,5 @@ components:
       schema:
         type: string
         format: path
+        x-newtype:
+          pub: true
