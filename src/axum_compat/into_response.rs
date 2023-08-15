@@ -158,12 +158,8 @@ fn impl_into_response_for_response_type(
 
     // wrap the body in a JSON wrapper if it is not a unit type, and
     // the item content-type ends with "json"
-    let wrap_with_json = !matches!(&item.value, Value::Scalar(crate::codegen::Scalar::Unit))
-        && item
-            .content_type
-            .as_deref()
-            .unwrap_or("json")
-            .eq_ignore_ascii_case("json");
+    let wrap_with_json =
+        !matches!(&item.value, Value::Scalar(crate::codegen::Scalar::Unit)) && item.is_json();
 
     let body = if wrap_with_json {
         quote!(openapi_gen::reexport::axum::Json(#body))

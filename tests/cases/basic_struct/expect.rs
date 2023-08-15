@@ -70,4 +70,13 @@ pub struct OuterStruct {
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {}
+/// Transform an instance of [`trait Api`][Api] into a [`Router`][axum::Router].
+pub fn build_router<Instance>(instance: Instance) -> openapi_gen::reexport::axum::Router
+where
+    Instance: 'static + Api + Send + Sync,
+{
+    #[allow(unused_variables)]
+    let instance = ::std::sync::Arc::new(instance);
+    openapi_gen::reexport::axum::Router::new()
+}
 

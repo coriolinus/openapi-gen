@@ -96,4 +96,38 @@ impl openapi_gen::reexport::axum::response::IntoResponse for PutThingResponse {
         }
     }
 }
+/// Transform an instance of [`trait Api`][Api] into a [`Router`][axum::Router].
+pub fn build_router<Instance>(instance: Instance) -> openapi_gen::reexport::axum::Router
+where
+    Instance: 'static + Api + Send + Sync,
+{
+    #[allow(unused_variables)]
+    let instance = ::std::sync::Arc::new(instance);
+    openapi_gen::reexport::axum::Router::new()
+        .route(
+            "/thing/:id",
+            openapi_gen::reexport::axum::routing::get({
+                let instance = instance.clone();
+                move |
+                    openapi_gen::reexport::axum::extract::Path(
+                        id,
+                    ): openapi_gen::reexport::axum::extract::Path<Id>|
+                async move { instance.get_thing(id).await }
+            }),
+        )
+        .route(
+            "/thing/:id",
+            openapi_gen::reexport::axum::routing::put({
+                let instance = instance.clone();
+                move |
+                    openapi_gen::reexport::axum::extract::Path(
+                        id,
+                    ): openapi_gen::reexport::axum::extract::Path<Id>,
+                    openapi_gen::reexport::axum::extract::Json(
+                        request_body,
+                    ): openapi_gen::reexport::axum::extract::Json<PutThingRequest>|
+                async move { instance.put_thing(id, request_body).await }
+            }),
+        )
+}
 

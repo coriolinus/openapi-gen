@@ -309,6 +309,16 @@ impl Item {
             }
     }
 
+    /// `true` when the item is probably json
+    #[allow(dead_code)]
+    pub(crate) fn is_json(&self) -> bool {
+        // cast to bytes in case it's not ascii, so we don't have an indexing panic
+        let content_type = self.content_type.as_deref().unwrap_or("json").as_bytes();
+        // re-subslice the string to get the trailing four bytes
+        let content_type = &content_type[content_type.len() - 4..];
+        content_type.eq_ignore_ascii_case(b"json")
+    }
+
     /// Is this item public?
     ///
     /// True if any:

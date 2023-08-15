@@ -114,4 +114,48 @@ impl openapi_gen::reexport::axum::response::IntoResponse for SameRequestResponse
         }
     }
 }
+/// Transform an instance of [`trait Api`][Api] into a [`Router`][axum::Router].
+pub fn build_router<Instance>(instance: Instance) -> openapi_gen::reexport::axum::Router
+where
+    Instance: 'static + Api + Send + Sync,
+{
+    #[allow(unused_variables)]
+    let instance = ::std::sync::Arc::new(instance);
+    openapi_gen::reexport::axum::Router::new()
+        .route(
+            "/multi-requests",
+            openapi_gen::reexport::axum::routing::post({
+                let instance = instance.clone();
+                move |
+                    openapi_gen::reexport::axum::extract::Json(
+                        request_body,
+                    ): openapi_gen::reexport::axum::extract::Json<MultiRequestsRequest>|
+                async move { instance.multi_requests(request_body).await }
+            }),
+        )
+        .route(
+            "/optional-request-body",
+            openapi_gen::reexport::axum::routing::post({
+                let instance = instance.clone();
+                move |
+                    openapi_gen::reexport::axum::extract::Json(
+                        request_body,
+                    ): openapi_gen::reexport::axum::extract::Json<
+                        OptionalRequestBodyRequest,
+                    >|
+                async move { instance.optional_request_body(request_body).await }
+            }),
+        )
+        .route(
+            "/unified-request-body",
+            openapi_gen::reexport::axum::routing::post({
+                let instance = instance.clone();
+                move |
+                    openapi_gen::reexport::axum::extract::Json(
+                        request_body,
+                    ): openapi_gen::reexport::axum::extract::Json<SameRequestRequest>|
+                async move { instance.same_request(request_body).await }
+            }),
+        )
+}
 

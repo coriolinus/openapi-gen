@@ -170,4 +170,28 @@ for CreateNaturalPersonIdentificationResponse {
         }
     }
 }
+/// Transform an instance of [`trait Api`][Api] into a [`Router`][axum::Router].
+pub fn build_router<Instance>(instance: Instance) -> openapi_gen::reexport::axum::Router
+where
+    Instance: 'static + Api + Send + Sync,
+{
+    #[allow(unused_variables)]
+    let instance = ::std::sync::Arc::new(instance);
+    openapi_gen::reexport::axum::Router::new()
+        .route(
+            "/natural-persons",
+            openapi_gen::reexport::axum::routing::post({
+                let instance = instance.clone();
+                move |
+                    openapi_gen::reexport::axum::extract::Json(
+                        request_body,
+                    ): openapi_gen::reexport::axum::extract::Json<
+                        CreateNaturalPersonIdentificationRequest,
+                    >|
+                async move {
+                    instance.create_natural_person_identification(request_body).await
+                }
+            }),
+        )
+}
 

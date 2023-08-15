@@ -16,6 +16,7 @@ use crate::{
     ApiModel,
 };
 
+mod build_router;
 mod header;
 mod into_response;
 
@@ -41,8 +42,7 @@ pub(crate) fn axum_items(model: &ApiModel) -> Result<TokenStream, Error> {
         );
     }
 
-    // TODO: implement builder for fn build_router
-    let build_router = TokenStream::default();
+    let build_router = build_router::fn_build_router(model)?;
 
     Ok(quote! {
         #( #header_impls )*
