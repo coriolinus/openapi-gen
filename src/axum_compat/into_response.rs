@@ -23,18 +23,34 @@ where
     (status, Json(default)).into_response()
 }
 
-/// `value` must evaluate to an `&str`
 #[macro_export]
-macro_rules! header_value_of {
+macro_rules! or_ice {
     ($value:expr) => {
-        match openapi_gen::reexport::http::HeaderValue::from_str($value) {
+        match $value {
             Ok(value) => value,
-            Err(_err) => return (
-                openapi_gen::reexport::http::status::StatusCode::INTERNAL_SERVER_ERROR,
-                format!("invalid header value for `{}` ({}:{}): all characters must be visible single-byte ascii (32-127)", stringify!($value), line!(), column!()),
-            ).into_response(),
+            Err(err) => {
+                return (
+                    openapi_gen::reexport::http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                    format!(
+                        "invalid header value for `{}` ({}:{}): {err}",
+                        stringify!($value),
+                        line!(),
+                        column!()
+                    ),
+                )
+                    .into_response()
+            }
         }
     };
+}
+
+/// `value` must implement `CanonicalForm<JsonRepresentation=String>`.
+#[macro_export]
+macro_rules! header_value_of {
+    ($value:expr) => {{
+        let value = $crate::or_ice!(openapi_gen::CanonicalForm::canonicalize($value));
+        $crate::or_ice!(openapi_gen::reexport::http::HeaderValue::from_str(&value))
+    }};
 }
 
 /// Implement a single `match` arm of `IntoResponse`.
