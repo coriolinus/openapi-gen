@@ -66,6 +66,7 @@ pub(crate) fn insert_parameter(
     let parameter_data = param.parameter_data_ref();
     let spec_name = parameter_data.name.clone();
     let rust_name = spec_name.to_upper_camel_case();
+    let mut content_type = None;
     let schema_ref = match &parameter_data.format {
         ParameterSchemaOrContent::Schema(schema) => schema,
         ParameterSchemaOrContent::Content(content) => {
@@ -75,7 +76,10 @@ pub(crate) fn insert_parameter(
             }
             content
                 .first()
-                .and_then(|(_content_type, media_type)| media_type.schema.as_ref())
+                .and_then(|(content_type_str, media_type)| {
+                    content_type = Some(content_type_str.to_owned());
+                    media_type.schema.as_ref()
+                })
                 .ok_or_else(|| anyhow!("malformed content type: contained no values"))?
         }
     };
@@ -99,6 +103,7 @@ pub(crate) fn insert_parameter(
                     rust_name,
                     nullable: true,
                     value: Value::Ref(inner_ref),
+                    content_type,
                     ..Default::default()
                 };
                 model
@@ -116,7 +121,7 @@ pub(crate) fn insert_parameter(
                     reference_name,
                     schema,
                     None,
-                    None,
+                    content_type,
                 )
                 .context("adding parameter item")?
         }
@@ -124,6 +129,13 @@ pub(crate) fn insert_parameter(
 
     if let Some(named_reference) = reference_name {
         model.insert_named_reference_for(named_reference, &ref_)?;
+    }
+
+    // best-effort ensure that we `impl Header` wherever necessary
+    if matches!(param, openapiv3::Parameter::Header { .. }) {
+        if let Some(item) = model.resolve_mut(&ref_) {
+            item.impl_header = true;
+        }
     }
 
     Ok(ref_)
