@@ -9,11 +9,13 @@
     Copy,
     Eq,
     Hash,
-    openapi_gen::reexport::derive_more::Constructor,
+    openapi_gen::reexport::derive_more::Constructor
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct IdentificationId(pub openapi_gen::reexport::uuid::Uuid);
-openapi_gen::newtype_derive_canonical_form!(IdentificationId, openapi_gen::reexport::uuid::Uuid);
+openapi_gen::newtype_derive_canonical_form!(
+    IdentificationId, openapi_gen::reexport::uuid::Uuid
+);
 ///the FINVIA PersonId for this individual
 #[derive(
     Debug,
@@ -24,7 +26,7 @@ openapi_gen::newtype_derive_canonical_form!(IdentificationId, openapi_gen::reexp
     Copy,
     Eq,
     Hash,
-    openapi_gen::reexport::derive_more::Constructor,
+    openapi_gen::reexport::derive_more::Constructor
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct PersonId(pub openapi_gen::reexport::uuid::Uuid);
@@ -39,7 +41,7 @@ type Id = IdentificationId;
     Copy,
     Eq,
     Hash,
-    openapi_gen::reexport::derive_more::Constructor,
+    openapi_gen::reexport::derive_more::Constructor
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct NaturalPersonIdentification {
@@ -59,7 +61,7 @@ pub struct NaturalPersonIdentification {
     Hash,
     openapi_gen::reexport::derive_more::From,
     openapi_gen::reexport::derive_more::Into,
-    openapi_gen::reexport::derive_more::Constructor,
+    openapi_gen::reexport::derive_more::Constructor
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct XFlowId(openapi_gen::reexport::uuid::Uuid);
@@ -75,11 +77,13 @@ openapi_gen::newtype_derive_canonical_form!(XFlowId, openapi_gen::reexport::uuid
     Hash,
     openapi_gen::reexport::derive_more::From,
     openapi_gen::reexport::derive_more::Into,
-    openapi_gen::reexport::derive_more::Constructor,
+    openapi_gen::reexport::derive_more::Constructor
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct XRequestId(openapi_gen::reexport::uuid::Uuid);
-openapi_gen::newtype_derive_canonical_form!(XRequestId, openapi_gen::reexport::uuid::Uuid);
+openapi_gen::newtype_derive_canonical_form!(
+    XRequestId, openapi_gen::reexport::uuid::Uuid
+);
 type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 /**The path at which the new resource can be found.
 
@@ -94,7 +98,7 @@ It is relative in that it does not name the server, transport method, port, or o
     openapi_gen::reexport::serde::Deserialize,
     Eq,
     Hash,
-    openapi_gen::reexport::derive_more::Constructor,
+    openapi_gen::reexport::derive_more::Constructor
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Location(pub String);
@@ -108,15 +112,15 @@ pub type CreateNaturalPersonIdentificationRequest = NaturalPersonIdentification;
     openapi_gen::reexport::serde::Deserialize,
     Eq,
     Hash,
-    openapi_gen::reexport::derive_more::Constructor,
+    openapi_gen::reexport::derive_more::Constructor
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct CreateNaturalPersonIdentificationResponseCreated {
     /**The path at which the new resource can be found.
 
-    This is absolute in that it starts with a `/`, and describes the complete path.
-    It is relative in that it does not name the server, transport method, port, or other URL-specific data.
-    */
+This is absolute in that it starts with a `/`, and describes the complete path.
+It is relative in that it does not name the server, transport method, port, or other URL-specific data.
+*/
     pub location: Location,
     pub body: NaturalPersonIdentification,
 }
@@ -126,7 +130,7 @@ pub struct CreateNaturalPersonIdentificationResponseCreated {
     PartialEq,
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize,
-    Eq,
+    Eq
 )]
 #[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum CreateNaturalPersonIdentificationResponse {
@@ -137,16 +141,16 @@ pub enum CreateNaturalPersonIdentificationResponse {
 pub trait Api {
     /**Create a new natural person identification.
 
-    An identification is a snapshot in time of the data available to identify a person.
+An identification is a snapshot in time of the data available to identify a person.
 
 
-    ## Endpoint Data
+## Endpoint Data
 
-    `POST /natural-persons`
+`POST /natural-persons`
 
-    Operation ID: `createNaturalPersonIdentification`
+Operation ID: `createNaturalPersonIdentification`
 
-    */
+*/
     async fn create_natural_person_identification(
         &self,
         x_flow_id: XFlowId,
@@ -154,44 +158,16 @@ pub trait Api {
         request_body: CreateNaturalPersonIdentificationRequest,
     ) -> CreateNaturalPersonIdentificationResponse;
 }
-impl openapi_gen::reexport::headers::Header for Location {
-    fn name() -> &'static openapi_gen::reexport::headers::HeaderName {
-        static NAME: openapi_gen::reexport::headers::HeaderName =
-            openapi_gen::reexport::headers::HeaderName::from_static("location");
-        &NAME
-    }
-    fn decode<'i, I>(values: &mut I) -> Result<Self, openapi_gen::reexport::headers::Error>
-    where
-        Self: Sized,
-        I: Iterator<Item = &'i openapi_gen::reexport::headers::HeaderValue>,
-    {
-        let value = values
-            .next()
-            .ok_or_else(openapi_gen::reexport::headers::Error::invalid)?;
-        let value_str = value
-            .to_str()
-            .map_err(|_| openapi_gen::reexport::headers::Error::invalid())?;
-        openapi_gen::CanonicalForm::validate(value_str)
-            .map_err(|_| openapi_gen::reexport::headers::Error::invalid())
-    }
-    fn encode<E>(&self, values: &mut E)
-    where
-        E: ::std::iter::Extend<openapi_gen::reexport::headers::HeaderValue>,
-    {
-        let value = openapi_gen::CanonicalForm::canonicalize(self)
-            .expect("header encoding must be infallible");
-        let header_value = openapi_gen::reexport::headers::HeaderValue::from_str(&value)
-            .expect("header canonical form must include only visible ascii");
-        values.extend(::std::iter::once(header_value));
-    }
-}
 impl openapi_gen::reexport::headers::Header for XFlowId {
     fn name() -> &'static openapi_gen::reexport::headers::HeaderName {
-        static NAME: openapi_gen::reexport::headers::HeaderName =
-            openapi_gen::reexport::headers::HeaderName::from_static("x-flow-id");
+        static NAME: openapi_gen::reexport::headers::HeaderName = openapi_gen::reexport::headers::HeaderName::from_static(
+            "x-flow-id",
+        );
         &NAME
     }
-    fn decode<'i, I>(values: &mut I) -> Result<Self, openapi_gen::reexport::headers::Error>
+    fn decode<'i, I>(
+        values: &mut I,
+    ) -> Result<Self, openapi_gen::reexport::headers::Error>
     where
         Self: Sized,
         I: Iterator<Item = &'i openapi_gen::reexport::headers::HeaderValue>,
@@ -218,11 +194,48 @@ impl openapi_gen::reexport::headers::Header for XFlowId {
 }
 impl openapi_gen::reexport::headers::Header for XRequestId {
     fn name() -> &'static openapi_gen::reexport::headers::HeaderName {
-        static NAME: openapi_gen::reexport::headers::HeaderName =
-            openapi_gen::reexport::headers::HeaderName::from_static("x-request-id");
+        static NAME: openapi_gen::reexport::headers::HeaderName = openapi_gen::reexport::headers::HeaderName::from_static(
+            "x-request-id",
+        );
         &NAME
     }
-    fn decode<'i, I>(values: &mut I) -> Result<Self, openapi_gen::reexport::headers::Error>
+    fn decode<'i, I>(
+        values: &mut I,
+    ) -> Result<Self, openapi_gen::reexport::headers::Error>
+    where
+        Self: Sized,
+        I: Iterator<Item = &'i openapi_gen::reexport::headers::HeaderValue>,
+    {
+        let value = values
+            .next()
+            .ok_or_else(openapi_gen::reexport::headers::Error::invalid)?;
+        let value_str = value
+            .to_str()
+            .map_err(|_| openapi_gen::reexport::headers::Error::invalid())?;
+        openapi_gen::CanonicalForm::validate(value_str)
+            .map_err(|_| openapi_gen::reexport::headers::Error::invalid())
+    }
+    fn encode<E>(&self, values: &mut E)
+    where
+        E: ::std::iter::Extend<openapi_gen::reexport::headers::HeaderValue>,
+    {
+        let value = openapi_gen::CanonicalForm::canonicalize(self)
+            .expect("header encoding must be infallible");
+        let header_value = openapi_gen::reexport::headers::HeaderValue::from_str(&value)
+            .expect("header canonical form must include only visible ascii");
+        values.extend(::std::iter::once(header_value));
+    }
+}
+impl openapi_gen::reexport::headers::Header for Location {
+    fn name() -> &'static openapi_gen::reexport::headers::HeaderName {
+        static NAME: openapi_gen::reexport::headers::HeaderName = openapi_gen::reexport::headers::HeaderName::from_static(
+            "location",
+        );
+        &NAME
+    }
+    fn decode<'i, I>(
+        values: &mut I,
+    ) -> Result<Self, openapi_gen::reexport::headers::Error>
     where
         Self: Sized,
         I: Iterator<Item = &'i openapi_gen::reexport::headers::HeaderValue>,
@@ -248,18 +261,24 @@ impl openapi_gen::reexport::headers::Header for XRequestId {
     }
 }
 impl openapi_gen::reexport::axum::response::IntoResponse
-    for CreateNaturalPersonIdentificationResponse
-{
+for CreateNaturalPersonIdentificationResponse {
     fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
         match self {
             CreateNaturalPersonIdentificationResponse::Created(created) => {
-                let CreateNaturalPersonIdentificationResponseCreated { location, body } = created;
-                let mut header_map =
-                    openapi_gen::reexport::http::header::HeaderMap::with_capacity(1usize);
-                header_map.insert(
-                    openapi_gen::reexport::http::header::HeaderName::from_static("location"),
-                    openapi_gen::header_value_of!(&location),
+                let CreateNaturalPersonIdentificationResponseCreated {
+                    location,
+                    body,
+                } = created;
+                let mut header_map = openapi_gen::reexport::http::header::HeaderMap::with_capacity(
+                    1usize,
                 );
+                header_map
+                    .insert(
+                        openapi_gen::reexport::http::header::HeaderName::from_static(
+                            "location",
+                        ),
+                        openapi_gen::header_value_of!(& location),
+                    );
                 (
                     openapi_gen::reexport::http::status::StatusCode::CREATED,
                     header_map,
@@ -280,11 +299,12 @@ where
 {
     #[allow(unused_variables)]
     let instance = ::std::sync::Arc::new(instance);
-    openapi_gen::reexport::axum::Router::new().route(
-        "/natural-persons",
-        openapi_gen::reexport::axum::routing::post({
-            let instance = instance.clone();
-            move |
+    openapi_gen::reexport::axum::Router::new()
+        .route(
+            "/natural-persons",
+            openapi_gen::reexport::axum::routing::post({
+                let instance = instance.clone();
+                move |
                     openapi_gen::reexport::axum::extract::TypedHeader(
                         x_flow_id,
                     ): openapi_gen::reexport::axum::extract::TypedHeader<XFlowId>,
@@ -305,6 +325,7 @@ where
                         )
                         .await
                 }
-        }),
-    )
+            }),
+        )
 }
+

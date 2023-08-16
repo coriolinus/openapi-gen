@@ -666,8 +666,9 @@ impl ApiModel {
             let reference_name = Some(reference_name);
             let reference_name = reference_name.as_deref();
             let ref_ = create_header(spec, &mut model, spec_name, reference_name, header)?;
-            // all top-level component parameters are also public
             if let Some(item) = model.resolve_mut(&ref_) {
+                item.impl_header = true;
+                // all top-level component parameters are also public
                 item.pub_typedef = true;
             }
         }
