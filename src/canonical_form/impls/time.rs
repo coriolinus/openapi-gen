@@ -13,9 +13,10 @@ const DATE_FORM: &[FormatItem<'static>] = format_description!("[year]-[month]-[d
 ///
 /// [RFC 3339, section 5.6]: https://tools.ietf.org/html/rfc3339#section-5.6
 impl CanonicalForm for Date {
+    type ParseableFrom = str;
     type JsonRepresentation = String;
 
-    fn validate(from: &Self::JsonRepresentation) -> Result<Self, ValidationError> {
+    fn validate(from: &str) -> Result<Self, ValidationError> {
         Self::parse(from, &DATE_FORM)
             .map_err(|err| ValidationError::reason::<Self>(Reason::from_err(err)))
     }
@@ -33,9 +34,10 @@ impl CanonicalForm for Date {
 ///
 /// [RFC 3339, section 5.6]: https://tools.ietf.org/html/rfc3339#section-5.6
 impl CanonicalForm for OffsetDateTime {
+    type ParseableFrom = str;
     type JsonRepresentation = String;
 
-    fn validate(from: &Self::JsonRepresentation) -> Result<Self, ValidationError> {
+    fn validate(from: &str) -> Result<Self, ValidationError> {
         Self::parse(from, &Rfc3339)
             .map_err(|err| ValidationError::reason::<Self>(Reason::from_err(err)))
     }

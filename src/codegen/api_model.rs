@@ -13,6 +13,9 @@ use quote::quote;
 const OPENAPI_GEN_VERSION: &str = env!("CARGO_PKG_VERSION");
 const OPENAPI_GEN_GIT_SHA: &str = env!("VERGEN_GIT_SHA");
 
+#[cfg(feature = "axum-support")]
+use crate::axum_compat;
+
 use crate::{
     codegen::{
         endpoint::{
@@ -248,6 +251,18 @@ impl<R> ApiModel<R> {
         }
         Ok(())
     }
+
+    /// Iterate references over all currently-known items.
+    //
+    // This function is not currently called from all feature sets, so it might erroneously trigger
+    // a dead code warning without this annotation.
+    #[allow(dead_code)]
+    pub(crate) fn iter_items(&self) -> impl '_ + Iterator<Item = R>
+    where
+        R: AsBackref,
+    {
+        (0..self.items.len()).map(R::from_backref)
+    }
 }
 
 // These functions only appear when we use potentially forward references.
@@ -276,6 +291,7 @@ impl ApiModel<Ref> {
                 reference_name,
                 schema,
                 containing_object,
+                None,
             ),
             ReferenceOr::Reference { reference } => match self.named_references.get(reference) {
                 Some(position) => Ok(Ref::Back(*position)),
@@ -289,6 +305,9 @@ impl ApiModel<Ref> {
     /// All inline item definitions are added in topographic order.
     ///
     /// External item definitions are permitted to be forward references.
+    //
+    // Unfortunatley I think we're stuck with this argument count.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_inline_items(
         &mut self,
         spec: &OpenAPI,
@@ -297,8 +316,17 @@ impl ApiModel<Ref> {
         reference_name: Option<&str>,
         schema: &Schema,
         containing_object: ContainingObject,
+        content_type: Option<String>,
     ) -> Result<Ref, Error> {
-        let item = Item::parse_schema(spec, self, spec_name, rust_name, schema, containing_object)?;
+        let item = Item::parse_schema(
+            spec,
+            self,
+            spec_name,
+            rust_name,
+            schema,
+            containing_object,
+            content_type,
+        )?;
         self.add_item(item, reference_name)
     }
 
@@ -502,10 +530,16 @@ Your changes may be overwritten without notice.
             }
         };
 
+        #[cfg(not(feature = "axum-support"))]
+        let axum = TokenStream::default();
+        #[cfg(feature = "axum-support")]
+        let axum = axum_compat::axum_items(self)?;
+
         Ok(quote! {
             #header
             #( #items )*
             #trait_api
+            #axum
         })
     }
 
@@ -580,6 +614,7 @@ impl ApiModel {
                     &rust_name,
                     reference_name,
                     schema,
+                    None,
                     None,
                 )?,
                 OrScalar::Scalar(scalar) => {
@@ -675,4 +710,7 @@ pub enum Error {
     },
     #[error("inserting component headers")]
     InsertHeader(#[from] header::Error),
+    #[cfg(feature = "axum-support")]
+    #[error("implementing axum compatibility")]
+    AxumCompat(#[from] axum_compat::Error),
 }

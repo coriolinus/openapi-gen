@@ -11,6 +11,9 @@ pub type IsAwesome = bool;
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct ArbitraryJson(openapi_gen::reexport::serde_json::Value);
+openapi_gen::newtype_derive_canonical_form!(
+    ArbitraryJson, openapi_gen::reexport::serde_json::Value
+);
 #[derive(
     Debug,
     Clone,
@@ -99,4 +102,13 @@ pub enum UntaggedEnum {
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {}
+/// Transform an instance of [`trait Api`][Api] into a [`Router`][axum::Router].
+pub fn build_router<Instance>(instance: Instance) -> openapi_gen::reexport::axum::Router
+where
+    Instance: 'static + Api + Send + Sync,
+{
+    #[allow(unused_variables)]
+    let instance = ::std::sync::Arc::new(instance);
+    openapi_gen::reexport::axum::Router::new()
+}
 

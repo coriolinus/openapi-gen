@@ -3,9 +3,10 @@ use serde_json::Number;
 use crate::{CanonicalForm, CanonicalizeError, Reason, ValidationError};
 
 impl CanonicalForm for f64 {
+    type ParseableFrom = Number;
     type JsonRepresentation = Number;
 
-    fn validate(from: &Self::JsonRepresentation) -> Result<Self, ValidationError> {
+    fn validate(from: &Self::ParseableFrom) -> Result<Self, ValidationError> {
         from.as_f64()
             .ok_or_else(|| ValidationError::reason::<Self>(format!("number not finite: {from}")))
     }
@@ -17,9 +18,10 @@ impl CanonicalForm for f64 {
 }
 
 impl CanonicalForm for f32 {
+    type ParseableFrom = Number;
     type JsonRepresentation = Number;
 
-    fn validate(from: &Self::JsonRepresentation) -> Result<Self, ValidationError> {
+    fn validate(from: &Self::ParseableFrom) -> Result<Self, ValidationError> {
         f64::validate(from).map(|n| n as _)
     }
 
@@ -29,9 +31,10 @@ impl CanonicalForm for f32 {
 }
 
 impl CanonicalForm for i64 {
+    type ParseableFrom = Number;
     type JsonRepresentation = Number;
 
-    fn validate(from: &Self::JsonRepresentation) -> Result<Self, ValidationError> {
+    fn validate(from: &Self::ParseableFrom) -> Result<Self, ValidationError> {
         from.as_i64()
             .ok_or_else(|| ValidationError::reason::<Self>(format!("number not integer: {from}")))
     }
@@ -42,9 +45,10 @@ impl CanonicalForm for i64 {
 }
 
 impl CanonicalForm for i32 {
+    type ParseableFrom = Number;
     type JsonRepresentation = Number;
 
-    fn validate(from: &Self::JsonRepresentation) -> Result<Self, ValidationError> {
+    fn validate(from: &Self::ParseableFrom) -> Result<Self, ValidationError> {
         i64::validate(from).and_then(|n| {
             n.try_into()
                 .map_err(|err| ValidationError::reason::<Self>(Reason::from_err(err)))

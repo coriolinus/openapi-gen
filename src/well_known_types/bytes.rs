@@ -21,9 +21,10 @@ use crate::{CanonicalForm, Reason, ValidationError};
 pub struct Bytes(pub Vec<u8>);
 
 impl CanonicalForm for Bytes {
+    type ParseableFrom = str;
     type JsonRepresentation = String;
 
-    fn validate(from: &Self::JsonRepresentation) -> Result<Self, ValidationError> {
+    fn validate(from: &str) -> Result<Self, ValidationError> {
         from.parse()
     }
 

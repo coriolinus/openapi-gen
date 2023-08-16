@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context as _};
-use heck::{AsUpperCamelCase, ToUpperCamelCase};
+use heck::{AsUpperCamelCase, ToSnakeCase, ToUpperCamelCase};
 use openapiv3::{Header, OpenAPI, ReferenceOr, Response, Responses, Schema, StatusCode};
 
 use crate::{
@@ -7,7 +7,10 @@ use crate::{
         api_model::Ref,
         endpoint::{header::create_header, Error},
         find_well_known_type,
-        value::{object::ObjectMember, one_of_enum},
+        value::{
+            object::{ObjectMember, BODY_IDENT},
+            one_of_enum,
+        },
         Item, Object, OneOfEnum, Reference, Scalar, UnknownReference,
     },
     openapi_compat::is_external,
@@ -60,10 +63,10 @@ fn named_response_items(
 fn iter_status_and_content_schemas<'a>(
     base_name: &'a str,
     response: &'a Response,
-) -> impl 'a + Iterator<Item = (String, Option<&'a ReferenceOr<Schema>>)> {
+) -> impl 'a + Iterator<Item = (String, Option<(&'a String, &'a ReferenceOr<Schema>)>)> {
     if response.content.is_empty() {
         Box::new(std::iter::once((base_name.to_owned(), None)))
-            as Box<dyn Iterator<Item = (String, Option<&'a ReferenceOr<Schema>>)>>
+            as Box<dyn Iterator<Item = (String, Option<(&'a String, &'a ReferenceOr<Schema>)>)>>
     } else {
         let append_suffix = response.content.len() != 1;
         Box::new(
@@ -77,9 +80,12 @@ fn iter_status_and_content_schemas<'a>(
                         base_name.to_owned()
                     };
 
-                    let schema = media_type.schema.as_ref();
+                    let content_type_and_schema = media_type
+                        .schema
+                        .as_ref()
+                        .map(|schema| (content_type, schema));
 
-                    (spec_name, schema)
+                    (spec_name, content_type_and_schema)
                 }),
         )
     }
@@ -127,7 +133,10 @@ fn make_response_object_with_headers_and_body<'a>(
     body: Ref,
     headers: impl Iterator<Item = (&'a String, &'a ReferenceOr<Header>)>,
 ) -> Result<Ref, Error> {
-    let mut object = Object::<Ref>::default();
+    let mut object = Object::<Ref> {
+        is_generated_body_and_headers: true,
+        ..Default::default()
+    };
 
     for (header_name, header_ref) in headers {
         let definition = match header_ref {
@@ -139,18 +148,21 @@ fn make_response_object_with_headers_and_body<'a>(
             }
         };
 
+        let mut field_name = header_name.to_snake_case();
+        model.deconflict_member_or_variant_ident(&mut field_name);
+
         object
             .members
-            .insert(header_name.to_owned(), ObjectMember::new(definition));
+            .insert(field_name, ObjectMember::new(definition));
     }
 
-    if object.members.contains_key("body") {
+    if object.members.contains_key(BODY_IDENT) {
         return Err(wrap_err(anyhow!("invalid header name: `body`")));
     }
 
     object
         .members
-        .insert("body".to_owned(), ObjectMember::new(body));
+        .insert(BODY_IDENT.to_owned(), ObjectMember::new(body));
 
     let ref_ = model
         .add_item(
@@ -184,9 +196,14 @@ pub(crate) fn create_response_variants(
 ) -> Result<ResponseVariants<Ref>, Error> {
     let mut variants = Vec::new();
 
-    for (status_name, maybe_schema_ref) in iter_status_and_content_schemas(spec_name, response) {
+    for (status_name, maybe_content_and_schema) in
+        iter_status_and_content_schemas(spec_name, response)
+    {
         let mut rust_name = status_name.to_upper_camel_case();
         model.deconflict_member_or_variant_ident(&mut rust_name);
+
+        let (content_type, maybe_schema_ref) = maybe_content_and_schema.unzip();
+        let content_type = content_type.map(ToOwned::to_owned);
 
         let content = match maybe_schema_ref {
             None => {
@@ -200,9 +217,15 @@ pub(crate) fn create_response_variants(
             }
             // basic references and inline definitions have obvious implementations
             Some(ReferenceOr::Reference { reference }) => model.get_named_reference(reference),
-            Some(ReferenceOr::Item(schema)) => {
-                model.add_inline_items(spec, &status_name, &rust_name, None, schema, None)
-            }
+            Some(ReferenceOr::Item(schema)) => model.add_inline_items(
+                spec,
+                &status_name,
+                &rust_name,
+                None,
+                schema,
+                None,
+                content_type,
+            ),
         }
         .with_context(|| anyhow!("unable to produce variant ref for {rust_name}"))
         .map_err(wrap_err)?;
@@ -282,10 +305,8 @@ pub(crate) fn create_responses(
         {
             let definition = definition.clone();
             let mapping_name = Some(spec_name.clone());
-            out.variants.push(one_of_enum::Variant {
-                definition,
-                mapping_name,
-            });
+            out.variants
+                .push(one_of_enum::Variant::new(definition, mapping_name));
         }
     }
 

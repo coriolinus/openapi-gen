@@ -109,7 +109,15 @@ pub(crate) fn insert_parameter(
         ReferenceOr::Item(schema) => {
             // if we defined an inline schema, we need to add the item
             model
-                .add_inline_items(spec, &spec_name, &rust_name, reference_name, schema, None)
+                .add_inline_items(
+                    spec,
+                    &spec_name,
+                    &rust_name,
+                    reference_name,
+                    schema,
+                    None,
+                    None,
+                )
                 .context("adding parameter item")?
         }
     };

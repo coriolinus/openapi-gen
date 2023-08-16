@@ -12,6 +12,7 @@
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Id(pub openapi_gen::reexport::uuid::Uuid);
+openapi_gen::newtype_derive_canonical_form!(Id, openapi_gen::reexport::uuid::Uuid);
 type ThingId = Id;
 #[derive(
     Debug,
@@ -46,4 +47,13 @@ pub struct WriteableThing {
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {}
+/// Transform an instance of [`trait Api`][Api] into a [`Router`][axum::Router].
+pub fn build_router<Instance>(instance: Instance) -> openapi_gen::reexport::axum::Router
+where
+    Instance: 'static + Api + Send + Sync,
+{
+    #[allow(unused_variables)]
+    let instance = ::std::sync::Arc::new(instance);
+    openapi_gen::reexport::axum::Router::new()
+}
 

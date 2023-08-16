@@ -129,6 +129,16 @@ pub struct Item<Ref = Reference> {
     pub nullable: bool,
     /// What value this item contains
     pub value: Value<Ref>,
+    /// The `content-type` MIME type known to be associated with this item.
+    ///
+    /// Not all items have a known MIME type. The most common case where this is set are
+    /// direct `*Request` and `*Response` items.
+    ///
+    /// For items defined in `components/schemas` and defined inline within other item definitions,
+    /// this should be unset.
+    pub content_type: Option<String>,
+    /// When true, we should `impl headers::Header` for this item.
+    pub impl_header: bool,
 }
 
 impl<R> Default for Item<R> {
@@ -142,6 +152,8 @@ impl<R> Default for Item<R> {
             pub_typedef: Default::default(),
             nullable: Default::default(),
             value: Default::default(),
+            content_type: Default::default(),
+            impl_header: Default::default(),
         }
     }
 }
@@ -160,6 +172,8 @@ impl Item<Ref> {
             pub_typedef,
             nullable,
             value,
+            content_type,
+            impl_header,
         } = self;
         let value = value.resolve_refs(resolver)?;
         Ok(Item {
@@ -171,6 +185,8 @@ impl Item<Ref> {
             pub_typedef,
             nullable,
             value,
+            content_type,
+            impl_header,
         })
     }
 
@@ -185,6 +201,7 @@ impl Item<Ref> {
         rust_name: &str,
         schema: &Schema,
         containing_object: ContainingObject,
+        content_type: Option<String>,
     ) -> Result<Self, ParseItemError> {
         let value: Value<Ref> = match &schema.schema_kind {
             SchemaKind::Type(Type::Boolean {}) => Value::Scalar(Scalar::Bool),
@@ -269,6 +286,8 @@ impl Item<Ref> {
             pub_typedef,
             nullable,
             value,
+            content_type,
+            impl_header: false,
         })
     }
 }
@@ -277,7 +296,7 @@ impl Item {
     /// `true` when the item is a typedef.
     ///
     /// This disables derives when the item is emitted.
-    fn is_typedef(&self) -> bool {
+    pub(crate) fn is_typedef(&self) -> bool {
         self.newtype.is_none()
             && match &self.value {
                 Value::Scalar(_)
@@ -288,6 +307,16 @@ impl Item {
                 | Value::PropertyOverride(_) => true,
                 Value::StringEnum(_) | Value::OneOfEnum(_) | Value::Object(_) => false,
             }
+    }
+
+    /// `true` when the item is probably json
+    #[allow(dead_code)]
+    pub(crate) fn is_json(&self) -> bool {
+        // cast to bytes in case it's not ascii, so we don't have an indexing panic
+        let content_type = self.content_type.as_deref().unwrap_or("json").as_bytes();
+        // re-subslice the string to get the trailing four bytes
+        let content_type = &content_type[content_type.len().checked_sub(4).unwrap_or_default()..];
+        content_type.eq_ignore_ascii_case(b"json")
     }
 
     /// Is this item public?
@@ -372,6 +401,19 @@ impl Item {
 
         let semicolon = (self.newtype.is_some() || self.is_typedef()).then_some(quote!(;));
 
+        // in the future we may want custom derives here for subtypes, but for now, we're keeping things simple
+        let canonical_form = self.newtype.is_some()
+            .then(|| match &self.value {
+                Value::Scalar(scalar) => Some(scalar.emit_type()),
+                Value::Ref(ref_) | Value::PropertyOverride(PropertyOverride { ref_, .. }) => model.resolve(*ref_).map(|item| {
+                    let ident = make_ident(&item.rust_name);
+                    quote!(#ident)
+                }),
+                _ => None
+            })
+            .flatten()
+            .map(|inner_type| quote!(openapi_gen::newtype_derive_canonical_form!(#item_ident, #inner_type);));
+
         Ok(quote! {
             #wrapper_def
 
@@ -379,6 +421,8 @@ impl Item {
             #derives
             #serde_container_attributes
             #pub_ #item_keyword #item_ident #equals #item_def #semicolon
+
+            #canonical_form
         })
     }
 

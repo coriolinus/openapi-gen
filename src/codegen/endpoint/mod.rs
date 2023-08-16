@@ -88,7 +88,7 @@ impl<R> Endpoint<R> {
     /// The endpoint doesn't know internally whether it is unique at the verb/path combo,
     /// or whether it needs a suffix to disambiguate from other content types. That must
     /// therefore be provided externally.
-    fn function_name(&self, suffix: Option<&str>) -> String {
+    pub(crate) fn function_name(&self, suffix: Option<&str>) -> String {
         self.operation_id
             .clone()
             .unwrap_or_else(|| {

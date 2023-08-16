@@ -1,8 +1,11 @@
+pub(crate) mod as_status_code;
 pub(crate) mod canonical_form;
 pub(crate) mod codegen;
 pub(crate) mod openapi_compat;
 pub(crate) mod resolve_trait;
 pub(crate) mod well_known_types;
+
+pub use as_status_code::AsStatusCode;
 
 pub use canonical_form::{
     CanonicalForm, CanonicalizeError, ConstraintViolation, Reason, ValidationError,
@@ -13,15 +16,23 @@ pub use codegen::{ApiModel, Error};
 #[cfg(feature = "bytes")]
 pub use well_known_types::Bytes;
 
+#[cfg(feature = "axum-support")]
+pub mod axum_compat;
+
 /// Reexport crates used by generated code.
 ///
 /// This makes it much easier to keep the types in sync between the generated code and your own types.
 pub mod reexport {
     pub use async_trait;
+    #[cfg(feature = "axum-support")]
+    pub use axum;
     #[cfg(feature = "integer-restrictions")]
     pub use bounded_integer;
     pub use derive_more;
+    #[cfg(feature = "axum-support")]
+    pub use headers;
     pub use heck;
+    pub use http;
     #[cfg(feature = "api-problem")]
     pub use http_api_problem;
     #[cfg(feature = "string-pattern")]

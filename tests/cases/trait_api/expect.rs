@@ -26,4 +26,37 @@ Operation ID: `postKudos`
 */
     async fn post_kudos(&self, request_body: PostKudosRequest) -> PostKudosResponse;
 }
+impl openapi_gen::reexport::axum::response::IntoResponse for PostKudosResponse {
+    fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
+        match self {
+            PostKudosResponse::Created(created) => {
+                (openapi_gen::reexport::http::status::StatusCode::CREATED, created)
+                    .into_response()
+            }
+            PostKudosResponse::Default(default) => {
+                openapi_gen::axum_compat::default_response(default)
+            }
+        }
+    }
+}
+/// Transform an instance of [`trait Api`][Api] into a [`Router`][axum::Router].
+pub fn build_router<Instance>(instance: Instance) -> openapi_gen::reexport::axum::Router
+where
+    Instance: 'static + Api + Send + Sync,
+{
+    #[allow(unused_variables)]
+    let instance = ::std::sync::Arc::new(instance);
+    openapi_gen::reexport::axum::Router::new()
+        .route(
+            "/post-kudos",
+            openapi_gen::reexport::axum::routing::post({
+                let instance = instance.clone();
+                move |
+                    openapi_gen::reexport::axum::extract::Json(
+                        request_body,
+                    ): openapi_gen::reexport::axum::extract::Json<PostKudosRequest>|
+                async move { instance.post_kudos(request_body).await }
+            }),
+        )
+}
 

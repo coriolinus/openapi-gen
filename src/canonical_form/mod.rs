@@ -77,8 +77,15 @@ impl CanonicalizeError {
 /// For simplicity, this is a copying operation; this trait copies all the data
 /// passed through it, instead of taking ownership.
 pub trait CanonicalForm: Sized {
+    /// The simplest parseable type from which this can be validated.
+    ///
+    /// This must be borrowable from `Self::JsonRepresentation`.
+    type ParseableFrom: ?Sized;
+
     /// What type this is expressed as in JSON.
-    type JsonRepresentation: std::fmt::Display;
+    ///
+    /// When borrowed,
+    type JsonRepresentation: std::fmt::Display + std::borrow::Borrow<Self::ParseableFrom>;
 
     /// Ensure that all constraints on this type are upheld.
     ///
@@ -94,7 +101,7 @@ pub trait CanonicalForm: Sized {
     /// which should be called from within this function.
     ///
     /// The input can be anything which, when borrowed, is the same as the JSON representation.
-    fn validate(from: &Self::JsonRepresentation) -> Result<Self, ValidationError>;
+    fn validate(from: &Self::ParseableFrom) -> Result<Self, ValidationError>;
 
     /// Emit the canonical form as a JSON-compatible item.
     ///
@@ -122,10 +129,10 @@ pub trait CanonicalForm: Sized {
 macro_rules! newtype_derive_canonical_form {
     ($outer:path, $inner:path) => {
         impl $crate::CanonicalForm for $outer {
+            type ParseableFrom = <$inner as $crate::CanonicalForm>::ParseableFrom;
             type JsonRepresentation = <$inner as $crate::CanonicalForm>::JsonRepresentation;
-            fn validate(
-                from: &<Self as $crate::CanonicalForm>::JsonRepresentation,
-            ) -> Result<Self, $crate::ValidationError> {
+
+            fn validate(from: &Self::ParseableFrom) -> Result<Self, $crate::ValidationError> {
                 let inner = <$inner>::validate(from)?;
                 Ok(Self(inner))
             }

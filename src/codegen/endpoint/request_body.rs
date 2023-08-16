@@ -62,7 +62,8 @@ pub(crate) fn convert_optional_schema_ref(
             })
         }
         Some(ReferenceOr::Item(schema)) => {
-            Item::parse_schema(spec, model, &spec_name, &rust_name, schema, None).map_err(wrap_err)
+            Item::parse_schema(spec, model, &spec_name, &rust_name, schema, None, None)
+                .map_err(wrap_err)
         }
     }
 }
@@ -133,10 +134,7 @@ pub(crate) fn create_request_body(
                 )?;
                 variant_item.nullable = !request_body.required;
                 let definition = model.add_item(variant_item, None).map_err(wrap_err)?;
-                Ok(one_of_enum::Variant {
-                    definition,
-                    mapping_name: None,
-                })
+                Ok(one_of_enum::Variant::new(definition, None))
             })
             .collect::<Result<_, _>>()?;
         let value = one_of_enum::OneOfEnum {

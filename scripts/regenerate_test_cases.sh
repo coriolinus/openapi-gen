@@ -15,3 +15,5 @@ for definition in tests/cases/*/definition.yaml; do
     case_dir="$(dirname "$definition")"
     target/release/openapi-gen --no-emit-docs "$definition" > "$case_dir/expect.rs"
 done
+
+./scripts/compile_test_cases.sh
