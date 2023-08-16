@@ -89,7 +89,7 @@ pub trait Api {
     */
     async fn get_np_identity_document_data(
         &self,
-        accept: openapi_gen::header::Accept,
+        accept: Option<openapi_gen::header::Accept>,
         identification_id: IdentificationId,
         document_id: DocumentId,
     ) -> GetNpIdentityDocumentDataResponse;
@@ -148,7 +148,7 @@ where
         openapi_gen::reexport::axum::routing::get({
             let instance = instance.clone();
             move |
-                    openapi_gen::reexport::axum::extract::TypedHeader(accept): openapi_gen::reexport::axum::extract::TypedHeader<openapi_gen::header::Accept>,
+                    openapi_gen::reexport::axum::extract::TypedHeader(accept): openapi_gen::reexport::axum::extract::TypedHeader<Option<openapi_gen::header::Accept>>,
                     openapi_gen::reexport::axum::extract::Path(identification_id): openapi_gen::reexport::axum::extract::Path<IdentificationId>,
                     openapi_gen::reexport::axum::extract::Path(document_id): openapi_gen::reexport::axum::extract::Path<DocumentId>,
                 |
