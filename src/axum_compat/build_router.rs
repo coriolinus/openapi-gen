@@ -13,7 +13,8 @@ use super::Error;
 
 /// Convert the variable identifier from curly brackets to leading colons
 ///
-/// ```
+/// ```ignore
+/// # // we ignore this test because this is a private function in a private module; the test runner does not have visibility
 /// # use openapi_gen::axum_compat::build_router::to_colon_path;
 /// assert_eq!(
 ///     to_colon_path("/users/{id}"),
