@@ -19,6 +19,7 @@ use super::ValueConversionError;
 pub struct Variant<Ref = Reference> {
     pub definition: Ref,
     pub mapping_name: Option<String>,
+    pub status_code: Option<http::StatusCode>,
     computed_name: OnceCell<String>,
 }
 
@@ -27,6 +28,7 @@ impl<R> Variant<R> {
         Self {
             definition,
             mapping_name,
+            status_code: None,
             computed_name: OnceCell::new(),
         }
     }
@@ -54,12 +56,14 @@ impl Variant<Ref> {
         let Self {
             definition,
             mapping_name,
+            status_code,
             computed_name,
         } = self;
         let definition = resolver(&definition)?;
         Ok(Variant {
             definition,
             mapping_name,
+            status_code,
             computed_name,
         })
     }
