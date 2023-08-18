@@ -65,11 +65,6 @@ impl Variant<Ref> {
     }
 }
 
-/// Get the part of the contained value after the last slash, or the whole thing if no slashes are present.
-fn strip_slash_if_present(v: &str) -> &str {
-    v.rsplit('/').next().unwrap_or(v)
-}
-
 impl Variant {
     /// Compute an appropriate variant identifier for this variant.
     ///
@@ -77,7 +72,7 @@ impl Variant {
     ///
     /// Rules:
     ///
-    /// - If there is an explicit mapping, use the portion of the mapping name after the last `/`.
+    /// - If there is an explicit mapping, use it
     /// - Else use the variant's identifier
     /// - Else use `Variant{idx:02}`.
     fn compute_variant_name<'a>(
@@ -89,7 +84,6 @@ impl Variant {
             .get_or_init(|| {
                 self.mapping_name
                     .as_deref()
-                    .map(strip_slash_if_present)
                     .or_else(|| name_resolver(self.definition).ok())
                     .map(|name| format!("{}", AsUpperCamelCase(name)))
                     .unwrap_or_else(|| format!("Variant{idx:02}"))

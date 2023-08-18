@@ -65,7 +65,7 @@ type NotAcceptable = openapi_gen::reexport::http_api_problem::HttpApiProblem;
     PartialEq,
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize,
-    Eq,
+    Eq
 )]
 #[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum GetNpIdentityDocumentDataResponse {
@@ -103,17 +103,23 @@ impl openapi_gen::reexport::axum::response::IntoResponse
 for GetNpIdentityDocumentDataResponse {
     fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
         match self {
-            GetNpIdentityDocumentDataResponse::OkApplicationJson(json) => {
-                let mut header_map =
-                    openapi_gen::reexport::http::header::HeaderMap::with_capacity(1usize);
-                header_map.insert(
-                    openapi_gen::reexport::http::header::CONTENT_TYPE,
-                    openapi_gen::reexport::http::HeaderValue::from_static("application/json"),
+            GetNpIdentityDocumentDataResponse::OkApplicationJson(
+                ok_application_json,
+            ) => {
+                let mut header_map = openapi_gen::reexport::http::header::HeaderMap::with_capacity(
+                    1usize,
                 );
+                header_map
+                    .insert(
+                        openapi_gen::reexport::http::header::CONTENT_TYPE,
+                        openapi_gen::reexport::http::HeaderValue::from_static(
+                            "application/json",
+                        ),
+                    );
                 (
                     openapi_gen::reexport::http::status::StatusCode::OK,
                     header_map,
-                    openapi_gen::reexport::axum::Json(json),
+                    openapi_gen::reexport::axum::Json(ok_application_json),
                 )
                     .into_response()
             }
