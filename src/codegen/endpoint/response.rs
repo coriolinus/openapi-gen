@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context as _};
 use heck::{AsUpperCamelCase, ToSnakeCase, ToUpperCamelCase};
-use openapiv3::{Header, OpenAPI, ReferenceOr, Response, Responses, Schema, StatusCode};
+use openapiv3::{Header, OpenAPI, Operation, ReferenceOr, Response, Responses, Schema, StatusCode};
 
 use crate::{
     codegen::{
@@ -14,11 +14,19 @@ use crate::{
         Item, Object, OneOfEnum, Reference, Scalar, UnknownReference,
     },
     openapi_compat::is_external,
+    resolve_trait::Resolve,
     ApiModel,
 };
 
 fn wrap_err<E: Into<anyhow::Error>>(err: E) -> Error {
     Error::CreateResponse(err.into())
+}
+
+fn status_code(code: &StatusCode) -> Option<http::StatusCode> {
+    match code {
+        StatusCode::Code(n) => http::StatusCode::from_u16(*n).ok(),
+        StatusCode::Range(_) => None,
+    }
 }
 
 /// Convert a `StatusCode` enum into a `String` describing that status.
@@ -42,16 +50,16 @@ fn status_name(code: &StatusCode) -> String {
 
 fn named_response_items(
     responses: &Responses,
-) -> impl '_ + Iterator<Item = (String, &ReferenceOr<Response>)> {
+) -> impl '_ + Iterator<Item = (String, &ReferenceOr<Response>, Option<http::StatusCode>)> {
     let enumerated_responses = responses
         .responses
         .iter()
-        .map(|(code, response_ref)| (status_name(code), response_ref));
+        .map(|(code, response_ref)| (status_name(code), response_ref, status_code(code)));
 
     let default_response = responses
         .default
         .iter()
-        .map(|response_ref| ("Default".into(), response_ref));
+        .map(|response_ref| ("Default".into(), response_ref, None));
 
     enumerated_responses.chain(default_response)
 }
@@ -279,7 +287,7 @@ pub(crate) fn create_responses(
         ..Default::default()
     };
 
-    for (status_code, response_ref) in named_response_items(responses) {
+    for (status_name, response_ref, maybe_status_code) in named_response_items(responses) {
         // we only need this owned binding in one branch of the following match,
         // but in that case, we need it here for the lifetime
         let variants_owned;
@@ -293,7 +301,7 @@ pub(crate) fn create_responses(
             }
             ReferenceOr::Item(response) => {
                 variants_owned =
-                    create_response_variants(spec, model, &status_code, Some(spec_name), response)?;
+                    create_response_variants(spec, model, &status_name, Some(spec_name), response)?;
                 &variants_owned
             }
         };
@@ -305,8 +313,9 @@ pub(crate) fn create_responses(
         {
             let definition = definition.clone();
             let mapping_name = Some(spec_name.clone());
-            out.variants
-                .push(one_of_enum::Variant::new(definition, mapping_name));
+            let mut variant = one_of_enum::Variant::new(definition, mapping_name);
+            variant.status_code = maybe_status_code;
+            out.variants.push(variant);
         }
     }
 
@@ -322,4 +331,18 @@ pub(crate) fn create_responses(
             None,
         )
         .map_err(wrap_err)
+}
+
+/// `true` if the operation includes any responses distinguished only by content type
+pub(crate) fn has_responses_distinguished_only_by_content_type(
+    spec: &OpenAPI,
+    operation: &Operation,
+) -> bool {
+    operation
+        .responses
+        .responses
+        .values()
+        .chain(operation.responses.default.iter())
+        .filter_map(|response_ref| Resolve::resolve(response_ref, spec).ok())
+        .any(|response| response.content.len() > 1)
 }

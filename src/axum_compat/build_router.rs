@@ -57,6 +57,7 @@ fn build_route(model: &ApiModel, endpoint: &Endpoint) -> Result<TokenStream, Err
 
     let mut parameters = Vec::new();
     let mut parameter_idents = Vec::new();
+    let mut optional_parameter_map = Vec::new();
 
     for (key, param) in endpoint.parameters.iter() {
         let item = model
@@ -70,16 +71,10 @@ fn build_route(model: &ApiModel, endpoint: &Endpoint) -> Result<TokenStream, Err
         let type_ident = make_ident(&item.rust_name);
         let variable_ident = make_ident(&item.rust_name.to_snake_case());
 
-        match key.location {
-            Some(ParameterLocation::Header) => parameters.push(quote! {
-                #prefix::TypedHeader(#variable_ident): #prefix::TypedHeader<#type_ident>
-            }),
-            Some(ParameterLocation::Path) => parameters.push(quote! {
-                #prefix::Path(#variable_ident): #prefix::Path<#type_ident>
-            }),
-            Some(ParameterLocation::Query) => parameters.push(quote! {
-                #prefix::Query(#variable_ident): #prefix::Query<#type_ident>
-            }),
+        let extractor = match key.location {
+            Some(ParameterLocation::Header) => quote!(#prefix::TypedHeader),
+            Some(ParameterLocation::Path) => quote!(#prefix::Path),
+            Some(ParameterLocation::Query) => quote!(#prefix::Query),
             Some(ParameterLocation::Cookie) => {
                 return Err(Error::new("cookie extractors not yet supported"))
             }
@@ -89,7 +84,24 @@ fn build_route(model: &ApiModel, endpoint: &Endpoint) -> Result<TokenStream, Err
                     item.rust_name
                 )))
             }
-        }
+        };
+
+        let (binding, bind_type) = if param.required {
+            (
+                quote!(#extractor(#variable_ident)),
+                quote!(#extractor<#type_ident>),
+            )
+        } else {
+            optional_parameter_map.push(quote! {
+                let #variable_ident = #variable_ident.map(|#variable_ident| #variable_ident.0);
+            });
+            (
+                quote!(#variable_ident),
+                quote!(Option<#extractor<#type_ident>>),
+            )
+        };
+
+        parameters.push(quote!(#binding: #bind_type));
 
         parameter_idents.push(variable_ident);
     }
@@ -124,6 +136,7 @@ fn build_route(model: &ApiModel, endpoint: &Endpoint) -> Result<TokenStream, Err
             #verb({
                 let instance = instance.clone();
                 move |#( #parameters ),*| async move {
+                    #( #optional_parameter_map )*
                     instance.#method_name(#( #parameter_idents ),*).await
                 }
             })

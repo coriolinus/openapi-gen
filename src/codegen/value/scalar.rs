@@ -37,6 +37,8 @@ pub enum Scalar {
     BoundedU64(u64, u64),
     #[cfg(feature = "api-problem")]
     ApiProblem,
+    Mime,
+    AcceptHeader,
 }
 
 impl Scalar {
@@ -56,6 +58,8 @@ impl Scalar {
             | Scalar::IpAddr
             | Scalar::Ipv4Addr
             | Scalar::Ipv6Addr
+            | Scalar::Mime
+            | Scalar::AcceptHeader
             | Scalar::Bool => true,
             #[cfg(feature = "bytes")]
             Scalar::Bytes => true,
@@ -87,7 +91,9 @@ impl Scalar {
             | Scalar::Ipv4Addr
             | Scalar::Ipv6Addr
             | Scalar::Bool => true,
-            Scalar::String | Scalar::Binary | Scalar::Any => false,
+            Scalar::String | Scalar::Binary | Scalar::Any | Scalar::Mime | Scalar::AcceptHeader => {
+                false
+            }
             #[cfg(feature = "bytes")]
             Scalar::Bytes => false,
             #[cfg(feature = "uuid")]
@@ -117,6 +123,8 @@ impl Scalar {
             | Scalar::IpAddr
             | Scalar::Ipv4Addr
             | Scalar::Ipv6Addr
+            | Scalar::Mime
+            | Scalar::AcceptHeader
             | Scalar::Bool => true,
             #[cfg(feature = "bytes")]
             Scalar::Bytes => true,
@@ -150,6 +158,8 @@ impl Scalar {
             Scalar::Ipv4Addr => quote!(std::net::Ipv4Addr),
             Scalar::Ipv6Addr => quote!(std::net::Ipv6Addr),
             Scalar::Any => quote!(openapi_gen::reexport::serde_json::Value),
+            Scalar::Mime => quote!(openapi_gen::reexport::mime::Mime),
+            Scalar::AcceptHeader => quote!(openapi_gen::reexport::accept_header::Accept),
             #[cfg(feature = "bytes")]
             Scalar::Bytes => quote!(openapi_gen::Bytes),
             #[cfg(feature = "uuid")]

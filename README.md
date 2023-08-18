@@ -406,12 +406,17 @@ Some string formats are well-known and automatically converted into appropriate 
 | string     | ipv4         | `std::net::Ipv4Addr` | [RFC 791] |
 | string     | ipv6         | `std::net::Ipv6Addr` | [RFC 4291] |
 | string     | uuid         | `uuid::Uuid`         | [RFC 4122] (requires feature `uuid`) |
+| string     | mime         | `mime::Mime`         | [RFC 2045] |
+| string     | content-type | `mime::Mime`         | [RFC 2045] |
+| string     | accept-header| `accept_header::Accept` | [RFC 9110] |
 | string     | _other_      | `String`  | Always only contains valid `utf8` encoded data |
 
 [RFC 3339, section 5.6]: https://tools.ietf.org/html/rfc3339#section-5.6
 [RFC 791]: https://tools.ietf.org/html/rfc791
+[RFC 2045]: https://datatracker.ietf.org/doc/html/rfc2045
 [RFC 4291]: https://tools.ietf.org/html/rfc4291
 [RFC 4122]: http://tools.ietf.org/html/rfc4122
+[RFC 9110]: https://datatracker.ietf.org/doc/html/rfc9110
 
 ##### `pattern`
 

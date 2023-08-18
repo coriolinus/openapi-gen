@@ -146,6 +146,11 @@ pub(crate) fn convert_param_ref(
     model: &mut ApiModel<Ref>,
     param_ref: &ReferenceOr<openapiv3::Parameter>,
 ) -> Result<(ParameterKey, Parameter<Ref>), Error> {
+    let param = Resolve::resolve(param_ref, spec).map_err(|err| {
+        Error::ConvertParamRef(anyhow!(err).context("failed to resolve parameter reference"))
+    })?;
+    let required = param.parameter_data_ref().required;
+
     // we don't want to be constantly redefining things, so this function has two modes:
     // if the parameter is a reference, then look for that reference among the existing definitions.
     // otherwise, for an inline definition, add it from scratch.
@@ -174,10 +179,7 @@ pub(crate) fn convert_param_ref(
         location,
     };
 
-    let parameter = Parameter {
-        required: !item.nullable,
-        item_ref,
-    };
+    let parameter = Parameter { required, item_ref };
 
     Ok((parameter_key, parameter))
 }

@@ -1,0 +1,82 @@
+openapi: "3.0.3" # Use older openAPI spec version due to a bug in Zally: https://github.com/zalando/zally/issues/1230
+info:
+  title: "Identification Service"
+  description: |
+    Ensure we're doing the right thing with multiple response types distinguished by content-type.
+
+    See <https://github.com/coriolinus/openapi-gen/issues/25>.
+  version: "0.1.0"
+
+paths:
+  "/natural-persons/{identification-id}/documents/{document-id}/data":
+    parameters:
+      - name: identification-id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/IdentificationId"
+      - name: document-id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/DocumentId"
+
+    get:
+      description: |
+        Get this identity document's raw data.
+
+        If the client accepts only `application/json`, then the data will be base64 encoded and enclosed in a small wrapper object.
+        Otherwise, the actual document content type will be returned, and the document data will be unencoded.
+      operationId: getNpIdentityDocumentData
+      responses:
+        '200':
+          description: data of the identity document
+          content:
+            "application/json":
+              schema:
+                type: object
+                properties:
+                  data:
+                    description: document data encoded as base64
+                    type: string
+                    format: byte
+            "*":
+              schema:
+                description: raw document data
+                type: string
+                format: binary
+        '406':
+          description: The client supplied a content negotiation header for this document request, but the server was unable to satisfy it.
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "https://opensource.zalando.com/restful-api-guidelines/models/problem-1.0.1.yaml#/Problem"
+        default:
+          $ref: "#/components/responses/Default"
+
+components:
+  schemas:
+    IdentificationId:
+      description: an identifier for this particular identification process
+      type: string
+      format: uuid
+      x-newtype:
+        pub: true
+
+    DocumentId:
+      description: |
+        An identifier for a document within the context of the identification service.
+
+        This is _not_ associated with the documents service in any way.
+      type: string
+      format: uuid
+      x-newtype:
+        pub: true
+
+  responses:
+    Default:
+      description: an error occurred; see status code and problem object for more information
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "https://opensource.zalando.com/restful-api-guidelines/models/problem-1.0.1.yaml#/Problem"

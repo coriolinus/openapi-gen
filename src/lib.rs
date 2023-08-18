@@ -23,6 +23,7 @@ pub mod axum_compat;
 ///
 /// This makes it much easier to keep the types in sync between the generated code and your own types.
 pub mod reexport {
+    pub use accept_header;
     pub use async_trait;
     #[cfg(feature = "axum-support")]
     pub use axum;
@@ -35,6 +36,7 @@ pub mod reexport {
     pub use http;
     #[cfg(feature = "api-problem")]
     pub use http_api_problem;
+    pub use mime;
     #[cfg(feature = "string-pattern")]
     pub use regress;
     pub use serde;

@@ -62,6 +62,7 @@ fn impl_into_response_for_response_type(
     response: &Reference,
     response_name: &str,
     variant_name: &str,
+    status_code: Option<http::StatusCode>,
 ) -> Result<TokenStream, Error> {
     let item = model
         .resolve(*response)
@@ -79,9 +80,16 @@ fn impl_into_response_for_response_type(
         make_ident(&binding)
     };
     let item_ident = make_ident(&item.rust_name);
-    let status_ident = {
-        let binding = variant_name.to_shouty_snake_case();
-        make_ident(&binding)
+    let status = match status_code {
+        Some(status_code) => {
+            let status_name = status_code
+                .canonical_reason()
+                .map(|reason| reason.to_shouty_snake_case())
+                .ok_or_else(|| Error::new("failed to get status code for response variant"))?;
+            let ident = make_ident(&status_name);
+            quote!(openapi_gen::reexport::http::status::StatusCode::#ident)
+        }
+        None => quote!(openapi_gen::AsStatusCode::as_status_code(&#item_ident)),
     };
 
     // if the item is a default item, then we delegate to the `default_response` handler and trust that the
@@ -169,7 +177,7 @@ fn impl_into_response_for_response_type(
 
     let into_response = quote! {
         (
-            openapi_gen::reexport::http::status::StatusCode::#status_ident,
+            #status,
             #header_map_ident_comma
             #body,
         ).into_response()
@@ -218,6 +226,7 @@ pub(crate) fn impl_into_response(
             &variant.definition,
             response_name,
             variant_name,
+            variant.status_code,
         )?);
     }
 
