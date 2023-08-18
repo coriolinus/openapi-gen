@@ -36,6 +36,7 @@ pub mod reexport {
     pub use http;
     #[cfg(feature = "api-problem")]
     pub use http_api_problem;
+    pub use mime;
     #[cfg(feature = "string-pattern")]
     pub use regress;
     pub use serde;

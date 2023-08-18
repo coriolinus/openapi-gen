@@ -120,6 +120,8 @@ impl Value<Ref> {
                 "ip" => Value::Scalar(Scalar::IpAddr),
                 "ipv4" => Value::Scalar(Scalar::Ipv4Addr),
                 "ipv6" => Value::Scalar(Scalar::Ipv6Addr),
+                "mime" | "content-type" => Value::Scalar(Scalar::Mime),
+                "accept-header" => Value::Scalar(Scalar::AcceptHeader),
                 #[cfg(feature = "uuid")]
                 "uuid" => Value::Scalar(Scalar::Uuid),
                 // unknown string types are valid and devolve to `String`

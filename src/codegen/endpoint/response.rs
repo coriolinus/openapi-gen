@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context as _};
 use heck::{AsUpperCamelCase, ToSnakeCase, ToUpperCamelCase};
-use openapiv3::{Header, OpenAPI, ReferenceOr, Response, Responses, Schema, StatusCode};
+use openapiv3::{Header, OpenAPI, Operation, ReferenceOr, Response, Responses, Schema, StatusCode};
 
 use crate::{
     codegen::{
@@ -14,6 +14,7 @@ use crate::{
         Item, Object, OneOfEnum, Reference, Scalar, UnknownReference,
     },
     openapi_compat::is_external,
+    resolve_trait::Resolve,
     ApiModel,
 };
 
@@ -322,4 +323,18 @@ pub(crate) fn create_responses(
             None,
         )
         .map_err(wrap_err)
+}
+
+/// `true` if the operation includes any responses distinguished only by content type
+pub(crate) fn has_responses_distinguished_only_by_content_type(
+    spec: &OpenAPI,
+    operation: &Operation,
+) -> bool {
+    operation
+        .responses
+        .responses
+        .values()
+        .chain(operation.responses.default.iter())
+        .filter_map(|response_ref| Resolve::resolve(response_ref, spec).ok())
+        .any(|response| response.content.len() > 1)
 }

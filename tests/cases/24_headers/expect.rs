@@ -153,8 +153,8 @@ Operation ID: `createNaturalPersonIdentification`
 */
     async fn create_natural_person_identification(
         &self,
-        x_flow_id: XFlowId,
-        x_request_id: XRequestId,
+        x_flow_id: Option<XFlowId>,
+        x_request_id: Option<XRequestId>,
         request_body: CreateNaturalPersonIdentificationRequest,
     ) -> CreateNaturalPersonIdentificationResponse;
 }
@@ -305,18 +305,20 @@ where
             openapi_gen::reexport::axum::routing::post({
                 let instance = instance.clone();
                 move |
-                    openapi_gen::reexport::axum::extract::TypedHeader(
-                        x_flow_id,
-                    ): openapi_gen::reexport::axum::extract::TypedHeader<XFlowId>,
-                    openapi_gen::reexport::axum::extract::TypedHeader(
-                        x_request_id,
-                    ): openapi_gen::reexport::axum::extract::TypedHeader<XRequestId>,
+                    x_flow_id: Option<
+                        openapi_gen::reexport::axum::extract::TypedHeader<XFlowId>,
+                    >,
+                    x_request_id: Option<
+                        openapi_gen::reexport::axum::extract::TypedHeader<XRequestId>,
+                    >,
                     openapi_gen::reexport::axum::extract::Json(
                         request_body,
                     ): openapi_gen::reexport::axum::extract::Json<
                         CreateNaturalPersonIdentificationRequest,
                     >|
                 async move {
+                    let x_flow_id = x_flow_id.map(|x_flow_id| x_flow_id.0);
+                    let x_request_id = x_request_id.map(|x_request_id| x_request_id.0);
                     instance
                         .create_natural_person_identification(
                             x_flow_id,

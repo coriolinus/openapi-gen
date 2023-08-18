@@ -302,7 +302,49 @@ pub(crate) fn insert_endpoints(spec: &OpenAPI, model: &mut ApiModel<Ref>) -> Res
                 .map(ToOwned::to_owned);
 
             let parameters = {
-                // start with the path item parameters
+                // we need to ensure that when at least one response variant has the same response code and more than one
+                // content type, the generated function includes the "Accept" header. This may or may not appear in the
+                // spec, so we ensure it appears first in the parameter list. After that point, if it does appear in the user spec,
+                // we can trust `IndexMap`'s update implementation to ensure it remains first in the emitted list.
+                let accept_header =
+                    response::has_responses_distinguished_only_by_content_type(spec, operation)
+                        .then(|| {
+                            let format = openapiv3::ParameterSchemaOrContent::Schema(
+                                openapiv3::ReferenceOr::Item(openapiv3::Schema {
+                                    schema_kind: openapiv3::SchemaKind::Type(
+                                        openapiv3::Type::String(openapiv3::StringType {
+                                            format: openapiv3::VariantOrUnknownOrEmpty::Unknown(
+                                                "accept-header".into(),
+                                            ),
+                                            ..Default::default()
+                                        }),
+                                    ),
+                                    schema_data: Default::default(),
+                                }),
+                            );
+
+                            let parameter = openapiv3::Parameter::Header {
+                                parameter_data: openapiv3::ParameterData {
+                                    name: "accept".into(),
+                                    description: Some(
+                                        "The content type expected by the client".into(),
+                                    ),
+                                    required: false,
+                                    format,
+                                    deprecated: Default::default(),
+                                    example: Default::default(),
+                                    examples: Default::default(),
+                                    explode: Default::default(),
+                                    extensions: Default::default(),
+                                },
+                                style: Default::default(),
+                            };
+
+                            openapiv3::ReferenceOr::Item(parameter)
+                        });
+                let accept_header = accept_header.iter();
+
+                // first real params are the path item parameters
                 let path_item_params = path_item.parameters.iter();
 
                 // update with the operation parameters
@@ -310,7 +352,8 @@ pub(crate) fn insert_endpoints(spec: &OpenAPI, model: &mut ApiModel<Ref>) -> Res
 
                 // `IndexMap::from_iter` uses the same logic as its `extend`,
                 // which lets subsequent items override earlier items.
-                path_item_params
+                accept_header
+                    .chain(path_item_params)
                     .chain(operation_params)
                     .map(|param_ref| convert_param_ref(spec, model, param_ref))
                     .collect::<Result<_, _>>()?

@@ -5,7 +5,7 @@ version = 3
 [[package]]
 name = "accept-header"
 version = "0.1.0"
-source = "git+https://github.com/coriolinus/accept-header.git#66fc0911edea34a323550cd46e9cae75f22d68e1"
+source = "git+https://github.com/coriolinus/accept-header.git#40ca7fb66d56a7d9c4a1d9906d4e9ea67c2b34df"
 dependencies = [
  "bstr",
  "headers-core",
@@ -1016,6 +1016,7 @@ dependencies = [
  "http-api-problem",
  "indexmap",
  "md-5",
+ "mime",
  "openapiv3-extended",
  "prettyplease",
  "proc-macro2",

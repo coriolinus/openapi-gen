@@ -13,6 +13,7 @@ use quote::quote;
 
 use crate::{
     axum_compat::{header::impl_header, into_response::impl_into_response},
+    codegen::{Scalar, Value},
     ApiModel,
 };
 
@@ -27,7 +28,8 @@ pub(crate) fn axum_items(model: &ApiModel) -> Result<TokenStream, Error> {
 
     for header_item in model.iter_items().filter_map(|ref_| {
         let item = model.resolve(ref_)?;
-        item.impl_header.then_some(item)
+        let has_existing_impl = matches!(&item.value, Value::Scalar(Scalar::AcceptHeader));
+        (!has_existing_impl && item.impl_header).then_some(item)
     }) {
         header_impls.push(impl_header(model, header_item)?);
     }
