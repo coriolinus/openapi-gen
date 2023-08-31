@@ -94,11 +94,10 @@ pub enum CreateNaturalPersonIdentificationResponse {
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
-    /**`POST /natural-persons`
+    /// `POST /natural-persons`
+    /// 
+    /// Operation ID: `createNaturalPersonIdentification`
 
-Operation ID: `createNaturalPersonIdentification`
-
-*/
     async fn create_natural_person_identification(
         &self,
         request_body: CreateNaturalPersonIdentificationRequest,

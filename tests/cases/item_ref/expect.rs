@@ -57,17 +57,15 @@ pub enum PutThingResponse {
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
-    /**`GET /thing/{id}`
+    /// `GET /thing/{id}`
+    /// 
+    /// Operation ID: `getThing`
 
-Operation ID: `getThing`
-
-*/
     async fn get_thing(&self, id: Id) -> GetThingResponse;
-    /**`PUT /thing/{id}`
+    /// `PUT /thing/{id}`
+    /// 
+    /// Operation ID: `putThing`
 
-Operation ID: `putThing`
-
-*/
     async fn put_thing(&self, id: Id, request_body: PutThingRequest) -> PutThingResponse;
 }
 impl openapi_gen::reexport::axum::response::IntoResponse for GetThingResponse {
