@@ -26,7 +26,7 @@ use crate::{
         rust_keywords::is_rust_keyword,
         Endpoint, Item, Scalar,
     },
-    fix_block_comments::{fix_block_comments_to_string},
+    fix_block_comments::fix_block_comments_to_string,
     openapi_compat::{
         component_headers, component_inline_and_external_schemas, component_parameters,
         component_requests, component_responses, OrScalar,

@@ -75,11 +75,11 @@ impl fmt::Debug for Span {
 }
 
 fn maybe_start(input: &str, start: usize) -> &str {
-    &input[start..start + START_TOKEN_LEN]
+    &input[start..(start + START_TOKEN_LEN).min(input.len())]
 }
 
 fn maybe_end(input: &str, end: usize) -> &str {
-    &input[end..end + END_TOKEN_LEN]
+    &input[end..(end + END_TOKEN_LEN).min(input.len())]
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -200,6 +200,8 @@ impl<'a> Iterator for BlockCommentScanner<'a> {
         for _ in 0..(START_TOKEN_LEN - 1) {
             self.inner.next();
         }
+        // make a note of where the line started at the current position. (it'll probably have updated by the time we want it.)
+        let line_start = self.line_start;
 
         // now find the next end token
         let mut end_token = None;
@@ -216,7 +218,7 @@ impl<'a> Iterator for BlockCommentScanner<'a> {
             self.inner.next();
         }
 
-        Some(BlockComment::new(self.input, self.line_start, start, end))
+        Some(BlockComment::new(self.input, line_start, start, end))
     }
 }
 
@@ -251,7 +253,7 @@ pub fn fix_block_comments_to_string(input: &str) -> io::Result<String> {
     let mut output = String::with_capacity(2 * input.len());
     // constructing a cursor here is safe because `fix_block_comments` only ever writes valid utf-8 to its output,
     // so we know that `output` is always a valid `String`.
-    let mut cursor = unsafe { Cursor::new(output.as_bytes_mut()) };
+    let mut cursor = unsafe { Cursor::new(output.as_mut_vec()) };
     fix_block_comments(input, &mut cursor)?;
     output.shrink_to_fit();
     Ok(output)
