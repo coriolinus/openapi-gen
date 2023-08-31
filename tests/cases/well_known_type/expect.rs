@@ -18,8 +18,8 @@ pub enum PostWellKnownTypesResponse {
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
-    /// `POST /well-known-types`
 
+    /// `POST /well-known-types`
     async fn post_well_known_types(
         &self,
         request_body: PostWellKnownTypesRequest,
