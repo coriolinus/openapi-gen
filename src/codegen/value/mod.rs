@@ -277,6 +277,20 @@ impl<R> Value<R> {
             _ => None,
         }
     }
+
+    pub fn use_serde_as_annotation(&self, model: &ApiModel) -> bool {
+        match self {
+            Value::StringEnum(_) => false,
+            Value::Scalar(scalar) => scalar.use_display_from_str(),
+            Value::OneOfEnum(oo_enum) => oo_enum.use_serde_as_annotation(model),
+            Value::Set(_) => todo!(),
+            Value::List(_) => todo!(),
+            Value::Object(_) => todo!(),
+            Value::Map(_) => todo!(),
+            Value::Ref(_) => todo!(),
+            Value::PropertyOverride(_) => todo!(),
+        }
+    }
 }
 
 impl Value {

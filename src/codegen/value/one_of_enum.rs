@@ -122,6 +122,15 @@ impl<R> Default for OneOfEnum<R> {
     }
 }
 
+impl<R> OneOfEnum<R> {
+    pub fn use_serde_as_annotation(&self, model: &ApiModel) -> bool {
+        self.variants.iter().any(|variant| {
+            let Some(item) = model.resolve(variant.definition) else {return false};
+            item.value.use_serde_as_annotation(model)
+        })
+    }
+}
+
 impl OneOfEnum<Ref> {
     pub(crate) fn new(
         spec: &OpenAPI,
