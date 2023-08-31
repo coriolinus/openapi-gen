@@ -16,10 +16,10 @@ pub struct IdentificationId(pub openapi_gen::reexport::uuid::Uuid);
 openapi_gen::newtype_derive_canonical_form!(
     IdentificationId, openapi_gen::reexport::uuid::Uuid
 );
+
 /// An identifier for a document within the context of the identification service.
 /// 
 /// This is _not_ associated with the documents service in any way.
-
 #[derive(
     Debug,
     Clone,
@@ -79,6 +79,7 @@ pub enum GetNpIdentityDocumentDataResponse {
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
+
     /// Get this identity document's raw data.
     /// 
     /// If the client accepts only `application/json`, then the data will be base64 encoded and enclosed in a small wrapper object.
@@ -90,7 +91,6 @@ pub trait Api {
     /// `GET /natural-persons/{identification-id}/documents/{document-id}/data`
     /// 
     /// Operation ID: `getNpIdentityDocumentData`
-
     async fn get_np_identity_document_data(
         &self,
         accept: Option<Accept>,

@@ -234,7 +234,11 @@ pub fn fix_block_comments<Output: Write>(input: &str, mut output: Output) -> io:
         output.write_all(non_comment_text.as_bytes())?;
 
         for comment_line in block_comment.text.trim().lines() {
-            writeln!(output, "{}/// {}", block_comment.indentation, comment_line)?;
+            write!(
+                output,
+                "\n{}/// {}",
+                block_comment.indentation, comment_line
+            )?;
         }
 
         end_of_previous = block_comment.end_token.end;
