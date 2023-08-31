@@ -22,11 +22,10 @@ pub enum RenderPdfResponse {
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
-    /**`POST /render`
+    /// `POST /render`
+    /// 
+    /// Operation ID: `renderPdf`
 
-Operation ID: `renderPdf`
-
-*/
     async fn render_pdf(&self) -> RenderPdfResponse;
 }
 impl openapi_gen::reexport::axum::response::IntoResponse for RenderPdfResponse {

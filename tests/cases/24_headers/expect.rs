@@ -85,11 +85,11 @@ openapi_gen::newtype_derive_canonical_form!(
     XRequestId, openapi_gen::reexport::uuid::Uuid
 );
 type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
-/**The path at which the new resource can be found.
+/// The path at which the new resource can be found.
+/// 
+/// This is absolute in that it starts with a `/`, and describes the complete path.
+/// It is relative in that it does not name the server, transport method, port, or other URL-specific data.
 
-This is absolute in that it starts with a `/`, and describes the complete path.
-It is relative in that it does not name the server, transport method, port, or other URL-specific data.
-*/
 #[derive(
     Debug,
     Clone,
@@ -116,11 +116,11 @@ pub type CreateNaturalPersonIdentificationRequest = NaturalPersonIdentification;
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct CreateNaturalPersonIdentificationResponseCreated {
-    /**The path at which the new resource can be found.
+    /// The path at which the new resource can be found.
+    /// 
+    /// This is absolute in that it starts with a `/`, and describes the complete path.
+    /// It is relative in that it does not name the server, transport method, port, or other URL-specific data.
 
-This is absolute in that it starts with a `/`, and describes the complete path.
-It is relative in that it does not name the server, transport method, port, or other URL-specific data.
-*/
     pub location: Location,
     pub body: NaturalPersonIdentification,
 }
@@ -139,18 +139,17 @@ pub enum CreateNaturalPersonIdentificationResponse {
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
-    /**Create a new natural person identification.
+    /// Create a new natural person identification.
+    /// 
+    /// An identification is a snapshot in time of the data available to identify a person.
+    /// 
+    /// 
+    /// ## Endpoint Data
+    /// 
+    /// `POST /natural-persons`
+    /// 
+    /// Operation ID: `createNaturalPersonIdentification`
 
-An identification is a snapshot in time of the data available to identify a person.
-
-
-## Endpoint Data
-
-`POST /natural-persons`
-
-Operation ID: `createNaturalPersonIdentification`
-
-*/
     async fn create_natural_person_identification(
         &self,
         x_flow_id: Option<XFlowId>,
