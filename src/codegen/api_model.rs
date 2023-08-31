@@ -26,6 +26,7 @@ use crate::{
         rust_keywords::is_rust_keyword,
         Endpoint, Item, Scalar,
     },
+    fix_block_comments::{fix_block_comments_to_string},
     openapi_compat::{
         component_headers, component_inline_and_external_schemas, component_parameters,
         component_requests, component_responses, OrScalar,
@@ -549,7 +550,10 @@ Your changes may be overwritten without notice.
         let buffer = tokens.to_string();
         let file = syn::parse_str::<syn::File>(&buffer)
             .map_err(|err| Error::CodegenParse { err, buffer })?;
-        Ok(prettyplease::unparse(&file))
+        let pretty = prettyplease::unparse(&file);
+        let fixed =
+            fix_block_comments_to_string(&pretty).map_err(Error::fix_block_comments(&pretty))?;
+        Ok(fixed)
     }
 }
 
@@ -714,4 +718,19 @@ pub enum Error {
     #[cfg(feature = "axum-support")]
     #[error("implementing axum compatibility")]
     AxumCompat(#[from] axum_compat::Error),
+    #[error("fixing block comments")]
+    FixBlockComments {
+        #[source]
+        err: std::io::Error,
+        pretty: String,
+    },
+}
+
+impl Error {
+    fn fix_block_comments(pretty: &str) -> impl '_ + FnOnce(std::io::Error) -> Self {
+        move |err| {
+            let pretty = pretty.to_owned();
+            Self::FixBlockComments { err, pretty }
+        }
+    }
 }
