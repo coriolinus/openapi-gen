@@ -58,29 +58,26 @@ pub enum SameRequestResponse {
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
-    /**`POST /multi-requests`
 
-Operation ID: `multiRequests`
-
-*/
+    /// `POST /multi-requests`
+    /// 
+    /// Operation ID: `multiRequests`
     async fn multi_requests(
         &self,
         request_body: MultiRequestsRequest,
     ) -> MultiRequestsResponse;
-    /**`POST /optional-request-body`
 
-Operation ID: `optionalRequestBody`
-
-*/
+    /// `POST /optional-request-body`
+    /// 
+    /// Operation ID: `optionalRequestBody`
     async fn optional_request_body(
         &self,
         request_body: OptionalRequestBodyRequest,
     ) -> OptionalRequestBodyResponse;
-    /**`POST /unified-request-body`
 
-Operation ID: `sameRequest`
-
-*/
+    /// `POST /unified-request-body`
+    /// 
+    /// Operation ID: `sameRequest`
     async fn same_request(
         &self,
         request_body: SameRequestRequest,

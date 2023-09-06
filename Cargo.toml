@@ -45,6 +45,9 @@ similar = "2.2.1"
 syn = { version = "2.0.15", features = ["extra-traits"] }
 termcolor = "1.2.0"
 
+[build-dependencies]
+vergen = { version = "8.2.4", features = ["git", "gitcl"] }
+
 [features]
 default = []
 api-problem = ["http-api-problem"]
@@ -59,5 +62,6 @@ string-pattern = ["regress"]
 name = "openapi-gen"
 required-features = ["cli"]
 
-[build-dependencies]
-vergen = { version = "8.2.4", features = ["git", "gitcl"] }
+[[bin]]
+name = "fix-block-comments"
+required-features = ["clap"]

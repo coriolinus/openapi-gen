@@ -84,9 +84,9 @@ pub enum Collection {
     Set(Set),
     Map(Map),
 }
-/**An untagged enum matches the first variant which successfully parses,
-so ensure they are distinguishable
-*/
+
+/// An untagged enum matches the first variant which successfully parses,
+/// so ensure they are distinguishable
 #[derive(
     Debug,
     Clone,

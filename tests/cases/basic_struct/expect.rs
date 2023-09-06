@@ -20,12 +20,12 @@ pub struct InnerStruct {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bar: Option<Bar>,
 }
-/**even given compatible names and types, distinct inline types are distinguished.
-the software makes no attempt to unify the types, because that would violate the
-principle of least surprise.
 
-for type unification, use a reference.
-*/
+/// even given compatible names and types, distinct inline types are distinguished.
+/// the software makes no attempt to unify the types, because that would violate the
+/// principle of least surprise.
+/// 
+/// for type unification, use a reference.
 type DefinedInlineFoo = u64;
 type Bat = i64;
 ///this object is defined inline within `OuterStruct`
@@ -42,12 +42,12 @@ type Bat = i64;
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct DefinedInline {
-    /**even given compatible names and types, distinct inline types are distinguished.
-the software makes no attempt to unify the types, because that would violate the
-principle of least surprise.
 
-for type unification, use a reference.
-*/
+    /// even given compatible names and types, distinct inline types are distinguished.
+    /// the software makes no attempt to unify the types, because that would violate the
+    /// principle of least surprise.
+    /// 
+    /// for type unification, use a reference.
     pub foo: DefinedInlineFoo,
     pub bat: Bat,
 }

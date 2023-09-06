@@ -7,6 +7,8 @@ pub(crate) mod well_known_types;
 
 pub use as_status_code::AsStatusCode;
 
+pub mod fix_block_comments;
+
 pub use canonical_form::{
     CanonicalForm, CanonicalizeError, ConstraintViolation, Reason, ValidationError,
 };

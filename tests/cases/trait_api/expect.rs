@@ -19,11 +19,10 @@ pub enum PostKudosResponse {
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
-    /**`POST /post-kudos`
 
-Operation ID: `postKudos`
-
-*/
+    /// `POST /post-kudos`
+    /// 
+    /// Operation ID: `postKudos`
     async fn post_kudos(&self, request_body: PostKudosRequest) -> PostKudosResponse;
 }
 impl openapi_gen::reexport::axum::response::IntoResponse for PostKudosResponse {
