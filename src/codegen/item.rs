@@ -47,7 +47,9 @@ fn is_property_singleton(
     schema: &Schema,
 ) -> bool {
     // the schema is a property sub-schema of an object type
-    let Some((object_type, property_name)) = containing_object else {return false};
+    let Some((object_type, property_name)) = containing_object else {
+        return false;
+    };
     if object_type
         .properties
         .get(property_name)
@@ -67,7 +69,9 @@ fn is_property_singleton(
     }
 
     // the schema has an `allOf` definition
-    let SchemaKind::AllOf { all_of } = &schema.schema_kind else {return false};
+    let SchemaKind::AllOf { all_of } = &schema.schema_kind else {
+        return false;
+    };
 
     // the `allOf` definition possesses exactly one item
     if all_of.len() != 1 {
@@ -364,6 +368,11 @@ impl Item {
         let equals =
             (self.newtype.is_none() && !self.value.is_struct_or_enum()).then_some(quote!(=));
 
+        let serde_as = self
+            .value
+            .use_serde_as_annotation(model)
+            .then(|| quote!(#[openapi_gen::reexport::serde_with::serde_as]));
+
         let derives = (!self.is_typedef())
             .then(|| self.derives(model))
             .and_then(|derives| (!derives.is_empty()).then_some(derives))
@@ -418,6 +427,7 @@ impl Item {
             #wrapper_def
 
             #docs
+            #serde_as
             #derives
             #serde_container_attributes
             #pub_ #item_keyword #item_ident #equals #item_def #semicolon

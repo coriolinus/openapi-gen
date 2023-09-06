@@ -1,6 +1,6 @@
 use crate::{
     codegen::{
-        api_model::{Ref, Reference, UnknownReference},
+        api_model::{AsBackref, Ref, Reference, UnknownReference},
         make_ident,
     },
     ApiModel,
@@ -16,6 +16,23 @@ use super::ValueConversionError;
 #[derive(Debug, Clone)]
 pub struct Map<Ref = Reference> {
     pub value_type: Option<Ref>,
+}
+
+impl<R> Map<R> {
+    pub(crate) fn use_serde_as_annotation(&self, model: &ApiModel<R>) -> bool
+    where
+        R: AsBackref,
+    {
+        self.value_type
+            .as_ref()
+            .map(|value_type_ref| {
+                let Some(item) = model.resolve_as_backref(value_type_ref) else {
+                    return false;
+                };
+                item.value.use_display_from_str(model)
+            })
+            .unwrap_or_default()
+    }
 }
 
 impl Map<Ref> {

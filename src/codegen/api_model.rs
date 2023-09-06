@@ -596,6 +596,28 @@ impl ApiModel<Ref> {
     }
 }
 
+/// Generic implementations using the `AsBackref` trait are more flexible than using the more specialized versions above.
+#[allow(dead_code)]
+impl<R> ApiModel<R> {
+    #[inline]
+    pub(crate) fn resolve_as_backref(&self, ref_: &R) -> Option<&Item<R>>
+    where
+        R: AsBackref,
+    {
+        let backref = ref_.as_backref()?;
+        self.definitions.get(backref)
+    }
+
+    #[inline]
+    pub(crate) fn resolve_as_backref_mut(&mut self, ref_: &R) -> Option<&mut Item<R>>
+    where
+        R: AsBackref,
+    {
+        let backref = ref_.as_backref()?;
+        self.definitions.get_mut(backref)
+    }
+}
+
 impl ApiModel {
     pub fn new(spec: &OpenAPI, input_file: Option<impl AsRef<Path>>) -> Result<Self, Error> {
         let input_file = input_file.map(|path_ref| path_ref.as_ref().to_owned());

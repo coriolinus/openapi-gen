@@ -1,5 +1,5 @@
 use crate::codegen::{
-    api_model::{Ref, Reference, UnknownReference},
+    api_model::{AsBackref, Ref, Reference, UnknownReference},
     make_ident, ApiModel, PropertyOverride,
 };
 
@@ -134,6 +134,20 @@ impl<R> Default for Object<R> {
             members: Default::default(),
             is_generated_body_and_headers: Default::default(),
         }
+    }
+}
+
+impl<R> Object<R> {
+    pub(crate) fn use_serde_as_annotation(&self, model: &ApiModel<R>) -> bool
+    where
+        R: AsBackref,
+    {
+        self.members.values().any(|member| {
+            let Some(item) = model.resolve_as_backref(&member.definition) else {
+                return false;
+            };
+            item.value.use_display_from_str(model)
+        })
     }
 }
 

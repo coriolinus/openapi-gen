@@ -1,6 +1,9 @@
-use crate::codegen::{
-    api_model::{Ref, Reference, UnknownReference},
-    make_ident,
+use crate::{
+    codegen::{
+        api_model::{AsBackref, Ref, Reference, UnknownReference},
+        make_ident,
+    },
+    ApiModel,
 };
 
 use proc_macro2::TokenStream;
@@ -9,6 +12,18 @@ use quote::quote;
 #[derive(Debug, Clone)]
 pub struct Set<Ref = Reference> {
     pub item: Ref,
+}
+
+impl<R> Set<R> {
+    pub(crate) fn use_serde_as_annotation(&self, model: &ApiModel<R>) -> bool
+    where
+        R: AsBackref,
+    {
+        let Some(item) = model.resolve_as_backref(&self.item) else {
+            return false;
+        };
+        item.value.use_display_from_str(model)
+    }
 }
 
 impl Set<Ref> {

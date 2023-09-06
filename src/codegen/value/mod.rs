@@ -19,6 +19,8 @@ use openapiv3::{
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use super::api_model::AsBackref;
+
 /// The fundamental value type.
 ///
 /// This type doesn't capture all of the information needed for codegen, but it
@@ -278,17 +280,40 @@ impl<R> Value<R> {
         }
     }
 
-    pub fn use_serde_as_annotation(&self, model: &ApiModel) -> bool {
+    pub(crate) fn use_serde_as_annotation(&self, model: &ApiModel<R>) -> bool
+    where
+        R: AsBackref,
+    {
         match self {
-            Value::StringEnum(_) => false,
-            Value::Scalar(scalar) => scalar.use_display_from_str(),
+            Value::StringEnum(_) | Value::Scalar(_) => false,
             Value::OneOfEnum(oo_enum) => oo_enum.use_serde_as_annotation(model),
-            Value::Set(_) => todo!(),
-            Value::List(_) => todo!(),
-            Value::Object(_) => todo!(),
-            Value::Map(_) => todo!(),
-            Value::Ref(_) => todo!(),
-            Value::PropertyOverride(_) => todo!(),
+            Value::Set(set) => set.use_serde_as_annotation(model),
+            Value::List(list) => list.use_serde_as_annotation(model),
+            Value::Object(object) => object.use_serde_as_annotation(model),
+            Value::Map(map) => map.use_serde_as_annotation(model),
+            Value::Ref(ref_) | Value::PropertyOverride(PropertyOverride { ref_, .. }) => {
+                let Some(item) = model.resolve_as_backref(ref_) else {
+                    return false;
+                };
+                item.value.use_display_from_str(model)
+            }
+        }
+    }
+
+    pub(crate) fn use_display_from_str(&self, _model: &ApiModel<R>) -> bool
+    where
+        R: AsBackref,
+    {
+        match self {
+            Value::Scalar(scalar) => scalar.use_display_from_str(),
+            Value::StringEnum(_)
+            | Value::OneOfEnum(_)
+            | Value::Set(_)
+            | Value::List(_)
+            | Value::Object(_)
+            | Value::Map(_)
+            | Value::Ref(_)
+            | Value::PropertyOverride(_) => false,
         }
     }
 }
