@@ -1,0 +1,43 @@
+openapi: "3.0.3" # Use older openAPI spec version due to a bug in Zally: https://github.com/zalando/zally/issues/1230
+info:
+  title: "Query handler parameters"
+  description: |
+    Query handler parameters should coalesce into a single Query object
+  version: "0.1.0"
+
+
+paths:
+  "/":
+    get:
+      operationId: getRoot
+      parameters:
+        - in: query
+          name: bar
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: bat
+          schema:
+            type: string
+            format: uuid
+          required: true
+      responses:
+        '200':
+          description: get the root value, as modified by the query parameters
+          content:
+            "application/octet-stream":
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: "#/components/responses/Default"
+
+components:
+  responses:
+    Default:
+      description: an error occurred; see status code and problem object for more information
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "https://opensource.zalando.com/restful-api-guidelines/models/problem-1.0.1.yaml#/Problem"
