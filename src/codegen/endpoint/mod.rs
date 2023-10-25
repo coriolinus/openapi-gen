@@ -40,8 +40,22 @@ pub struct Endpoint<Ref = Reference> {
     /// `Operation::description` and then to `Operation::summary`.
     pub operation_documentation: Option<String>,
     pub verb: Verb,
-    /// The parameters are derived first from `PathItem::parameters`, then updated from `Operation::parameters`.
-    pub parameters: IndexMap<ParameterKey, Parameter<Ref>>,
+    /// Query parameters are grouped together into a single object, which has one field per parameter.
+    ///
+    /// This is useful because Axum supports only one `Query` extractor per request, so query parameters must be coalesced.
+    ///
+    /// They are derived first from `PathItem::parameters`, then updated from `Operation::parameters`.
+    pub query_parameters: Option<Ref>,
+    /// Path parameters are grouped together into a single object, which has one field per parameter.
+    ///
+    /// This is useful because Axum supports only on `Path` extractor per request, so path parameters must be coalesced.
+    ///
+    /// They are derived first from `PathItem::parameters`, then updated from `Operation::parameters`.
+    pub path_parameters: Option<Ref>,
+    /// Headers by name.
+    ///
+    /// They are derived first from `PathItem::parameters`, then updated from `Operation::parameters`.`
+    pub headers: IndexMap<String, Parameter<Ref>>,
     /// Operation ID.
     ///
     /// If set, this is used as the basis for the rust name.
