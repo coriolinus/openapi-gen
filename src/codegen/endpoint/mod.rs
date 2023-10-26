@@ -76,6 +76,8 @@ pub struct Endpoint<Ref = Reference> {
     pub response: Ref,
 }
 
+type MaybeItemObject<'a, R> = Option<(&'a Item<R>, Object<R>)>;
+
 impl<R> Endpoint<R> {
     /// Compute a documentation string for this endpoint.
     fn doc_string(&self) -> String {
@@ -115,7 +117,7 @@ impl<R> Endpoint<R> {
     pub(crate) fn path_parameter_object<'a>(
         &'a self,
         model: &'a ApiModel<R>,
-    ) -> Result<Option<(&'a Item<R>, Object<R>)>, UnknownReference>
+    ) -> Result<MaybeItemObject<'a, R>, UnknownReference>
     where
         R: 'static + AsBackref + fmt::Debug + Clone,
     {
@@ -139,7 +141,7 @@ impl<R> Endpoint<R> {
     pub(crate) fn query_parameter_object<'a>(
         &'a self,
         model: &'a ApiModel<R>,
-    ) -> Result<Option<(&'a Item<R>, Object<R>)>, UnknownReference>
+    ) -> Result<MaybeItemObject<'a, R>, UnknownReference>
     where
         R: 'static + AsBackref + fmt::Debug + Clone,
     {
