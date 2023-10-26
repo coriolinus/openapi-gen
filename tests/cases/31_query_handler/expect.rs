@@ -2,6 +2,24 @@
 type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 type Bar = u64;
 type Bat = openapi_gen::reexport::uuid::Uuid;
+///Combination item for query parameters of `getRoot`
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde::Serialize,
+    openapi_gen::reexport::serde::Deserialize,
+    Copy,
+    Eq,
+    Hash,
+    openapi_gen::reexport::derive_more::Constructor
+)]
+#[serde(crate = "openapi_gen::reexport::serde")]
+pub struct GetRootQueryParameters {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bar: Option<Bar>,
+    pub bat: Bat,
+}
 type Ok_ = Vec<u8>;
 #[derive(
     Debug,
@@ -9,20 +27,7 @@ type Ok_ = Vec<u8>;
     PartialEq,
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize,
-    Eq,
-)]
-#[serde(crate = "openapi_gen::reexport::serde")]
-struct GetRootQueryParameters {
-    bar: Option<Bar>,
-    bat: Bat,
-}
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    openapi_gen::reexport::serde::Serialize,
-    openapi_gen::reexport::serde::Deserialize,
-    Eq,
+    Eq
 )]
 #[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum GetRootResponse {
@@ -32,8 +37,9 @@ pub enum GetRootResponse {
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
+
     /// `GET /`
-    ///
+    /// 
     /// Operation ID: `getRoot`
     async fn get_root(&self, bar: Option<Bar>, bat: Bat) -> GetRootResponse;
 }
@@ -41,19 +47,17 @@ impl openapi_gen::reexport::axum::response::IntoResponse for GetRootResponse {
     fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
         match self {
             GetRootResponse::Ok(ok) => {
-                let mut header_map =
-                    openapi_gen::reexport::http::header::HeaderMap::with_capacity(1usize);
-                header_map.insert(
-                    openapi_gen::reexport::http::header::CONTENT_TYPE,
-                    openapi_gen::reexport::http::HeaderValue::from_static(
-                        "application/octet-stream",
-                    ),
+                let mut header_map = openapi_gen::reexport::http::header::HeaderMap::with_capacity(
+                    1usize,
                 );
-                (
-                    openapi_gen::reexport::http::status::StatusCode::OK,
-                    header_map,
-                    ok,
-                )
+                header_map
+                    .insert(
+                        openapi_gen::reexport::http::header::CONTENT_TYPE,
+                        openapi_gen::reexport::http::HeaderValue::from_static(
+                            "application/octet-stream",
+                        ),
+                    );
+                (openapi_gen::reexport::http::status::StatusCode::OK, header_map, ok)
                     .into_response()
             }
             GetRootResponse::Default(default) => {
@@ -69,16 +73,19 @@ where
 {
     #[allow(unused_variables)]
     let instance = ::std::sync::Arc::new(instance);
-    openapi_gen::reexport::axum::Router::new().route(
-        "/",
-        openapi_gen::reexport::axum::routing::get({
-            let instance = instance.clone();
-            move |openapi_gen::reexport::axum::extract::Query(GetRootQueryParameters {
-                      bar,
-                      bat,
-                  }): openapi_gen::reexport::axum::extract::Query<
-                GetRootQueryParameters,
-            >| async move { instance.get_root(bar, bat).await }
-        }),
-    )
+    openapi_gen::reexport::axum::Router::new()
+        .route(
+            "/",
+            openapi_gen::reexport::axum::routing::get({
+                let instance = instance.clone();
+                move |
+                    openapi_gen::reexport::axum::extract::Query(
+                        GetRootQueryParameters { bar, bat },
+                    ): openapi_gen::reexport::axum::extract::Query<
+                        GetRootQueryParameters,
+                    >|
+                async move { instance.get_root(bar, bat).await }
+            }),
+        )
 }
+

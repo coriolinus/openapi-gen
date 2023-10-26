@@ -27,7 +27,7 @@ pub(crate) fn axum_items(model: &ApiModel) -> Result<TokenStream, Error> {
     let mut header_impls = Vec::new();
 
     for header_item in model.iter_items().filter_map(|ref_| {
-        let item = model.resolve(ref_)?;
+        let item = model.resolve(ref_).ok()?;
         let has_existing_impl = matches!(&item.value, Value::Scalar(Scalar::AcceptHeader));
         (!has_existing_impl && item.impl_header).then_some(item)
     }) {

@@ -47,7 +47,9 @@ fn is_property_singleton(
     schema: &Schema,
 ) -> bool {
     // the schema is a property sub-schema of an object type
-    let Some((object_type, property_name)) = containing_object else {return false};
+    let Some((object_type, property_name)) = containing_object else {
+        return false;
+    };
     if object_type
         .properties
         .get(property_name)
@@ -67,7 +69,9 @@ fn is_property_singleton(
     }
 
     // the schema has an `allOf` definition
-    let SchemaKind::AllOf { all_of } = &schema.schema_kind else {return false};
+    let SchemaKind::AllOf { all_of } = &schema.schema_kind else {
+        return false;
+    };
 
     // the `allOf` definition possesses exactly one item
     if all_of.len() != 1 {
@@ -405,7 +409,7 @@ impl Item {
         let canonical_form = self.newtype.is_some()
             .then(|| match &self.value {
                 Value::Scalar(scalar) => Some(scalar.emit_type()),
-                Value::Ref(ref_) | Value::PropertyOverride(PropertyOverride { ref_, .. }) => model.resolve(*ref_).map(|item| {
+                Value::Ref(ref_) | Value::PropertyOverride(PropertyOverride { ref_, .. }) => model.resolve(*ref_).ok().map(|item| {
                     let ident = make_ident(&item.rust_name);
                     quote!(#ident)
                 }),

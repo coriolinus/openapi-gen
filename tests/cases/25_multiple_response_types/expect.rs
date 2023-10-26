@@ -38,6 +38,28 @@ openapi_gen::newtype_derive_canonical_form!(
 );
 type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 type Accept = openapi_gen::reexport::accept_header::Accept;
+///Combination item for path parameters of `getNpIdentityDocumentData`
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde::Serialize,
+    openapi_gen::reexport::serde::Deserialize,
+    Copy,
+    Eq,
+    Hash,
+    openapi_gen::reexport::derive_more::Constructor
+)]
+#[serde(crate = "openapi_gen::reexport::serde")]
+pub struct GetNpIdentityDocumentDataPathParameters {
+    ///an identifier for this particular identification process
+    pub identification_id: IdentificationId,
+
+    /// An identifier for a document within the context of the identification service.
+    /// 
+    /// This is _not_ associated with the documents service in any way.
+    pub document_id: DocumentId,
+}
 ///document data encoded as base64
 type Data = openapi_gen::Bytes;
 #[derive(
@@ -93,9 +115,9 @@ pub trait Api {
     /// Operation ID: `getNpIdentityDocumentData`
     async fn get_np_identity_document_data(
         &self,
-        accept: Option<Accept>,
         identification_id: IdentificationId,
         document_id: DocumentId,
+        accept: Option<Accept>,
     ) -> GetNpIdentityDocumentDataResponse;
 }
 impl openapi_gen::reexport::axum::response::IntoResponse
@@ -160,22 +182,24 @@ where
             openapi_gen::reexport::axum::routing::get({
                 let instance = instance.clone();
                 move |
+                    openapi_gen::reexport::axum::extract::Path(
+                        GetNpIdentityDocumentDataPathParameters {
+                            identification_id,
+                            document_id,
+                        },
+                    ): openapi_gen::reexport::axum::extract::Path<
+                        GetNpIdentityDocumentDataPathParameters,
+                    >,
                     accept: Option<
                         openapi_gen::reexport::axum::extract::TypedHeader<Accept>,
-                    >,
-                    openapi_gen::reexport::axum::extract::Path(
-                        identification_id,
-                    ): openapi_gen::reexport::axum::extract::Path<IdentificationId>,
-                    openapi_gen::reexport::axum::extract::Path(
-                        document_id,
-                    ): openapi_gen::reexport::axum::extract::Path<DocumentId>|
+                    >|
                 async move {
                     let accept = accept.map(|accept| accept.0);
                     instance
                         .get_np_identity_document_data(
-                            accept,
                             identification_id,
                             document_id,
+                            accept,
                         )
                         .await
                 }

@@ -1,5 +1,7 @@
 use std::{
+    borrow::Borrow,
     collections::HashMap,
+    fmt,
     ops::Deref,
     path::{Path, PathBuf},
 };
@@ -57,7 +59,7 @@ pub(crate) enum Ref {
     Forward(String),
 }
 
-pub(crate) trait AsBackref: Sized {
+pub trait AsBackref: Sized {
     fn as_backref(&self) -> Option<usize>;
     fn from_backref(backref: usize) -> Self;
 }
@@ -519,7 +521,7 @@ Your changes may be overwritten without notice.
         let endpoints = self
             .endpoints
             .iter()
-            .map(|endpoint| endpoint.emit(&name_resolver))
+            .map(|endpoint| endpoint.emit(self, &name_resolver))
             .collect::<Result<Vec<_>, _>>()?;
 
         let trait_api = quote! {
@@ -566,33 +568,24 @@ impl std::ops::Index<Reference> for ApiModel<Reference> {
     }
 }
 
-impl ApiModel<Reference> {
+impl<R> ApiModel<R>
+where
+    R: AsBackref + fmt::Debug,
+{
     #[inline]
-    pub fn resolve(&self, ref_: Reference) -> Option<&Item> {
-        self.definitions.get(ref_.0)
+    pub fn resolve(&self, ref_: impl Borrow<R>) -> Result<&Item<R>, UnknownReference> {
+        let ref_ = ref_.borrow();
+        let unknown_reference = || UnknownReference(format!("{ref_:?}"));
+        let idx = ref_.as_backref().ok_or_else(unknown_reference)?;
+        self.definitions.get(idx).ok_or_else(unknown_reference)
     }
 
     #[inline]
-    pub fn resolve_mut(&mut self, ref_: Reference) -> Option<&mut Item> {
-        self.definitions.get_mut(ref_.0)
-    }
-}
-
-impl ApiModel<Ref> {
-    #[inline]
-    pub fn resolve(&self, ref_: &Ref) -> Option<&Item<Ref>> {
-        match ref_ {
-            Ref::Back(idx) => self.definitions.get(*idx),
-            Ref::Forward(_) => None,
-        }
-    }
-
-    #[inline]
-    pub fn resolve_mut(&mut self, ref_: &Ref) -> Option<&mut Item<Ref>> {
-        match ref_ {
-            Ref::Back(idx) => self.definitions.get_mut(*idx),
-            Ref::Forward(_) => None,
-        }
+    pub fn resolve_mut(&mut self, ref_: impl Borrow<R>) -> Result<&mut Item<R>, UnknownReference> {
+        let ref_ = ref_.borrow();
+        let unknown_reference = || UnknownReference(format!("{ref_:?}"));
+        let idx = ref_.as_backref().ok_or_else(unknown_reference)?;
+        self.definitions.get_mut(idx).ok_or_else(unknown_reference)
     }
 }
 
@@ -626,7 +619,7 @@ impl ApiModel {
                 }
             };
             // all top-level components are public, even if they are typedefs
-            if let Some(item) = model.resolve_mut(&ref_) {
+            if let Ok(item) = model.resolve_mut(&ref_) {
                 item.pub_typedef = true;
             }
         }
@@ -638,7 +631,7 @@ impl ApiModel {
             let ref_ = insert_parameter(spec, &mut model, reference_name, param)
                 .map_err(Error::InsertComponentParameter)?;
             // all top-level component parameters are also public
-            if let Some(item) = model.resolve_mut(&ref_) {
+            if let Ok(item) = model.resolve_mut(&ref_) {
                 item.pub_typedef = true;
             }
         }
@@ -650,7 +643,7 @@ impl ApiModel {
             let ref_ =
                 create_request_body(spec, &mut model, spec_name, reference_name, request_body)?;
             // all top-level component parameters are also public
-            if let Some(item) = model.resolve_mut(&ref_) {
+            if let Ok(item) = model.resolve_mut(&ref_) {
                 item.pub_typedef = true;
                 item.nullable = !request_body.required;
                 if item.docs.is_none() {
@@ -670,7 +663,7 @@ impl ApiModel {
             let reference_name = Some(reference_name);
             let reference_name = reference_name.as_deref();
             let ref_ = create_header(spec, &mut model, spec_name, reference_name, header)?;
-            if let Some(item) = model.resolve_mut(&ref_) {
+            if let Ok(item) = model.resolve_mut(&ref_) {
                 item.impl_header = true;
                 // all top-level component parameters are also public
                 item.pub_typedef = true;
