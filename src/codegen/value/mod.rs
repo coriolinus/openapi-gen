@@ -23,7 +23,7 @@ use quote::quote;
 ///
 /// This type doesn't capture all of the information needed for codegen, but it
 /// is the heart of the type abstraction.
-#[derive(Debug, Clone, derive_more::From)]
+#[derive(Debug, Clone, derive_more::From, derive_more::TryInto)]
 pub enum Value<Ref = Reference> {
     Scalar(Scalar),
     StringEnum(StringEnum),
@@ -33,6 +33,7 @@ pub enum Value<Ref = Reference> {
     Object(Object<Ref>),
     Map(Map<Ref>),
     #[from(ignore)]
+    #[try_into(ignore)]
     Ref(Ref),
     PropertyOverride(PropertyOverride<Ref>),
 }

@@ -30,15 +30,10 @@ impl<'a> From<&'a openapiv3::Parameter> for ParameterLocation {
     }
 }
 
-/// A unique parameter is defined by a combination of a name and location.
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct ParameterKey {
-    pub name: String,
-    pub location: Option<ParameterLocation>,
-}
-
 #[derive(Debug, Clone)]
 pub struct Parameter<Ref = Reference> {
+    pub rust_name: String,
+    pub location: ParameterLocation,
     pub required: bool,
     pub item_ref: Ref,
 }
@@ -48,11 +43,21 @@ impl Parameter<Ref> {
         self,
         resolver: impl Fn(&Ref) -> Result<Reference, UnknownReference>,
     ) -> Result<Parameter<Reference>, UnknownReference> {
-        let Self { required, item_ref } = self;
+        let Self {
+            rust_name,
+            location,
+            required,
+            item_ref,
+        } = self;
 
         let item_ref = resolver(&item_ref)?;
 
-        Ok(Parameter { required, item_ref })
+        Ok(Parameter {
+            rust_name,
+            location,
+            required,
+            item_ref,
+        })
     }
 }
 
@@ -133,7 +138,7 @@ pub(crate) fn insert_parameter(
 
     // best-effort ensure that we `impl Header` wherever necessary
     if matches!(param, openapiv3::Parameter::Header { .. }) {
-        if let Some(item) = model.resolve_mut(&ref_) {
+        if let Ok(item) = model.resolve_mut(&ref_) {
             item.impl_header = true;
         }
     }
@@ -145,11 +150,13 @@ pub(crate) fn convert_param_ref(
     spec: &OpenAPI,
     model: &mut ApiModel<Ref>,
     param_ref: &ReferenceOr<openapiv3::Parameter>,
-) -> Result<(ParameterKey, Parameter<Ref>), Error> {
+) -> Result<Parameter<Ref>, Error> {
+    // we get the parameter the simple way this time, as a shorthand for determining certain parameters
     let param = Resolve::resolve(param_ref, spec).map_err(|err| {
         Error::ConvertParamRef(anyhow!(err).context("failed to resolve parameter reference"))
     })?;
     let required = param.parameter_data_ref().required;
+    let location = ParameterLocation::from(param);
 
     // we don't want to be constantly redefining things, so this function has two modes:
     // if the parameter is a reference, then look for that reference among the existing definitions.
@@ -164,22 +171,21 @@ pub(crate) fn convert_param_ref(
         }
     };
 
-    let item = model.resolve(&item_ref).ok_or_else(|| {
-        Error::ConvertParamRef(anyhow!(
-            "unexpected forward reference converting parameter ref: {param_ref:?}"
-        ))
+    let item = model.resolve(&item_ref).map_err(|err| {
+        Error::ConvertParamRef(
+            anyhow!(err)
+                .context("unexpected forward reference converting parameter ref: {param_ref:?}"),
+        )
     })?;
 
-    let location = Resolve::resolve(param_ref, spec)
-        .ok()
-        .map(ParameterLocation::from);
+    let rust_name = item.rust_name.clone();
 
-    let parameter_key = ParameterKey {
-        name: item.rust_name.clone(),
+    let parameter = Parameter {
+        rust_name,
         location,
+        required,
+        item_ref,
     };
 
-    let parameter = Parameter { required, item_ref };
-
-    Ok((parameter_key, parameter))
+    Ok(parameter)
 }

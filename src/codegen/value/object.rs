@@ -63,7 +63,7 @@ impl ObjectMember {
             .as_deref()
             .map(|docs| quote!(#[doc = #docs]));
 
-        let item = model.resolve(self.definition);
+        let item = model.resolve(self.definition).ok();
         let get_property_override = |override_value: &dyn Fn(&PropertyOverride) -> bool| -> bool {
             item.and_then(|item| item.value.as_property_override())
                 .map(override_value)

@@ -30,6 +30,22 @@ pub struct Thing {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bar: Option<Bar>,
 }
+///Combination item for path parameters of `getThing`
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde::Serialize,
+    openapi_gen::reexport::serde::Deserialize,
+    Copy,
+    Eq,
+    Hash,
+    openapi_gen::reexport::derive_more::Constructor
+)]
+#[serde(crate = "openapi_gen::reexport::serde")]
+pub struct GetThingPathParameters {
+    pub id: Id,
+}
 #[derive(
     Debug,
     Clone,
@@ -41,6 +57,22 @@ pub struct Thing {
 pub enum GetThingResponse {
     #[serde(rename = "OK")]
     Ok(Thing),
+}
+///Combination item for path parameters of `putThing`
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde::Serialize,
+    openapi_gen::reexport::serde::Deserialize,
+    Copy,
+    Eq,
+    Hash,
+    openapi_gen::reexport::derive_more::Constructor
+)]
+#[serde(crate = "openapi_gen::reexport::serde")]
+pub struct PutThingPathParameters {
+    pub id: Id,
 }
 pub type PutThingRequest = Thing;
 #[derive(
@@ -108,8 +140,10 @@ where
                 let instance = instance.clone();
                 move |
                     openapi_gen::reexport::axum::extract::Path(
-                        id,
-                    ): openapi_gen::reexport::axum::extract::Path<Id>|
+                        GetThingPathParameters { id },
+                    ): openapi_gen::reexport::axum::extract::Path<
+                        GetThingPathParameters,
+                    >|
                 async move { instance.get_thing(id).await }
             }),
         )
@@ -119,8 +153,10 @@ where
                 let instance = instance.clone();
                 move |
                     openapi_gen::reexport::axum::extract::Path(
-                        id,
-                    ): openapi_gen::reexport::axum::extract::Path<Id>,
+                        PutThingPathParameters { id },
+                    ): openapi_gen::reexport::axum::extract::Path<
+                        PutThingPathParameters,
+                    >,
                     openapi_gen::reexport::axum::extract::Json(
                         request_body,
                     ): openapi_gen::reexport::axum::extract::Json<PutThingRequest>|
