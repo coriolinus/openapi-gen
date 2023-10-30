@@ -81,7 +81,7 @@ fn build_route(model: &ApiModel, endpoint: &Endpoint) -> Result<TokenStream, Err
         let field_names = object
             .members
             .keys()
-            .map(|name| make_ident(name))
+            .map(|name| make_ident(&name.to_snake_case()))
             .collect::<Vec<_>>();
 
         let binding = quote!(#extractor(#type_ident{ #( #field_names ),* }));

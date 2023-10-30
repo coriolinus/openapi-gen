@@ -355,14 +355,14 @@ fn make_param_object(
             .into_iter()
             .map(|param| {
                 let Parameter {
-                    rust_name,
+                    spec_name,
                     required,
                     item_ref,
                     ..
                 } = param;
                 let mut member = ObjectMember::new(item_ref);
                 member.inline_option = !required;
-                (rust_name.to_snake_case(), member)
+                (spec_name, member)
             })
             .collect();
 
