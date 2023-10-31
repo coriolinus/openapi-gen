@@ -33,6 +33,7 @@ impl<'a> From<&'a openapiv3::Parameter> for ParameterLocation {
 #[derive(Debug, Clone)]
 pub struct Parameter<Ref = Reference> {
     pub rust_name: String,
+    pub spec_name: String,
     pub location: ParameterLocation,
     pub required: bool,
     pub item_ref: Ref,
@@ -45,6 +46,7 @@ impl Parameter<Ref> {
     ) -> Result<Parameter<Reference>, UnknownReference> {
         let Self {
             rust_name,
+            spec_name,
             location,
             required,
             item_ref,
@@ -54,6 +56,7 @@ impl Parameter<Ref> {
 
         Ok(Parameter {
             rust_name,
+            spec_name,
             location,
             required,
             item_ref,
@@ -156,6 +159,7 @@ pub(crate) fn convert_param_ref(
         Error::ConvertParamRef(anyhow!(err).context("failed to resolve parameter reference"))
     })?;
     let required = param.parameter_data_ref().required;
+    let spec_name = param.parameter_data_ref().name.clone();
     let location = ParameterLocation::from(param);
 
     // we don't want to be constantly redefining things, so this function has two modes:
@@ -182,6 +186,7 @@ pub(crate) fn convert_param_ref(
 
     let parameter = Parameter {
         rust_name,
+        spec_name,
         location,
         required,
         item_ref,

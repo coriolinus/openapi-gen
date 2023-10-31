@@ -53,11 +53,13 @@ type Accept = openapi_gen::reexport::accept_header::Accept;
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct GetNpIdentityDocumentDataPathParameters {
     ///an identifier for this particular identification process
+    #[serde(rename = "identification-id")]
     pub identification_id: IdentificationId,
 
     /// An identifier for a document within the context of the identification service.
     /// 
     /// This is _not_ associated with the documents service in any way.
+    #[serde(rename = "document-id")]
     pub document_id: DocumentId,
 }
 ///document data encoded as base64

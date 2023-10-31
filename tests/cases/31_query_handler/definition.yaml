@@ -22,6 +22,11 @@ paths:
             type: string
             format: uuid
           required: true
+        - in: query
+          name: camelCaseName
+          schema:
+            type: string
+          required: true
       responses:
         '200':
           description: get the root value, as modified by the query parameters

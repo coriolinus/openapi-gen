@@ -2,6 +2,7 @@
 type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 type Bar = u64;
 type Bat = openapi_gen::reexport::uuid::Uuid;
+type CamelCaseName = String;
 ///Combination item for query parameters of `getRoot`
 #[derive(
     Debug,
@@ -9,7 +10,6 @@ type Bat = openapi_gen::reexport::uuid::Uuid;
     PartialEq,
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize,
-    Copy,
     Eq,
     Hash,
     openapi_gen::reexport::derive_more::Constructor
@@ -19,6 +19,8 @@ pub struct GetRootQueryParameters {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bar: Option<Bar>,
     pub bat: Bat,
+    #[serde(rename = "camelCaseName")]
+    pub camel_case_name: CamelCaseName,
 }
 type Ok_ = Vec<u8>;
 #[derive(
@@ -41,7 +43,12 @@ pub trait Api {
     /// `GET /`
     /// 
     /// Operation ID: `getRoot`
-    async fn get_root(&self, bar: Option<Bar>, bat: Bat) -> GetRootResponse;
+    async fn get_root(
+        &self,
+        bar: Option<Bar>,
+        bat: Bat,
+        camel_case_name: CamelCaseName,
+    ) -> GetRootResponse;
 }
 impl openapi_gen::reexport::axum::response::IntoResponse for GetRootResponse {
     fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
@@ -80,11 +87,11 @@ where
                 let instance = instance.clone();
                 move |
                     openapi_gen::reexport::axum::extract::Query(
-                        GetRootQueryParameters { bar, bat },
+                        GetRootQueryParameters { bar, bat, camel_case_name },
                     ): openapi_gen::reexport::axum::extract::Query<
                         GetRootQueryParameters,
                     >|
-                async move { instance.get_root(bar, bat).await }
+                async move { instance.get_root(bar, bat, camel_case_name).await }
             }),
         )
 }
