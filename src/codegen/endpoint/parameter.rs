@@ -3,7 +3,7 @@ use heck::ToUpperCamelCase;
 use openapiv3::{OpenAPI, ParameterSchemaOrContent, ReferenceOr};
 
 use crate::{
-    codegen::{endpoint::Error, Item, Ref, Reference, UnknownReference, Value},
+    codegen::{endpoint::Error, Ref, Reference, UnknownReference},
     resolve_trait::Resolve,
     ApiModel,
 };
@@ -94,30 +94,17 @@ pub(crate) fn insert_parameter(
 
     let ref_ = match schema_ref {
         ReferenceOr::Reference { reference } => {
-            // if the schema is a reference to something else, we branch our behavior:
+            // conveniently, this never needs to be optional:
             //
-            // If the schema is required, we can return the ref directly. Otherwise, we need
-            // to create a typedef which wraps it in an Option.
-            let inner_ref = model
+            // - path parameters must always be required
+            // - query parameters are collected into a parameter object, which has its own avenue for optionality
+            // - header parameters are not collected into a single object but have special-casing for optionality
+            // - cookie parameters are not supported
+            //
+            // as such, we can always just return the reference
+            model
                 .get_named_reference(reference)
-                .context("looking up parameter reference")?;
-            if parameter_data.required {
-                inner_ref
-            } else {
-                // so let's make a nullable wrapper just pointing to the original item
-                let wrapper = Item {
-                    docs: parameter_data.description.clone(),
-                    spec_name,
-                    rust_name,
-                    nullable: true,
-                    value: Value::Ref(inner_ref),
-                    content_type,
-                    ..Default::default()
-                };
-                model
-                    .add_item(wrapper, reference_name)
-                    .context("adding wrapper item for parameter data")?
-            }
+                .context("looking up parameter reference")?
         }
         ReferenceOr::Item(schema) => {
             // if we defined an inline schema, we need to add the item

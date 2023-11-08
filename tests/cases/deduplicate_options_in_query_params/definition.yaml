@@ -1,0 +1,80 @@
+openapi: "3.0.3" # Use older openAPI spec version due to a bug in Zally: https://github.com/zalando/zally/issues/1230
+info:
+  title: "Deduplicate options in query params"
+  description: |
+    Query parameters, when not required, should be wrapped in a single `Option`, not two.
+  version: "0.1.0"
+
+paths:
+  "/list":
+    get:
+      description: Get a list of natural person identifications.
+      parameters:
+        - in: query
+          name: status
+          description: Filters the list by `status`.
+          schema:
+            $ref: "#/components/schemas/Status"
+        - in: query
+          name: id
+          description: Filters the list by `id`.
+          schema:
+            $ref: "#/components/schemas/Id"
+        - in: header
+          name: X-Request-Id
+          schema:
+            type: string
+            format: uuid
+            x-newtype:
+              pub: true
+      responses:
+        '200':
+          description: list of items
+          content:
+            "application/json":
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Item"
+        default:
+          $ref: "#/components/responses/Default"
+      operationId: getList
+
+
+components:
+  schemas:
+    Id:
+      description: an identifier for an item
+      type: string
+      format: uuid
+      x-newtype:
+        pub: true
+
+    Status:
+      description: |
+        An item's status
+      type: string
+      x-extensible-enum:
+        - ONE
+        - TWO
+        - THREE
+
+    Item:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/Id"
+        foo:
+          type: string
+        status:
+          $ref: "#/components/schemas/Status"
+      required:
+        - id
+
+  responses:
+    Default:
+      description: an error occurred; see status code and problem object for more information
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "https://opensource.zalando.com/restful-api-guidelines/models/problem-1.0.1.yaml#/Problem"
