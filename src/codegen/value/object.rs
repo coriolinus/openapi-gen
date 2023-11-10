@@ -74,6 +74,19 @@ impl ObjectMember {
         let read_only = self.read_only || get_property_override(&|prop| prop.read_only);
         let write_only = self.write_only || get_property_override(&|prop| prop.write_only);
 
+        let serde_as = item
+            .and_then(|item| item.use_display_from_str(model))
+            .map(|dfs| {
+                let dfs = if self.inline_option {
+                    quote!(Option<#dfs>)
+                } else {
+                    dfs
+                };
+
+                let dfs = dfs.to_string();
+                quote!(#[serde_as(as = #dfs)])
+            });
+
         let mut serde_attributes = Vec::new();
 
         if read_only {
@@ -107,6 +120,7 @@ impl ObjectMember {
 
         Ok(quote! {
             #docs
+            #serde_as
             #serde_attributes
             pub #snake_member_name: #item_ref,
         })
@@ -147,7 +161,7 @@ impl<R> Object<R> {
             let Ok(item) = model.resolve(&member.definition) else {
                 return false;
             };
-            item.value.use_display_from_str(model)
+            item.use_display_from_str(model).is_some()
         })
     }
 }

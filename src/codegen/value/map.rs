@@ -17,20 +17,26 @@ pub struct Map<Ref = Reference> {
     pub value_type: Option<Ref>,
 }
 
-impl<R> Map<R> {
-    pub(crate) fn use_serde_as_annotation(&self, model: &ApiModel<R>) -> bool
-    where
-        R: AsBackref + fmt::Debug,
-    {
+impl<R> Map<R>
+where
+    R: AsBackref + fmt::Debug,
+{
+    pub(crate) fn use_serde_as_annotation(&self, model: &ApiModel<R>) -> bool {
         self.value_type
             .as_ref()
             .map(|value_type_ref| {
                 let Ok(item) = model.resolve(value_type_ref) else {
                     return false;
                 };
-                item.value.use_display_from_str(model)
+                item.use_display_from_str(model).is_some()
             })
             .unwrap_or_default()
+    }
+
+    pub(crate) fn use_display_from_str(&self, model: &ApiModel<R>) -> Option<TokenStream> {
+        let item = model.resolve(self.value_type.as_ref()?).ok()?;
+        let inner = item.use_display_from_str(model)?;
+        Some(quote!(std::collections::HashMap<String, #inner>))
     }
 }
 

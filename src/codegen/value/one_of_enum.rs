@@ -131,7 +131,7 @@ impl<R> OneOfEnum<R> {
             let Ok(item) = model.resolve(&variant.definition) else {
                 return false;
             };
-            item.value.use_display_from_str(model)
+            item.use_display_from_str(model).is_some()
         })
     }
 }

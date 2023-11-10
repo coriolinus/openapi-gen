@@ -144,9 +144,11 @@ impl Scalar {
     ///
     /// Most primitives implement `serde::Serialize` and `serde::Deserialize`. However, that is not universally true:
     /// some require this helper for serialization. For that, they just need to implement `Display` and `FromStr`.
-    pub fn use_display_from_str(self) -> bool {
+    pub fn use_display_from_str(self) -> Option<TokenStream> {
         match self {
-            Scalar::Mime | Scalar::AcceptHeader => true,
+            Scalar::Mime | Scalar::AcceptHeader => {
+                Some(quote!(openapi_gen::reexport::serde_with::DisplayFromStr))
+            }
             Scalar::Unit
             | Scalar::F64
             | Scalar::F32
@@ -162,21 +164,21 @@ impl Scalar {
             | Scalar::Ipv4Addr
             | Scalar::Ipv6Addr
             | Scalar::Bool
-            | Scalar::Any => false,
+            | Scalar::Any => None,
             #[cfg(feature = "bytes")]
-            Scalar::Bytes => false,
+            Scalar::Bytes => None,
             #[cfg(feature = "uuid")]
-            Scalar::Uuid => false,
+            Scalar::Uuid => None,
             #[cfg(feature = "integer-restrictions")]
-            Scalar::BoundedI32(_, _) => false,
+            Scalar::BoundedI32(_, _) => None,
             #[cfg(feature = "integer-restrictions")]
-            Scalar::BoundedI64(_, _) => false,
+            Scalar::BoundedI64(_, _) => None,
             #[cfg(feature = "integer-restrictions")]
-            Scalar::BoundedU32(_, _) => false,
+            Scalar::BoundedU32(_, _) => None,
             #[cfg(feature = "integer-restrictions")]
-            Scalar::BoundedU64(_, _) => false,
+            Scalar::BoundedU64(_, _) => None,
             #[cfg(feature = "api-problem")]
-            Scalar::ApiProblem => false,
+            Scalar::ApiProblem => None,
         }
     }
 

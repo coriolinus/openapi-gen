@@ -1,3 +1,5 @@
+use std::fmt;
+
 use heck::ToUpperCamelCase;
 use openapiv3::{ObjectType, OpenAPI, Schema, SchemaKind, Type};
 use proc_macro2::TokenStream;
@@ -12,7 +14,7 @@ use crate::{
     resolve_trait::Resolve,
 };
 
-use super::{OneOfEnum, StringEnum};
+use super::{api_model::AsBackref, OneOfEnum, StringEnum};
 
 // note: openapiv3 intentionally ignores extensions whose name does not start with "x-".
 fn get_extension_value<'a>(schema: &'a Schema, key: &str) -> Option<&'a serde_json::Value> {
@@ -159,6 +161,19 @@ impl<R> Default for Item<R> {
             content_type: Default::default(),
             impl_header: Default::default(),
         }
+    }
+}
+
+impl<R> Item<R>
+where
+    R: AsBackref + fmt::Debug,
+{
+    pub(crate) fn use_display_from_str(&self, model: &ApiModel<R>) -> Option<TokenStream> {
+        let mut vd = self.value.use_display_from_str(model)?;
+        if self.nullable {
+            vd = quote!(Option<#vd>);
+        }
+        Some(vd)
     }
 }
 

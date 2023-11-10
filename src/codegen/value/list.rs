@@ -13,15 +13,21 @@ pub struct List<Ref = Reference> {
     pub item: Ref,
 }
 
-impl<R> List<R> {
-    pub(crate) fn use_serde_as_annotation(&self, model: &ApiModel<R>) -> bool
-    where
-        R: AsBackref + fmt::Debug,
-    {
+impl<R> List<R>
+where
+    R: AsBackref + fmt::Debug,
+{
+    pub(crate) fn use_serde_as_annotation(&self, model: &ApiModel<R>) -> bool {
         let Ok(item) = model.resolve(&self.item) else {
             return false;
         };
-        item.value.use_display_from_str(model)
+        item.use_display_from_str(model).is_some()
+    }
+
+    pub(crate) fn use_display_from_str(&self, model: &ApiModel<R>) -> Option<TokenStream> {
+        let item = model.resolve(&self.item).ok()?;
+        let inner = item.use_display_from_str(model)?;
+        Some(quote!(Vec<#inner>))
     }
 }
 
