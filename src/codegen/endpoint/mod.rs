@@ -76,7 +76,7 @@ pub struct Endpoint<Ref = Reference> {
     pub response: Ref,
 }
 
-type MaybeItemObject<'a, R> = Option<(&'a Item<R>, Object<R>)>;
+type MaybeItemObject<'a, R> = Option<(R, &'a Item<R>, Object<R>)>;
 
 impl<R> Endpoint<R> {
     /// Compute a documentation string for this endpoint.
@@ -124,10 +124,11 @@ impl<R> Endpoint<R> {
         let obj = self
             .path_parameters
             .as_ref()
-            .map(|ref_| model.resolve(ref_))
+            .map(|ref_| model.resolve(ref_).map(|item| (ref_.clone(), item)))
             .transpose()?
-            .map(|item| {
+            .map(|(ref_, item)| {
                 (
+                    ref_,
                     item,
                     item.value
                         .clone()
@@ -148,10 +149,11 @@ impl<R> Endpoint<R> {
         let obj = self
             .query_parameters
             .as_ref()
-            .map(|ref_| model.resolve(ref_))
+            .map(|ref_| model.resolve(ref_).map(|item| (ref_.clone(), item)))
             .transpose()?
-            .map(|item| {
+            .map(|(ref_, item)| {
                 (
+                    ref_,
                     item,
                     item.value
                         .clone()
@@ -178,20 +180,19 @@ impl<R> Endpoint<R> {
         // then query parameters,
         // then headers
 
-        let path_parameters =
-            self.path_parameter_object(model)?
-                .into_iter()
-                .flat_map(|(_item, parameter_object)| {
-                    parameter_object.members.into_iter().map(|(name, member)| {
-                        let name = name.to_snake_case();
-                        let ref_ = member.definition;
-                        let required = !member.inline_option;
-                        (name, ref_, required)
-                    })
-                });
+        let path_parameters = self.path_parameter_object(model)?.into_iter().flat_map(
+            |(_ref_, _item, parameter_object)| {
+                parameter_object.members.into_iter().map(|(name, member)| {
+                    let name = name.to_snake_case();
+                    let ref_ = member.definition;
+                    let required = !member.inline_option;
+                    (name, ref_, required)
+                })
+            },
+        );
 
         let query_parameters = self.query_parameter_object(model)?.into_iter().flat_map(
-            |(_item, parameter_object)| {
+            |(_ref_, _item, parameter_object)| {
                 parameter_object.members.into_iter().map(|(name, member)| {
                     let name = name.to_snake_case();
                     let ref_ = member.definition;
@@ -276,8 +277,7 @@ impl Endpoint {
             .function_parameters(api_model)?
             .map(|(name, ref_, required)| {
                 let param_name = make_ident(&name);
-                let type_name = make_ident(name_resolver(ref_)?);
-                let mut type_name = quote!(#type_name);
+                let mut type_name = api_model.definition(ref_, &name_resolver)?;
                 if !required {
                     type_name = quote!(Option< #type_name >);
                 }
@@ -288,14 +288,13 @@ impl Endpoint {
         let request_body = self
             .request_body
             .map(|ref_| {
-                let type_name = name_resolver(ref_)?;
-                let type_name = make_ident(type_name);
+                let type_name = api_model.definition(ref_, &name_resolver)?;
 
                 Ok(quote!(request_body: #type_name))
             })
             .transpose()?;
 
-        let response_body = make_ident(name_resolver(self.response)?);
+        let response_body = api_model.definition(self.response, name_resolver)?;
 
         Ok(quote! {
             #docs

@@ -84,7 +84,7 @@ impl ObjectMember {
         let mut snake_member_name = format!("{}", AsSnakeCase(member_name));
         model.deconflict_member_or_variant_ident(&mut snake_member_name);
         let snake_member_name = make_ident(&snake_member_name);
-        let item_ref = make_ident(name_resolver(self.definition)?);
+        let mut item_ref = model.definition(self.definition, name_resolver)?;
 
         if snake_member_name != member_name {
             serde_attributes.push(quote!(rename = #member_name));
@@ -92,7 +92,6 @@ impl ObjectMember {
 
         // `self.inline_option` is set when this item is optional, not intrinsically,
         // but within the context of this object.
-        let mut item_ref = quote!(#item_ref);
         if self.inline_option {
             item_ref = quote!(Option<#item_ref>);
             serde_attributes.push(quote!(skip_serializing_if = "Option::is_none"));

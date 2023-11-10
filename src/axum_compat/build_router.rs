@@ -5,7 +5,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::{
-    codegen::{make_ident, Endpoint},
+    codegen::{make_ident, Endpoint, Reference, UnknownReference},
     ApiModel,
 };
 
@@ -54,7 +54,11 @@ fn to_colon_path(curly_bracket_path: &str) -> Result<String, Error> {
     Ok(out)
 }
 
-fn build_route(model: &ApiModel, endpoint: &Endpoint) -> Result<TokenStream, Error> {
+fn build_route<'a>(
+    model: &ApiModel,
+    name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+    endpoint: &Endpoint,
+) -> Result<TokenStream, Error> {
     let path = to_colon_path(&endpoint.path)?;
     let verb = endpoint.verb.emit_axum();
     let prefix = quote!(openapi_gen::reexport::axum::extract);
@@ -69,15 +73,20 @@ fn build_route(model: &ApiModel, endpoint: &Endpoint) -> Result<TokenStream, Err
     //   3. header parameters
     //   4. body
 
-    if let Some((item, object)) = endpoint
-        .path_parameter_object(model)
-        .map_err(Error::context(
-            "attempting to extract path parameter object",
-        ))?
+    if let Some((ref_, _item, object)) =
+        endpoint
+            .path_parameter_object(model)
+            .map_err(Error::context(
+                "attempting to extract path parameter object",
+            ))?
     {
         let extractor = quote!(#prefix::Path);
 
-        let type_ident = make_ident(&item.rust_name);
+        let type_ident = model
+            .definition(ref_, &name_resolver)
+            .map_err(Error::context(
+                "getting type ident of path parameter object",
+            ))?;
         let field_names = object
             .members
             .keys()
@@ -91,15 +100,20 @@ fn build_route(model: &ApiModel, endpoint: &Endpoint) -> Result<TokenStream, Err
         parameter_idents.extend(field_names);
     }
 
-    if let Some((item, object)) = endpoint
-        .query_parameter_object(model)
-        .map_err(Error::context(
-            "attempting to extract query parameter object",
-        ))?
+    if let Some((ref_, _item, object)) =
+        endpoint
+            .query_parameter_object(model)
+            .map_err(Error::context(
+                "attempting to extract query parameter object",
+            ))?
     {
         let extractor = quote!(#prefix::Query);
 
-        let type_ident = make_ident(&item.rust_name);
+        let type_ident = model
+            .definition(ref_, &name_resolver)
+            .map_err(Error::context(
+                "getting type ident of query parameter object",
+            ))?;
         let field_names = object
             .members
             .keys()
@@ -118,7 +132,13 @@ fn build_route(model: &ApiModel, endpoint: &Endpoint) -> Result<TokenStream, Err
             .resolve(param.item_ref)
             .map_err(Error::context(format!("getting item for param \"{key}\"")))?;
 
-        let type_ident = make_ident(&item.rust_name);
+        let type_ident =
+            model
+                .definition(param.item_ref, &name_resolver)
+                .map_err(Error::context(format!(
+                    "getting type ident for {}",
+                    &item.rust_name
+                )))?;
         let variable_ident = make_ident(&item.rust_name.to_snake_case());
 
         let extractor = quote!(#prefix::TypedHeader);
@@ -181,11 +201,14 @@ fn build_route(model: &ApiModel, endpoint: &Endpoint) -> Result<TokenStream, Err
 }
 
 /// Create `fn build_router`, which transforms an arbitrary `Api` instance into a `Router`.
-pub(crate) fn fn_build_router(model: &ApiModel) -> Result<TokenStream, Error> {
+pub(crate) fn fn_build_router<'a>(
+    model: &ApiModel,
+    name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+) -> Result<TokenStream, Error> {
     let mut routes = Vec::<TokenStream>::new();
 
     for endpoint in model.endpoints.iter() {
-        let route = build_route(model, endpoint)?;
+        let route = build_route(model, &name_resolver, endpoint)?;
         routes.push(route);
     }
 

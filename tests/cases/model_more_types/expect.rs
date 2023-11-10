@@ -29,8 +29,7 @@ pub struct Thing {
     pub data: ArbitraryJson,
 }
 pub type List = Vec<Thing>;
-type SetItem = i64;
-pub type Set = std::collections::HashSet<SetItem>;
+pub type Set = std::collections::HashSet<i64>;
 pub type Map = std::collections::HashMap<String, Thing>;
 ///sort order
 #[derive(
