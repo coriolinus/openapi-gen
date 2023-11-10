@@ -29,8 +29,7 @@ openapi_gen::newtype_derive_canonical_form!(
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct PersonId(pub openapi_gen::reexport::uuid::Uuid);
 openapi_gen::newtype_derive_canonical_form!(PersonId, openapi_gen::reexport::uuid::Uuid);
-type AdditionalInformationItem = String;
-pub type AdditionalInformation = Vec<AdditionalInformationItem>;
+pub type AdditionalInformation = Vec<String>;
 type Id = IdentificationId;
 #[derive(
     Debug,
@@ -49,7 +48,6 @@ pub struct NaturalPersonIdentification {
     pub id: Option<Id>,
     pub person_id: PersonId,
 }
-type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 #[derive(
     Debug,
     Clone,
@@ -90,7 +88,7 @@ pub struct CreateNaturalPersonIdentificationResponseCreated {
 #[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum CreateNaturalPersonIdentificationResponse {
     Created(CreateNaturalPersonIdentificationResponseCreated),
-    Default(Default_),
+    Default(openapi_gen::reexport::http_api_problem::HttpApiProblem),
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {

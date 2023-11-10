@@ -7,9 +7,11 @@ pub(crate) mod scalar;
 pub(crate) mod set;
 pub(crate) mod string_enum;
 
+use std::fmt;
+
 use crate::codegen::{
     api_model::{self, Ref, Reference, UnknownReference},
-    make_ident, ApiModel, List, Map, Object, OneOfEnum, PropertyOverride, Scalar, Set, StringEnum,
+    ApiModel, List, Map, Object, OneOfEnum, PropertyOverride, Scalar, Set, StringEnum,
 };
 
 use openapiv3::{
@@ -18,6 +20,8 @@ use openapiv3::{
 };
 use proc_macro2::TokenStream;
 use quote::quote;
+
+use super::api_model::AsBackref;
 
 /// The fundamental value type.
 ///
@@ -278,6 +282,36 @@ impl<R> Value<R> {
             _ => None,
         }
     }
+
+    /// A trivial value is one which should not emit a typedef, but should instead directly emit the type definition.
+    ///
+    /// In general, this means primitives, externally defined types, etc.
+    ///
+    /// Specifically here, it means any Scalar variant, and references to the same.
+    ///
+    /// An inner `None` indicates that this value's definition is non-trivial; the item should be referred to by name.
+    pub(crate) fn trivial_definition(
+        &self,
+        model: &ApiModel<R>,
+    ) -> Result<Option<TokenStream>, UnknownReference>
+    where
+        R: AsBackref + fmt::Debug,
+    {
+        match self {
+            Value::Scalar(scalar) => Ok(Some(scalar.emit_type())),
+            Value::StringEnum(_)
+            | Value::OneOfEnum(_)
+            | Value::Set(_)
+            | Value::List(_)
+            | Value::Object(_)
+            | Value::Map(_)
+            | Value::PropertyOverride(_) => Ok(None),
+            Value::Ref(ref_) => {
+                let item = model.resolve(ref_)?;
+                item.value.trivial_definition(model)
+            }
+        }
+    }
 }
 
 impl Value {
@@ -372,20 +406,14 @@ impl Value {
         match self {
             Value::Scalar(scalar) => Ok(scalar.emit_type()),
             Value::StringEnum(string_enum) => Ok(string_enum.emit_definition()),
-            Value::List(list) => list.emit_definition(name_resolver),
-            Value::Set(set) => set.emit_definition(name_resolver),
-            Value::Map(map) => map.emit_definition(name_resolver),
-            Value::OneOfEnum(one_of_enum) => one_of_enum.emit_definition(name_resolver),
+            Value::List(list) => list.emit_definition(model, name_resolver),
+            Value::Set(set) => set.emit_definition(model, name_resolver),
+            Value::Map(map) => map.emit_definition(model, name_resolver),
+            Value::OneOfEnum(one_of_enum) => one_of_enum.emit_definition(model, name_resolver),
             Value::Object(object) => object.emit_definition(model, name_resolver),
-            Value::Ref(ref_) => {
-                let name = name_resolver(*ref_)?;
-                let ident = make_ident(name);
-                Ok(quote!(#ident))
-            }
+            Value::Ref(ref_) => model.definition(*ref_, name_resolver),
             Value::PropertyOverride(property_override) => {
-                let name = name_resolver(property_override.ref_)?;
-                let ident = make_ident(name);
-                Ok(quote!(#ident))
+                model.definition(property_override.ref_, name_resolver)
             }
         }
     }

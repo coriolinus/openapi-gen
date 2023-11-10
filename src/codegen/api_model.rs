@@ -25,6 +25,7 @@ use crate::{
             response::create_response_variants,
         },
         item::{EmitError, ParseItemError},
+        make_ident,
         rust_keywords::is_rust_keyword,
         Endpoint, Item, Scalar,
     },
@@ -427,6 +428,25 @@ impl ApiModel<Ref> {
 }
 
 impl ApiModel {
+    /// Emit the definition for an item by reference.
+    ///
+    /// If the item is trivial, emits the definition dirctly. Otherwise, emits the appropriate resolved name.
+    pub(crate) fn definition<'a>(
+        &self,
+        ref_: Reference,
+        name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+    ) -> Result<TokenStream, UnknownReference> {
+        let item = self.resolve(ref_)?;
+        match item.trivial_definition(self)? {
+            Some(definition) => Ok(definition),
+            None => {
+                let name = name_resolver(ref_)?;
+                let ident = make_ident(name);
+                Ok(quote!(#ident))
+            }
+        }
+    }
+
     /// Emit a footer to the module header with data about the input file
     fn emit_header_footer(&self) -> Option<String> {
         use md5::{Digest, Md5};
@@ -536,7 +556,7 @@ Your changes may be overwritten without notice.
         #[cfg(not(feature = "axum-support"))]
         let axum = TokenStream::default();
         #[cfg(feature = "axum-support")]
-        let axum = axum_compat::axum_items(self)?;
+        let axum = axum_compat::axum_items(self, &name_resolver)?;
 
         Ok(quote! {
             #header

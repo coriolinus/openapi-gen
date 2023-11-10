@@ -13,8 +13,6 @@
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Id(pub openapi_gen::reexport::uuid::Uuid);
 openapi_gen::newtype_derive_canonical_form!(Id, openapi_gen::reexport::uuid::Uuid);
-type Foo = f64;
-type Bar = String;
 #[derive(
     Debug,
     Clone,
@@ -26,9 +24,9 @@ type Bar = String;
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Thing {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub foo: Option<Foo>,
+    pub foo: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bar: Option<Bar>,
+    pub bar: Option<String>,
 }
 ///Combination item for path parameters of `getThing`
 #[derive(

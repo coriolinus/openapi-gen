@@ -36,8 +36,6 @@ pub struct DocumentId(pub openapi_gen::reexport::uuid::Uuid);
 openapi_gen::newtype_derive_canonical_form!(
     DocumentId, openapi_gen::reexport::uuid::Uuid
 );
-type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
-type Accept = openapi_gen::reexport::accept_header::Accept;
 ///Combination item for path parameters of `getNpIdentityDocumentData`
 #[derive(
     Debug,
@@ -62,8 +60,6 @@ pub struct GetNpIdentityDocumentDataPathParameters {
     #[serde(rename = "document-id")]
     pub document_id: DocumentId,
 }
-///document data encoded as base64
-type Data = openapi_gen::Bytes;
 #[derive(
     Debug,
     Clone,
@@ -78,11 +74,8 @@ type Data = openapi_gen::Bytes;
 pub struct OkApplicationJson {
     ///document data encoded as base64
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<Data>,
+    pub data: Option<openapi_gen::Bytes>,
 }
-///raw document data
-type Ok_ = Vec<u8>;
-type NotAcceptable = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 #[derive(
     Debug,
     Clone,
@@ -96,10 +89,10 @@ pub enum GetNpIdentityDocumentDataResponse {
     #[serde(rename = "OK application/json")]
     OkApplicationJson(OkApplicationJson),
     #[serde(rename = "OK *")]
-    Ok(Ok_),
+    Ok(Vec<u8>),
     #[serde(rename = "Not Acceptable")]
-    NotAcceptable(NotAcceptable),
-    Default(Default_),
+    NotAcceptable(openapi_gen::reexport::http_api_problem::HttpApiProblem),
+    Default(openapi_gen::reexport::http_api_problem::HttpApiProblem),
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
@@ -119,7 +112,7 @@ pub trait Api {
         &self,
         identification_id: IdentificationId,
         document_id: DocumentId,
-        accept: Option<Accept>,
+        accept: Option<openapi_gen::reexport::accept_header::Accept>,
     ) -> GetNpIdentityDocumentDataResponse;
 }
 impl openapi_gen::reexport::axum::response::IntoResponse
@@ -193,7 +186,9 @@ where
                         GetNpIdentityDocumentDataPathParameters,
                     >,
                     accept: Option<
-                        openapi_gen::reexport::axum::extract::TypedHeader<Accept>,
+                        openapi_gen::reexport::axum::extract::TypedHeader<
+                            openapi_gen::reexport::accept_header::Accept,
+                        >,
                     >|
                 async move {
                     let accept = accept.map(|accept| accept.0);

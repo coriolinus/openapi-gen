@@ -1,8 +1,4 @@
 #![allow(non_camel_case_types)]
-type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
-type Bar = u64;
-type Bat = openapi_gen::reexport::uuid::Uuid;
-type CamelCaseName = String;
 ///Combination item for query parameters of `getRoot`
 #[derive(
     Debug,
@@ -17,12 +13,11 @@ type CamelCaseName = String;
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct GetRootQueryParameters {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bar: Option<Bar>,
-    pub bat: Bat,
+    pub bar: Option<u64>,
+    pub bat: openapi_gen::reexport::uuid::Uuid,
     #[serde(rename = "camelCaseName")]
-    pub camel_case_name: CamelCaseName,
+    pub camel_case_name: String,
 }
-type Ok_ = Vec<u8>;
 #[derive(
     Debug,
     Clone,
@@ -34,8 +29,8 @@ type Ok_ = Vec<u8>;
 #[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum GetRootResponse {
     #[serde(rename = "OK")]
-    Ok(Ok_),
-    Default(Default_),
+    Ok(Vec<u8>),
+    Default(openapi_gen::reexport::http_api_problem::HttpApiProblem),
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
@@ -45,9 +40,9 @@ pub trait Api {
     /// Operation ID: `getRoot`
     async fn get_root(
         &self,
-        bar: Option<Bar>,
-        bat: Bat,
-        camel_case_name: CamelCaseName,
+        bar: Option<u64>,
+        bat: openapi_gen::reexport::uuid::Uuid,
+        camel_case_name: String,
     ) -> GetRootResponse;
 }
 impl openapi_gen::reexport::axum::response::IntoResponse for GetRootResponse {

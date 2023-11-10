@@ -334,14 +334,38 @@ impl Item {
         self.newtype.is_some() || self.pub_typedef || self.value.is_struct_or_enum()
     }
 
+    /// If this item is trivial, emit its definition.
+    pub(crate) fn trivial_definition(
+        &self,
+        model: &ApiModel,
+    ) -> Result<Option<TokenStream>, UnknownReference> {
+        if self.is_pub() {
+            return Ok(None);
+        }
+        Ok(self.value.trivial_definition(model)?.map(|mut def| {
+            if self.nullable {
+                def = quote!(Option<#def>);
+            }
+            def
+        }))
+    }
+
     /// Generate an item definition for this item.
     ///
     /// The name resolver should be able to efficiently extract item names from references.
+    ///
+    /// If the item is not public and has a trivial value, nothing is emitted; implementations
+    /// downstream should simply emit the trivial definition instead.
     pub fn emit<'a>(
         &self,
         model: &ApiModel,
         name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
     ) -> Result<TokenStream, UnknownReference> {
+        if self.trivial_definition(model)?.is_some() {
+            // This item is trivial and does not deserve its own definition.
+            return Ok(Default::default());
+        }
+
         let docs = self.docs.as_ref().map(|docs| quote!(#[doc = #docs]));
 
         let (wrapper_def, item_ident) = match &self.inner_name {

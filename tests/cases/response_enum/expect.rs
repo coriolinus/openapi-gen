@@ -1,8 +1,5 @@
 #![allow(non_camel_case_types)]
 pub type RenderError = openapi_gen::reexport::serde_json::Value;
-type Ok_ = Vec<u8>;
-type ServiceUnavailable = openapi_gen::reexport::http_api_problem::HttpApiProblem;
-type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 #[derive(
     Debug,
     Clone,
@@ -13,12 +10,12 @@ type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 #[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum RenderPdfResponse {
     #[serde(rename = "OK")]
-    Ok(Ok_),
+    Ok(Vec<u8>),
     #[serde(rename = "Bad Request")]
     BadRequest(RenderError),
     #[serde(rename = "Service Unavailable")]
-    ServiceUnavailable(ServiceUnavailable),
-    Default(Default_),
+    ServiceUnavailable(openapi_gen::reexport::http_api_problem::HttpApiProblem),
+    Default(openapi_gen::reexport::http_api_problem::HttpApiProblem),
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {

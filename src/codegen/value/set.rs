@@ -1,6 +1,6 @@
-use crate::codegen::{
-    api_model::{Ref, Reference, UnknownReference},
-    make_ident,
+use crate::{
+    codegen::api_model::{Ref, Reference, UnknownReference},
+    ApiModel,
 };
 
 use proc_macro2::TokenStream;
@@ -29,10 +29,10 @@ impl Set<Ref> {
 impl Set {
     pub fn emit_definition<'a>(
         &self,
+        model: &ApiModel,
         name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
     ) -> Result<TokenStream, UnknownReference> {
-        let item_name = name_resolver(self.item)?;
-        let ident = make_ident(item_name);
-        Ok(quote!(std::collections::HashSet<#ident>))
+        let def = model.definition(self.item, name_resolver)?;
+        Ok(quote!(std::collections::HashSet<#def>))
     }
 }

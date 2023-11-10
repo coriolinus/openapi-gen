@@ -36,7 +36,6 @@ pub enum Status {
     #[serde(other)]
     Other(String),
 }
-type Foo = String;
 #[derive(
     Debug,
     Clone,
@@ -52,13 +51,12 @@ pub struct Item {
     ///an identifier for an item
     pub id: Id,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub foo: Option<Foo>,
+    pub foo: Option<String>,
 
     /// An item's status
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<Status>,
 }
-type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 #[derive(
     Debug,
     Clone,
@@ -109,7 +107,7 @@ type Ok_ = Vec<Item>;
 pub enum GetListResponse {
     #[serde(rename = "OK")]
     Ok(Ok_),
-    Default(Default_),
+    Default(openapi_gen::reexport::http_api_problem::HttpApiProblem),
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
