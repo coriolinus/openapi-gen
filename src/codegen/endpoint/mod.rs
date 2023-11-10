@@ -1,4 +1,6 @@
-use heck::{AsUpperCamelCase, ToSnakeCase};
+use std::fmt;
+
+use heck::{AsUpperCamelCase, ToSnakeCase, ToUpperCamelCase};
 use indexmap::IndexMap;
 use openapiv3::OpenAPI;
 use proc_macro2::TokenStream;
@@ -6,7 +8,8 @@ use quote::quote;
 
 use crate::{
     codegen::{
-        endpoint::parameter::ParameterLocation, make_ident, Ref, Reference, UnknownReference,
+        endpoint::parameter::ParameterLocation, make_ident, Item, Object, Ref, Reference,
+        UnknownReference,
     },
     openapi_compat::path_items,
     ApiModel,
@@ -15,7 +18,7 @@ use crate::{
 pub(crate) mod header;
 
 pub(crate) mod parameter;
-use parameter::{convert_param_ref, Parameter, ParameterKey};
+use parameter::{convert_param_ref, Parameter};
 
 pub(crate) mod request_body;
 
@@ -23,6 +26,8 @@ pub(crate) mod response;
 
 pub(crate) mod verb;
 use verb::Verb;
+
+use super::{api_model::AsBackref, value::object::ObjectMember};
 
 #[derive(Debug, Clone)]
 pub struct Endpoint<Ref = Reference> {
@@ -40,8 +45,22 @@ pub struct Endpoint<Ref = Reference> {
     /// `Operation::description` and then to `Operation::summary`.
     pub operation_documentation: Option<String>,
     pub verb: Verb,
-    /// The parameters are derived first from `PathItem::parameters`, then updated from `Operation::parameters`.
-    pub parameters: IndexMap<ParameterKey, Parameter<Ref>>,
+    /// Query parameters are grouped together into a single object, which has one field per parameter.
+    ///
+    /// This is useful because Axum supports only one `Query` extractor per request, so query parameters must be coalesced.
+    ///
+    /// They are derived first from `PathItem::parameters`, then updated from `Operation::parameters`.
+    pub query_parameters: Option<Ref>,
+    /// Path parameters are grouped together into a single object, which has one field per parameter.
+    ///
+    /// This is useful because Axum supports only on `Path` extractor per request, so path parameters must be coalesced.
+    ///
+    /// They are derived first from `PathItem::parameters`, then updated from `Operation::parameters`.
+    pub path_parameters: Option<Ref>,
+    /// Headers by name.
+    ///
+    /// They are derived first from `PathItem::parameters`, then updated from `Operation::parameters`.`
+    pub headers: IndexMap<String, Parameter<Ref>>,
     /// Operation ID.
     ///
     /// If set, this is used as the basis for the rust name.
@@ -56,6 +75,8 @@ pub struct Endpoint<Ref = Reference> {
     /// indicating a malformed OpenAPI specification).
     pub response: Ref,
 }
+
+type MaybeItemObject<'a, R> = Option<(R, &'a Item<R>, Object<R>)>;
 
 impl<R> Endpoint<R> {
     /// Compute a documentation string for this endpoint.
@@ -89,91 +110,110 @@ impl<R> Endpoint<R> {
     /// or whether it needs a suffix to disambiguate from other content types. That must
     /// therefore be provided externally.
     pub(crate) fn function_name(&self, suffix: Option<&str>) -> String {
-        self.operation_id
-            .clone()
-            .unwrap_or_else(|| {
-                let mut name = format!("{} {}", self.verb, self.path);
-                if let Some(suffix) = suffix {
-                    name.push(' ');
-                    name.push_str(suffix);
-                }
-                name
-            })
+        compute_uncased_item_name(self.operation_id.as_deref(), self.verb, &self.path, suffix)
             .to_snake_case()
+    }
+
+    pub(crate) fn path_parameter_object<'a>(
+        &'a self,
+        model: &'a ApiModel<R>,
+    ) -> Result<MaybeItemObject<'a, R>, UnknownReference>
+    where
+        R: 'static + AsBackref + fmt::Debug + Clone,
+    {
+        let obj = self
+            .path_parameters
+            .as_ref()
+            .map(|ref_| model.resolve(ref_).map(|item| (ref_.clone(), item)))
+            .transpose()?
+            .map(|(ref_, item)| {
+                (
+                    ref_,
+                    item,
+                    item.value
+                        .clone()
+                        .try_into()
+                        .expect("we only ever construct path_parameters as an object"),
+                )
+            });
+        Ok(obj)
+    }
+
+    pub(crate) fn query_parameter_object<'a>(
+        &'a self,
+        model: &'a ApiModel<R>,
+    ) -> Result<MaybeItemObject<'a, R>, UnknownReference>
+    where
+        R: 'static + AsBackref + fmt::Debug + Clone,
+    {
+        let obj = self
+            .query_parameters
+            .as_ref()
+            .map(|ref_| model.resolve(ref_).map(|item| (ref_.clone(), item)))
+            .transpose()?
+            .map(|(ref_, item)| {
+                (
+                    ref_,
+                    item,
+                    item.value
+                        .clone()
+                        .try_into()
+                        .expect("we only ever construct query_parameters as an object"),
+                )
+            });
+        Ok(obj)
     }
 
     /// Compute the function parameters.
     ///
     /// Items are `(name, type, required)` where `name` is an appropriate parameter name, and `type` is convertable into a type ident.
     /// `required` is `true` when the item is mandatory.
-    fn function_parameters(&self) -> impl Iterator<Item = (String, R, bool)>
+    fn function_parameters<'a>(
+        &'a self,
+        model: &'a ApiModel<R>,
+    ) -> Result<impl 'a + Iterator<Item = (String, R, bool)>, UnknownReference>
     where
-        R: Clone,
+        R: 'static + AsBackref + fmt::Debug + Clone,
     {
-        struct ByName<R2> {
-            no_location: Option<(R2, bool)>,
-            by_location: IndexMap<ParameterLocation, (R2, bool)>,
-        }
+        // we emit function parameters in approximate order of predecence:
+        // first path parameters,
+        // then query parameters,
+        // then headers
 
-        impl<R2> Default for ByName<R2> {
-            fn default() -> Self {
-                Self {
-                    no_location: Default::default(),
-                    by_location: Default::default(),
-                }
-            }
-        }
-
-        impl<R2> ByName<R2> {
-            fn len(&self) -> usize {
-                self.by_location.len() + if self.no_location.is_some() { 1 } else { 0 }
-            }
-
-            fn into_iter(self) -> impl Iterator<Item = (Option<ParameterLocation>, R2, bool)> {
-                self.by_location
-                    .into_iter()
-                    .map(|(location, (ref_, required))| (Some(location), ref_, required))
-                    .chain(
-                        self.no_location
-                            .into_iter()
-                            .map(|(ref_, required)| (None, ref_, required)),
-                    )
-            }
-        }
-
-        let mut params_by_name = IndexMap::<_, ByName<R>>::new();
-        for (ParameterKey { name, location }, Parameter { required, item_ref }) in
-            self.parameters.iter()
-        {
-            let by_name = params_by_name.entry(name.clone()).or_default();
-            match location {
-                None => by_name.no_location = Some((item_ref.clone(), *required)),
-                Some(location) => {
-                    by_name
-                        .by_location
-                        .insert(*location, (item_ref.clone(), *required));
-                }
-            }
-        }
-
-        params_by_name.into_iter().flat_map(|(name, by_name)| {
-            let append_location_name = by_name.len() != 1;
-            by_name
-                .into_iter()
-                .map(move |(maybe_location, ref_, required)| {
-                    let name = if append_location_name {
-                        let location_name = maybe_location
-                            .map(|location| location.to_string())
-                            .unwrap_or_else(|| "Unknown".into());
-                        format!("{name} {location_name}")
-                    } else {
-                        name.clone()
-                    }
-                    .to_snake_case();
-
+        let path_parameters = self.path_parameter_object(model)?.into_iter().flat_map(
+            |(_ref_, _item, parameter_object)| {
+                parameter_object.members.into_iter().map(|(name, member)| {
+                    let name = name.to_snake_case();
+                    let ref_ = member.definition;
+                    let required = !member.inline_option;
                     (name, ref_, required)
                 })
-        })
+            },
+        );
+
+        let query_parameters = self.query_parameter_object(model)?.into_iter().flat_map(
+            |(_ref_, _item, parameter_object)| {
+                parameter_object.members.into_iter().map(|(name, member)| {
+                    let name = name.to_snake_case();
+                    let ref_ = member.definition;
+                    let required = !member.inline_option;
+                    (name, ref_, required)
+                })
+            },
+        );
+
+        let header_parameters = self.headers.iter().map(
+            |(
+                name,
+                Parameter {
+                    required, item_ref, ..
+                },
+            )| (name.to_snake_case(), item_ref.clone(), *required),
+        );
+
+        Ok(path_parameters
+            .chain(query_parameters)
+            .chain(header_parameters))
     }
 }
 
@@ -187,19 +227,21 @@ impl Endpoint<Ref> {
             endpoint_documentation,
             operation_documentation,
             verb,
-            parameters,
             operation_id,
             request_body,
             response,
+            query_parameters,
+            path_parameters,
+            headers,
         } = self;
 
-        let parameters = parameters
+        let headers = headers
             .into_iter()
-            .map(|(pkey, param)| Ok((pkey, param.resolve_refs(&resolver)?)))
+            .map(|(name, param)| Ok((name, param.resolve_refs(&resolver)?)))
             .collect::<Result<_, _>>()?;
-        let request_body = request_body
-            .map(|request_body_ref| resolver(&request_body_ref))
-            .transpose()?;
+        let path_parameters = path_parameters.as_ref().map(&resolver).transpose()?;
+        let query_parameters = query_parameters.as_ref().map(&resolver).transpose()?;
+        let request_body = request_body.as_ref().map(&resolver).transpose()?;
         let response = resolver(&response)?;
 
         Ok(Endpoint {
@@ -207,10 +249,12 @@ impl Endpoint<Ref> {
             endpoint_documentation,
             operation_documentation,
             verb,
-            parameters,
             operation_id,
             request_body,
             response,
+            headers,
+            path_parameters,
+            query_parameters,
         })
     }
 }
@@ -221,6 +265,7 @@ impl Endpoint {
     /// The name resolver should be able to efficiently extract item names from references.
     pub fn emit<'a>(
         &self,
+        api_model: &ApiModel,
         name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
     ) -> Result<TokenStream, UnknownReference> {
         let docs = self.doc_string();
@@ -229,11 +274,10 @@ impl Endpoint {
         let function_name = make_ident(&self.function_name(None));
 
         let parameters = self
-            .function_parameters()
+            .function_parameters(api_model)?
             .map(|(name, ref_, required)| {
                 let param_name = make_ident(&name);
-                let type_name = make_ident(name_resolver(ref_)?);
-                let mut type_name = quote!(#type_name);
+                let mut type_name = api_model.definition(ref_, &name_resolver)?;
                 if !required {
                     type_name = quote!(Option< #type_name >);
                 }
@@ -244,14 +288,13 @@ impl Endpoint {
         let request_body = self
             .request_body
             .map(|ref_| {
-                let type_name = name_resolver(ref_)?;
-                let type_name = make_ident(type_name);
+                let type_name = api_model.definition(ref_, &name_resolver)?;
 
                 Ok(quote!(request_body: #type_name))
             })
             .transpose()?;
 
-        let response_body = make_ident(name_resolver(self.response)?);
+        let response_body = api_model.definition(self.response, name_resolver)?;
 
         Ok(quote! {
             #docs
@@ -282,6 +325,74 @@ fn make_operation_spec_name(
     }
 }
 
+/// Compute an appropriate name for this endpoint, but do not apply casing rules to it
+fn compute_uncased_item_name(
+    operation_id: Option<&str>,
+    verb: Verb,
+    path: &str,
+    suffix: Option<&str>,
+) -> String {
+    operation_id.map(ToOwned::to_owned).unwrap_or_else(|| {
+        let mut name = format!("{verb} {path}");
+        if let Some(suffix) = suffix {
+            name.push(' ');
+            name.push_str(suffix);
+        }
+        name
+    })
+}
+
+/// Make a parameter object
+fn make_param_object(
+    model: &mut ApiModel<Ref>,
+    param_type: &str,
+    uncased_item_name: &str,
+    params: Vec<Parameter<Ref>>,
+) -> Option<Ref> {
+    (!params.is_empty()).then(|| {
+        let members = params
+            .into_iter()
+            .map(|param| {
+                let Parameter {
+                    spec_name,
+                    required,
+                    item_ref,
+                    ..
+                } = param;
+                let mut member = ObjectMember::new(item_ref);
+                member.inline_option = !required;
+                (spec_name, member)
+            })
+            .collect();
+
+        let value = Object {
+            members,
+            is_generated_body_and_headers: false,
+        }
+        .into();
+
+        let mut rust_name = format!(
+            "{}{}Parameters",
+            uncased_item_name.to_upper_camel_case(),
+            param_type.to_upper_camel_case()
+        );
+        model.deconflict_ident(&mut rust_name);
+
+        let item = Item {
+            docs: Some(format!(
+                "Combination item for {param_type} parameters of `{uncased_item_name}`"
+            )),
+            rust_name,
+            value,
+            ..Default::default()
+        };
+
+        model
+            .add_item(item, None)
+            .expect("`add_item` cannot fail with `None` reference_name")
+    })
+}
+
 /// Iterate over the OpenApi specification, constructing endpoints anad inserting each into the model.
 pub(crate) fn insert_endpoints(spec: &OpenAPI, model: &mut ApiModel<Ref>) -> Result<(), Error> {
     for (path, path_item) in path_items(spec) {
@@ -301,63 +412,83 @@ pub(crate) fn insert_endpoints(spec: &OpenAPI, model: &mut ApiModel<Ref>) -> Res
                 .or(operation.summary.as_deref())
                 .map(ToOwned::to_owned);
 
-            let parameters = {
-                // we need to ensure that when at least one response variant has the same response code and more than one
-                // content type, the generated function includes the "Accept" header. This may or may not appear in the
-                // spec, so we ensure it appears first in the parameter list. After that point, if it does appear in the user spec,
-                // we can trust `IndexMap`'s update implementation to ensure it remains first in the emitted list.
-                let accept_header =
-                    response::has_responses_distinguished_only_by_content_type(spec, operation)
-                        .then(|| {
-                            let format = openapiv3::ParameterSchemaOrContent::Schema(
-                                openapiv3::ReferenceOr::Item(openapiv3::Schema {
-                                    schema_kind: openapiv3::SchemaKind::Type(
-                                        openapiv3::Type::String(openapiv3::StringType {
-                                            format: openapiv3::VariantOrUnknownOrEmpty::Unknown(
-                                                "accept-header".into(),
-                                            ),
-                                            ..Default::default()
-                                        }),
-                                    ),
-                                    schema_data: Default::default(),
-                                }),
-                            );
+            // we need to ensure that when at least one response variant has the same response code and more than one
+            // content type, the generated function includes the "Accept" header. This may or may not appear in the
+            // spec, so we ensure it appears first in the parameter list. After that point, if it does appear in the user spec,
+            // we can trust `IndexMap`'s update implementation to ensure it remains first in the emitted list.
+            let accept_header = response::has_responses_distinguished_only_by_content_type(
+                spec, operation,
+            )
+            .then(|| {
+                let format = openapiv3::ParameterSchemaOrContent::Schema(
+                    openapiv3::ReferenceOr::Item(openapiv3::Schema {
+                        schema_kind: openapiv3::SchemaKind::Type(openapiv3::Type::String(
+                            openapiv3::StringType {
+                                format: openapiv3::VariantOrUnknownOrEmpty::Unknown(
+                                    "accept-header".into(),
+                                ),
+                                ..Default::default()
+                            },
+                        )),
+                        schema_data: Default::default(),
+                    }),
+                );
 
-                            let parameter = openapiv3::Parameter::Header {
-                                parameter_data: openapiv3::ParameterData {
-                                    name: "accept".into(),
-                                    description: Some(
-                                        "The content type expected by the client".into(),
-                                    ),
-                                    required: false,
-                                    format,
-                                    deprecated: Default::default(),
-                                    example: Default::default(),
-                                    examples: Default::default(),
-                                    explode: Default::default(),
-                                    extensions: Default::default(),
-                                },
-                                style: Default::default(),
-                            };
+                let parameter = openapiv3::Parameter::Header {
+                    parameter_data: openapiv3::ParameterData {
+                        name: "accept".into(),
+                        description: Some("The content type expected by the client".into()),
+                        required: false,
+                        format,
+                        deprecated: Default::default(),
+                        example: Default::default(),
+                        examples: Default::default(),
+                        explode: Default::default(),
+                        extensions: Default::default(),
+                    },
+                    style: Default::default(),
+                };
 
-                            openapiv3::ReferenceOr::Item(parameter)
-                        });
-                let accept_header = accept_header.iter();
+                openapiv3::ReferenceOr::Item(parameter)
+            });
+            let accept_header = accept_header.iter();
 
-                // first real params are the path item parameters
-                let path_item_params = path_item.parameters.iter();
+            // first real params are the path item parameters
+            let path_item_params = path_item.parameters.iter();
 
-                // update with the operation parameters
-                let operation_params = operation.parameters.iter();
+            // update with the operation parameters
+            let operation_params = operation.parameters.iter();
 
-                // `IndexMap::from_iter` uses the same logic as its `extend`,
-                // which lets subsequent items override earlier items.
-                accept_header
-                    .chain(path_item_params)
-                    .chain(operation_params)
-                    .map(|param_ref| convert_param_ref(spec, model, param_ref))
-                    .collect::<Result<_, _>>()?
-            };
+            let mut path_parameters = Vec::new();
+            let mut query_parameters = Vec::new();
+            let mut headers = IndexMap::new();
+
+            // `IndexMap::from_iter` uses the same logic as its `extend`,
+            // which lets subsequent items override earlier items.
+            for maybe_param in accept_header
+                .chain(path_item_params)
+                .chain(operation_params)
+                .map(|param_ref| convert_param_ref(spec, model, param_ref))
+            {
+                let param = maybe_param?;
+                match param.location {
+                    ParameterLocation::Path => path_parameters.push(param),
+                    ParameterLocation::Query => query_parameters.push(param),
+                    ParameterLocation::Header => {
+                        headers.insert(param.rust_name.clone(), param);
+                    }
+                    ParameterLocation::Cookie => return Err(Error::CookesAreNotSupported),
+                }
+            }
+
+            let uncased_item_name =
+                compute_uncased_item_name(operation.operation_id.as_deref(), verb, path, None);
+
+            let path_parameters =
+                make_param_object(model, "path", &uncased_item_name, path_parameters);
+
+            let query_parameters =
+                make_param_object(model, "query", &uncased_item_name, query_parameters);
 
             let operation_id = operation.operation_id.clone();
 
@@ -387,7 +518,9 @@ pub(crate) fn insert_endpoints(spec: &OpenAPI, model: &mut ApiModel<Ref>) -> Res
                 endpoint_documentation,
                 operation_documentation,
                 verb,
-                parameters,
+                headers,
+                path_parameters,
+                query_parameters,
                 operation_id,
                 request_body,
                 response,
@@ -413,4 +546,6 @@ pub enum Error {
     CreateRequestBody(#[source] anyhow::Error),
     #[error("could not create from supplied response")]
     CreateResponse(#[source] anyhow::Error),
+    #[error("cookies are not supported")]
+    CookesAreNotSupported,
 }

@@ -1,4 +1,5 @@
 #![allow(non_camel_case_types)]
+///an identifier for an item
 #[derive(
     Debug,
     Clone,
@@ -11,72 +12,89 @@
     openapi_gen::reexport::derive_more::Constructor
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
-pub struct IdentificationId(pub openapi_gen::reexport::uuid::Uuid);
+pub struct Id(pub openapi_gen::reexport::uuid::Uuid);
+openapi_gen::newtype_derive_canonical_form!(Id, openapi_gen::reexport::uuid::Uuid);
+
+/// An item's status
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde_enum_str::Serialize_enum_str,
+    openapi_gen::reexport::serde_enum_str::Deserialize_enum_str,
+    Eq,
+    Hash
+)]
+#[serde(crate = "openapi_gen::reexport::serde")]
+pub enum Status {
+    #[serde(rename = "ONE")]
+    One,
+    #[serde(rename = "TWO")]
+    Two,
+    #[serde(rename = "THREE")]
+    Three,
+    #[serde(other)]
+    Other(String),
+}
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde::Serialize,
+    openapi_gen::reexport::serde::Deserialize,
+    Eq,
+    Hash,
+    openapi_gen::reexport::derive_more::Constructor
+)]
+#[serde(crate = "openapi_gen::reexport::serde")]
+pub struct Item {
+    ///an identifier for an item
+    pub id: Id,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub foo: Option<String>,
+
+    /// An item's status
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<Status>,
+}
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde::Serialize,
+    openapi_gen::reexport::serde::Deserialize,
+    Copy,
+    Eq,
+    Hash,
+    openapi_gen::reexport::derive_more::Constructor
+)]
+#[serde(crate = "openapi_gen::reexport::serde")]
+pub struct XRequestId(pub openapi_gen::reexport::uuid::Uuid);
 openapi_gen::newtype_derive_canonical_form!(
-    IdentificationId, openapi_gen::reexport::uuid::Uuid
+    XRequestId, openapi_gen::reexport::uuid::Uuid
 );
+///Combination item for query parameters of `getList`
 #[derive(
     Debug,
     Clone,
     PartialEq,
     openapi_gen::reexport::serde::Serialize,
     openapi_gen::reexport::serde::Deserialize,
-    Copy,
     Eq,
     Hash,
     openapi_gen::reexport::derive_more::Constructor
 )]
 #[serde(crate = "openapi_gen::reexport::serde")]
-pub struct PersonId(pub openapi_gen::reexport::uuid::Uuid);
-openapi_gen::newtype_derive_canonical_form!(PersonId, openapi_gen::reexport::uuid::Uuid);
-pub type AdditionalInformation = Vec<String>;
-type Id = IdentificationId;
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    openapi_gen::reexport::serde::Serialize,
-    openapi_gen::reexport::serde::Deserialize,
-    Copy,
-    Eq,
-    Hash,
-    openapi_gen::reexport::derive_more::Constructor
-)]
-#[serde(crate = "openapi_gen::reexport::serde")]
-pub struct NaturalPersonIdentification {
-    #[serde(skip_deserializing, skip_serializing_if = "Option::is_none")]
+pub struct GetListQueryParameters {
+
+    /// An item's status
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<Status>,
+    ///an identifier for an item
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<Id>,
-    pub person_id: PersonId,
 }
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    openapi_gen::reexport::serde::Serialize,
-    openapi_gen::reexport::serde::Deserialize,
-    Eq,
-    Hash,
-    openapi_gen::reexport::derive_more::Constructor
-)]
-#[serde(crate = "openapi_gen::reexport::serde")]
-pub struct Location(pub String);
-openapi_gen::newtype_derive_canonical_form!(Location, String);
-pub type CreateNaturalPersonIdentificationRequest = NaturalPersonIdentification;
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    openapi_gen::reexport::serde::Serialize,
-    openapi_gen::reexport::serde::Deserialize,
-    Eq,
-    Hash,
-    openapi_gen::reexport::derive_more::Constructor
-)]
-#[serde(crate = "openapi_gen::reexport::serde")]
-pub struct CreateNaturalPersonIdentificationResponseCreated {
-    pub location: Location,
-    pub body: NaturalPersonIdentification,
-}
+type Ok_ = Vec<Item>;
 #[derive(
     Debug,
     Clone,
@@ -86,25 +104,32 @@ pub struct CreateNaturalPersonIdentificationResponseCreated {
     Eq
 )]
 #[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
-pub enum CreateNaturalPersonIdentificationResponse {
-    Created(CreateNaturalPersonIdentificationResponseCreated),
+pub enum GetListResponse {
+    #[serde(rename = "OK")]
+    Ok(Ok_),
     Default(openapi_gen::reexport::http_api_problem::HttpApiProblem),
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
 
-    /// `POST /natural-persons`
+    /// Get a list of natural person identifications.
     /// 
-    /// Operation ID: `createNaturalPersonIdentification`
-    async fn create_natural_person_identification(
+    /// ## Endpoint Data
+    /// 
+    /// `GET /list`
+    /// 
+    /// Operation ID: `getList`
+    async fn get_list(
         &self,
-        request_body: CreateNaturalPersonIdentificationRequest,
-    ) -> CreateNaturalPersonIdentificationResponse;
+        status: Option<Status>,
+        id: Option<Id>,
+        x_request_id: Option<XRequestId>,
+    ) -> GetListResponse;
 }
-impl openapi_gen::reexport::headers::Header for Location {
+impl openapi_gen::reexport::headers::Header for XRequestId {
     fn name() -> &'static openapi_gen::reexport::headers::HeaderName {
         static NAME: openapi_gen::reexport::headers::HeaderName = openapi_gen::reexport::headers::HeaderName::from_static(
-            "location",
+            "x-request-id",
         );
         &NAME
     }
@@ -135,33 +160,28 @@ impl openapi_gen::reexport::headers::Header for Location {
         values.extend(::std::iter::once(header_value));
     }
 }
-impl openapi_gen::reexport::axum::response::IntoResponse
-for CreateNaturalPersonIdentificationResponse {
+impl openapi_gen::reexport::axum::response::IntoResponse for GetListResponse {
     fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
         match self {
-            CreateNaturalPersonIdentificationResponse::Created(created) => {
-                let CreateNaturalPersonIdentificationResponseCreated {
-                    location,
-                    body,
-                } = created;
+            GetListResponse::Ok(ok) => {
                 let mut header_map = openapi_gen::reexport::http::header::HeaderMap::with_capacity(
                     1usize,
                 );
                 header_map
                     .insert(
-                        openapi_gen::reexport::http::header::HeaderName::from_static(
-                            "location",
+                        openapi_gen::reexport::http::header::CONTENT_TYPE,
+                        openapi_gen::reexport::http::HeaderValue::from_static(
+                            "application/json",
                         ),
-                        openapi_gen::header_value_of!(& location),
                     );
                 (
-                    openapi_gen::reexport::http::status::StatusCode::CREATED,
+                    openapi_gen::reexport::http::status::StatusCode::OK,
                     header_map,
-                    openapi_gen::reexport::axum::Json(body),
+                    openapi_gen::reexport::axum::Json(ok),
                 )
                     .into_response()
             }
-            CreateNaturalPersonIdentificationResponse::Default(default) => {
+            GetListResponse::Default(default) => {
                 openapi_gen::axum_compat::default_response(default)
             }
         }
@@ -176,17 +196,21 @@ where
     let instance = ::std::sync::Arc::new(instance);
     openapi_gen::reexport::axum::Router::new()
         .route(
-            "/natural-persons",
-            openapi_gen::reexport::axum::routing::post({
+            "/list",
+            openapi_gen::reexport::axum::routing::get({
                 let instance = instance.clone();
                 move |
-                    openapi_gen::reexport::axum::extract::Json(
-                        request_body,
-                    ): openapi_gen::reexport::axum::extract::Json<
-                        CreateNaturalPersonIdentificationRequest,
+                    openapi_gen::reexport::axum::extract::Query(
+                        GetListQueryParameters { status, id },
+                    ): openapi_gen::reexport::axum::extract::Query<
+                        GetListQueryParameters,
+                    >,
+                    x_request_id: Option<
+                        openapi_gen::reexport::axum::extract::TypedHeader<XRequestId>,
                     >|
                 async move {
-                    instance.create_natural_person_identification(request_body).await
+                    let x_request_id = x_request_id.map(|x_request_id| x_request_id.0);
+                    instance.get_list(status, id, x_request_id).await
                 }
             }),
         )

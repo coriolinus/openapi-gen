@@ -79,7 +79,7 @@ pub(crate) fn create_header(
     };
 
     // simpler to edit the newly-created item than to add this param to all code paths for creating an item
-    if let Some(item) = model.resolve_mut(&ref_) {
+    if let Ok(item) = model.resolve_mut(&ref_) {
         item.impl_header = true;
     }
 

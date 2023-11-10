@@ -5,7 +5,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::{
-    codegen::{endpoint::parameter::ParameterLocation, make_ident, Endpoint, UnknownReference},
+    codegen::{make_ident, Endpoint, Reference, UnknownReference},
     ApiModel,
 };
 
@@ -17,7 +17,7 @@ use super::Error;
 /// # // we ignore this test because this is a private function in a private module; the test runner does not have visibility
 /// # use openapi_gen::axum_compat::build_router::to_colon_path;
 /// assert_eq!(
-///     to_colon_path("/users/{id}"),
+///     to_colon_path("/users/{id}").unwrap(),
 ///     "/users/:id",
 /// );
 /// ```
@@ -47,10 +47,18 @@ fn to_colon_path(curly_bracket_path: &str) -> Result<String, Error> {
         }
     }
 
+    if out.is_empty() {
+        out.push('/');
+    }
+
     Ok(out)
 }
 
-fn build_route(model: &ApiModel, endpoint: &Endpoint) -> Result<TokenStream, Error> {
+fn build_route<'a>(
+    model: &ApiModel,
+    name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+    endpoint: &Endpoint,
+) -> Result<TokenStream, Error> {
     let path = to_colon_path(&endpoint.path)?;
     let verb = endpoint.verb.emit_axum();
     let prefix = quote!(openapi_gen::reexport::axum::extract);
@@ -59,32 +67,81 @@ fn build_route(model: &ApiModel, endpoint: &Endpoint) -> Result<TokenStream, Err
     let mut parameter_idents = Vec::new();
     let mut optional_parameter_map = Vec::new();
 
-    for (key, param) in endpoint.parameters.iter() {
+    // extractors work from the first-encountered to the last:
+    //   1. path parameters
+    //   2. query parameters
+    //   3. header parameters
+    //   4. body
+
+    if let Some((ref_, _item, object)) =
+        endpoint
+            .path_parameter_object(model)
+            .map_err(Error::context(
+                "attempting to extract path parameter object",
+            ))?
+    {
+        let extractor = quote!(#prefix::Path);
+
+        let type_ident = model
+            .definition(ref_, &name_resolver)
+            .map_err(Error::context(
+                "getting type ident of path parameter object",
+            ))?;
+        let field_names = object
+            .members
+            .keys()
+            .map(|name| make_ident(&name.to_snake_case()))
+            .collect::<Vec<_>>();
+
+        let binding = quote!(#extractor(#type_ident{ #( #field_names ),* }));
+        let bind_type = quote!(#extractor<#type_ident>);
+
+        parameters.push(quote!(#binding: #bind_type));
+        parameter_idents.extend(field_names);
+    }
+
+    if let Some((ref_, _item, object)) =
+        endpoint
+            .query_parameter_object(model)
+            .map_err(Error::context(
+                "attempting to extract query parameter object",
+            ))?
+    {
+        let extractor = quote!(#prefix::Query);
+
+        let type_ident = model
+            .definition(ref_, &name_resolver)
+            .map_err(Error::context(
+                "getting type ident of query parameter object",
+            ))?;
+        let field_names = object
+            .members
+            .keys()
+            .map(|name| make_ident(&name.to_snake_case()))
+            .collect::<Vec<_>>();
+
+        let binding = quote!(#extractor(#type_ident{ #( #field_names ),* }));
+        let bind_type = quote!(#extractor<#type_ident>);
+
+        parameters.push(quote!(#binding: #bind_type));
+        parameter_idents.extend(field_names);
+    }
+
+    for (key, param) in endpoint.headers.iter() {
         let item = model
             .resolve(param.item_ref)
-            .ok_or_else(|| UnknownReference(format!("{:?}", param.item_ref)))
-            .map_err(Error::context(format!(
-                "getting item for param \"{}\"",
-                key.name
-            )))?;
+            .map_err(Error::context(format!("getting item for param \"{key}\"")))?;
 
-        let type_ident = make_ident(&item.rust_name);
+        let type_ident =
+            model
+                .definition(param.item_ref, &name_resolver)
+                .map_err(Error::context(format!(
+                    "getting type ident for {}",
+                    &item.rust_name
+                )))?;
         let variable_ident = make_ident(&item.rust_name.to_snake_case());
 
-        let extractor = match key.location {
-            Some(ParameterLocation::Header) => quote!(#prefix::TypedHeader),
-            Some(ParameterLocation::Path) => quote!(#prefix::Path),
-            Some(ParameterLocation::Query) => quote!(#prefix::Query),
-            Some(ParameterLocation::Cookie) => {
-                return Err(Error::new("cookie extractors not yet supported"))
-            }
-            None => {
-                return Err(Error::new(format!(
-                    "unknown parameter location for {}",
-                    item.rust_name
-                )))
-            }
-        };
+        let extractor = quote!(#prefix::TypedHeader);
 
         let (binding, bind_type) = if param.required {
             (
@@ -109,7 +166,6 @@ fn build_route(model: &ApiModel, endpoint: &Endpoint) -> Result<TokenStream, Err
         // add body parameter last
         let item = model
             .resolve(ref_)
-            .ok_or_else(|| UnknownReference(format!("{ref_:?}")))
             .map_err(Error::context("getting item for request body"))?;
 
         let type_ident = make_ident(&item.rust_name);
@@ -145,11 +201,14 @@ fn build_route(model: &ApiModel, endpoint: &Endpoint) -> Result<TokenStream, Err
 }
 
 /// Create `fn build_router`, which transforms an arbitrary `Api` instance into a `Router`.
-pub(crate) fn fn_build_router(model: &ApiModel) -> Result<TokenStream, Error> {
+pub(crate) fn fn_build_router<'a>(
+    model: &ApiModel,
+    name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
+) -> Result<TokenStream, Error> {
     let mut routes = Vec::<TokenStream>::new();
 
     for endpoint in model.endpoints.iter() {
-        let route = build_route(model, endpoint)?;
+        let route = build_route(model, &name_resolver, endpoint)?;
         routes.push(route);
     }
 
@@ -166,4 +225,21 @@ pub(crate) fn fn_build_router(model: &ApiModel) -> Result<TokenStream, Error> {
             #( #routes )*
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    mod to_colon_path {
+        use super::super::*;
+
+        #[test]
+        fn documentation_example() {
+            assert_eq!(to_colon_path("/users/{id}").unwrap(), "/users/:id");
+        }
+
+        #[test]
+        fn no_strip_bare_slash() {
+            assert_eq!(to_colon_path("/").unwrap(), "/");
+        }
+    }
 }

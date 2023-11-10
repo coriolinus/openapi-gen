@@ -13,8 +13,6 @@
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Id(pub openapi_gen::reexport::uuid::Uuid);
 openapi_gen::newtype_derive_canonical_form!(Id, openapi_gen::reexport::uuid::Uuid);
-type Foo = f64;
-type Bar = String;
 #[derive(
     Debug,
     Clone,
@@ -26,9 +24,25 @@ type Bar = String;
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct Thing {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub foo: Option<Foo>,
+    pub foo: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bar: Option<Bar>,
+    pub bar: Option<String>,
+}
+///Combination item for path parameters of `getThing`
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde::Serialize,
+    openapi_gen::reexport::serde::Deserialize,
+    Copy,
+    Eq,
+    Hash,
+    openapi_gen::reexport::derive_more::Constructor
+)]
+#[serde(crate = "openapi_gen::reexport::serde")]
+pub struct GetThingPathParameters {
+    pub id: Id,
 }
 #[derive(
     Debug,
@@ -41,6 +55,22 @@ pub struct Thing {
 pub enum GetThingResponse {
     #[serde(rename = "OK")]
     Ok(Thing),
+}
+///Combination item for path parameters of `putThing`
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde::Serialize,
+    openapi_gen::reexport::serde::Deserialize,
+    Copy,
+    Eq,
+    Hash,
+    openapi_gen::reexport::derive_more::Constructor
+)]
+#[serde(crate = "openapi_gen::reexport::serde")]
+pub struct PutThingPathParameters {
+    pub id: Id,
 }
 pub type PutThingRequest = Thing;
 #[derive(
@@ -108,8 +138,10 @@ where
                 let instance = instance.clone();
                 move |
                     openapi_gen::reexport::axum::extract::Path(
-                        id,
-                    ): openapi_gen::reexport::axum::extract::Path<Id>|
+                        GetThingPathParameters { id },
+                    ): openapi_gen::reexport::axum::extract::Path<
+                        GetThingPathParameters,
+                    >|
                 async move { instance.get_thing(id).await }
             }),
         )
@@ -119,8 +151,10 @@ where
                 let instance = instance.clone();
                 move |
                     openapi_gen::reexport::axum::extract::Path(
-                        id,
-                    ): openapi_gen::reexport::axum::extract::Path<Id>,
+                        PutThingPathParameters { id },
+                    ): openapi_gen::reexport::axum::extract::Path<
+                        PutThingPathParameters,
+                    >,
                     openapi_gen::reexport::axum::extract::Json(
                         request_body,
                     ): openapi_gen::reexport::axum::extract::Json<PutThingRequest>|

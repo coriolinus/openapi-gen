@@ -36,10 +36,30 @@ pub struct DocumentId(pub openapi_gen::reexport::uuid::Uuid);
 openapi_gen::newtype_derive_canonical_form!(
     DocumentId, openapi_gen::reexport::uuid::Uuid
 );
-type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
-type Accept = openapi_gen::reexport::accept_header::Accept;
-///document data encoded as base64
-type Data = openapi_gen::Bytes;
+///Combination item for path parameters of `getNpIdentityDocumentData`
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde::Serialize,
+    openapi_gen::reexport::serde::Deserialize,
+    Copy,
+    Eq,
+    Hash,
+    openapi_gen::reexport::derive_more::Constructor
+)]
+#[serde(crate = "openapi_gen::reexport::serde")]
+pub struct GetNpIdentityDocumentDataPathParameters {
+    ///an identifier for this particular identification process
+    #[serde(rename = "identification-id")]
+    pub identification_id: IdentificationId,
+
+    /// An identifier for a document within the context of the identification service.
+    /// 
+    /// This is _not_ associated with the documents service in any way.
+    #[serde(rename = "document-id")]
+    pub document_id: DocumentId,
+}
 #[derive(
     Debug,
     Clone,
@@ -54,11 +74,8 @@ type Data = openapi_gen::Bytes;
 pub struct OkApplicationJson {
     ///document data encoded as base64
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<Data>,
+    pub data: Option<openapi_gen::Bytes>,
 }
-///raw document data
-type Ok_ = Vec<u8>;
-type NotAcceptable = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 #[derive(
     Debug,
     Clone,
@@ -72,10 +89,10 @@ pub enum GetNpIdentityDocumentDataResponse {
     #[serde(rename = "OK application/json")]
     OkApplicationJson(OkApplicationJson),
     #[serde(rename = "OK *")]
-    Ok(Ok_),
+    Ok(Vec<u8>),
     #[serde(rename = "Not Acceptable")]
-    NotAcceptable(NotAcceptable),
-    Default(Default_),
+    NotAcceptable(openapi_gen::reexport::http_api_problem::HttpApiProblem),
+    Default(openapi_gen::reexport::http_api_problem::HttpApiProblem),
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
@@ -93,9 +110,9 @@ pub trait Api {
     /// Operation ID: `getNpIdentityDocumentData`
     async fn get_np_identity_document_data(
         &self,
-        accept: Option<Accept>,
         identification_id: IdentificationId,
         document_id: DocumentId,
+        accept: Option<openapi_gen::reexport::accept_header::Accept>,
     ) -> GetNpIdentityDocumentDataResponse;
 }
 impl openapi_gen::reexport::axum::response::IntoResponse
@@ -160,22 +177,26 @@ where
             openapi_gen::reexport::axum::routing::get({
                 let instance = instance.clone();
                 move |
-                    accept: Option<
-                        openapi_gen::reexport::axum::extract::TypedHeader<Accept>,
+                    openapi_gen::reexport::axum::extract::Path(
+                        GetNpIdentityDocumentDataPathParameters {
+                            identification_id,
+                            document_id,
+                        },
+                    ): openapi_gen::reexport::axum::extract::Path<
+                        GetNpIdentityDocumentDataPathParameters,
                     >,
-                    openapi_gen::reexport::axum::extract::Path(
-                        identification_id,
-                    ): openapi_gen::reexport::axum::extract::Path<IdentificationId>,
-                    openapi_gen::reexport::axum::extract::Path(
-                        document_id,
-                    ): openapi_gen::reexport::axum::extract::Path<DocumentId>|
+                    accept: Option<
+                        openapi_gen::reexport::axum::extract::TypedHeader<
+                            openapi_gen::reexport::accept_header::Accept,
+                        >,
+                    >|
                 async move {
                     let accept = accept.map(|accept| accept.0);
                     instance
                         .get_np_identity_document_data(
-                            accept,
                             identification_id,
                             document_id,
+                            accept,
                         )
                         .await
                 }

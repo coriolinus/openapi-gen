@@ -1,34 +1,54 @@
 #![allow(non_camel_case_types)]
-pub type RenderError = openapi_gen::reexport::serde_json::Value;
+///Combination item for query parameters of `getRoot`
 #[derive(
     Debug,
     Clone,
     PartialEq,
     openapi_gen::reexport::serde::Serialize,
-    openapi_gen::reexport::serde::Deserialize
+    openapi_gen::reexport::serde::Deserialize,
+    Eq,
+    Hash,
+    openapi_gen::reexport::derive_more::Constructor
+)]
+#[serde(crate = "openapi_gen::reexport::serde")]
+pub struct GetRootQueryParameters {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bar: Option<u64>,
+    pub bat: openapi_gen::reexport::uuid::Uuid,
+    #[serde(rename = "camelCaseName")]
+    pub camel_case_name: String,
+}
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    openapi_gen::reexport::serde::Serialize,
+    openapi_gen::reexport::serde::Deserialize,
+    Eq
 )]
 #[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
-pub enum RenderPdfResponse {
+pub enum GetRootResponse {
     #[serde(rename = "OK")]
     Ok(Vec<u8>),
-    #[serde(rename = "Bad Request")]
-    BadRequest(RenderError),
-    #[serde(rename = "Service Unavailable")]
-    ServiceUnavailable(openapi_gen::reexport::http_api_problem::HttpApiProblem),
     Default(openapi_gen::reexport::http_api_problem::HttpApiProblem),
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {
 
-    /// `POST /render`
+    /// `GET /`
     /// 
-    /// Operation ID: `renderPdf`
-    async fn render_pdf(&self) -> RenderPdfResponse;
+    /// Operation ID: `getRoot`
+    async fn get_root(
+        &self,
+        bar: Option<u64>,
+        bat: openapi_gen::reexport::uuid::Uuid,
+        camel_case_name: String,
+    ) -> GetRootResponse;
 }
-impl openapi_gen::reexport::axum::response::IntoResponse for RenderPdfResponse {
+impl openapi_gen::reexport::axum::response::IntoResponse for GetRootResponse {
     fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
         match self {
-            RenderPdfResponse::Ok(ok) => {
+            GetRootResponse::Ok(ok) => {
                 let mut header_map = openapi_gen::reexport::http::header::HeaderMap::with_capacity(
                     1usize,
                 );
@@ -36,27 +56,13 @@ impl openapi_gen::reexport::axum::response::IntoResponse for RenderPdfResponse {
                     .insert(
                         openapi_gen::reexport::http::header::CONTENT_TYPE,
                         openapi_gen::reexport::http::HeaderValue::from_static(
-                            "application/pdf",
+                            "application/octet-stream",
                         ),
                     );
                 (openapi_gen::reexport::http::status::StatusCode::OK, header_map, ok)
                     .into_response()
             }
-            RenderPdfResponse::BadRequest(bad_request) => {
-                (
-                    openapi_gen::reexport::http::status::StatusCode::BAD_REQUEST,
-                    openapi_gen::reexport::axum::Json(bad_request),
-                )
-                    .into_response()
-            }
-            RenderPdfResponse::ServiceUnavailable(service_unavailable) => {
-                (
-                    openapi_gen::reexport::http::status::StatusCode::SERVICE_UNAVAILABLE,
-                    openapi_gen::reexport::axum::Json(service_unavailable),
-                )
-                    .into_response()
-            }
-            RenderPdfResponse::Default(default) => {
+            GetRootResponse::Default(default) => {
                 openapi_gen::axum_compat::default_response(default)
             }
         }
@@ -71,10 +77,16 @@ where
     let instance = ::std::sync::Arc::new(instance);
     openapi_gen::reexport::axum::Router::new()
         .route(
-            "/render",
-            openapi_gen::reexport::axum::routing::post({
+            "/",
+            openapi_gen::reexport::axum::routing::get({
                 let instance = instance.clone();
-                move || async move { instance.render_pdf().await }
+                move |
+                    openapi_gen::reexport::axum::extract::Query(
+                        GetRootQueryParameters { bar, bat, camel_case_name },
+                    ): openapi_gen::reexport::axum::extract::Query<
+                        GetRootQueryParameters,
+                    >|
+                async move { instance.get_root(bar, bat, camel_case_name).await }
             }),
         )
 }

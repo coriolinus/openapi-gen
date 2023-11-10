@@ -2,7 +2,6 @@
 pub type JsonType = openapi_gen::reexport::serde_json::Value;
 pub type FormType = openapi_gen::reexport::serde_json::Value;
 pub type ReqType = openapi_gen::reexport::serde_json::Value;
-type Default_ = openapi_gen::reexport::http_api_problem::HttpApiProblem;
 pub type ApplicationJson = JsonType;
 pub type MultipartFormValue = openapi_gen::reexport::serde_json::Value;
 #[derive(
@@ -27,7 +26,7 @@ pub enum MultiRequestsRequest {
 )]
 #[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum MultiRequestsResponse {
-    Default(Default_),
+    Default(openapi_gen::reexport::http_api_problem::HttpApiProblem),
 }
 ///request body is optional
 pub type OptionalRequestBodyRequest = Option<JsonType>;
@@ -41,7 +40,7 @@ pub type OptionalRequestBodyRequest = Option<JsonType>;
 )]
 #[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum OptionalRequestBodyResponse {
-    Default(Default_),
+    Default(openapi_gen::reexport::http_api_problem::HttpApiProblem),
 }
 pub type SameRequestRequest = ReqType;
 #[derive(
@@ -54,7 +53,7 @@ pub type SameRequestRequest = ReqType;
 )]
 #[serde(crate = "openapi_gen::reexport::serde", tag = "status")]
 pub enum SameRequestResponse {
-    Default(Default_),
+    Default(openapi_gen::reexport::http_api_problem::HttpApiProblem),
 }
 #[openapi_gen::reexport::async_trait::async_trait]
 pub trait Api {

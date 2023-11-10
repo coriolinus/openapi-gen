@@ -1,8 +1,5 @@
 use crate::{
-    codegen::{
-        api_model::{AsBackref, Ref, Reference, UnknownReference},
-        make_ident,
-    },
+    codegen::api_model::{AsBackref, Ref, Reference, UnknownReference},
     ApiModel,
 };
 
@@ -76,15 +73,12 @@ impl Map<Ref> {
 impl Map {
     pub fn emit_definition<'a>(
         &self,
+        model: &ApiModel,
         name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,
     ) -> Result<TokenStream, UnknownReference> {
         let value_referent = self
             .value_type
-            .map(|reference| {
-                let item_name = name_resolver(reference)?;
-                let ident = make_ident(item_name);
-                Ok(quote!(#ident))
-            })
+            .map(|reference| model.definition(reference, name_resolver))
             .transpose()?
             .unwrap_or(quote!(openapi_gen::reexport::serde_json::Value));
         Ok(quote!(std::collections::HashMap<String, #value_referent>))

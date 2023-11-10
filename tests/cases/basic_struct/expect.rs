@@ -1,7 +1,4 @@
 #![allow(non_camel_case_types)]
-///unsigned integer
-type Foo = u64;
-type Bar = String;
 ///this object is defined separately, intended to be used within a reference
 #[derive(
     Debug,
@@ -16,18 +13,10 @@ type Bar = String;
 #[serde(crate = "openapi_gen::reexport::serde")]
 pub struct InnerStruct {
     ///unsigned integer
-    pub foo: Foo,
+    pub foo: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bar: Option<Bar>,
+    pub bar: Option<String>,
 }
-
-/// even given compatible names and types, distinct inline types are distinguished.
-/// the software makes no attempt to unify the types, because that would violate the
-/// principle of least surprise.
-/// 
-/// for type unification, use a reference.
-type DefinedInlineFoo = u64;
-type Bat = i64;
 ///this object is defined inline within `OuterStruct`
 #[derive(
     Debug,
@@ -48,8 +37,8 @@ pub struct DefinedInline {
     /// principle of least surprise.
     /// 
     /// for type unification, use a reference.
-    pub foo: DefinedInlineFoo,
-    pub bat: Bat,
+    pub foo: u64,
+    pub bat: i64,
 }
 #[derive(
     Debug,

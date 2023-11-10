@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::{
     axum_compat::Error,
-    codegen::{make_ident, value::object::BODY_IDENT, Object, Reference, UnknownReference, Value},
+    codegen::{make_ident, value::object::BODY_IDENT, Object, Reference, Value},
     ApiModel, AsStatusCode,
 };
 
@@ -65,12 +65,10 @@ fn impl_into_response_for_response_type(
     status_code: Option<http::StatusCode>,
 ) -> Result<TokenStream, Error> {
     let item = model
-        .resolve(*response)
-        .ok_or_else(|| {
-            UnknownReference(format!(
-                "response variant reference: {response:?} ({response_name})"
-            ))
-        })
+        .resolve(response)
+        .map_err(Error::context(format!(
+            "response variant reference: {response:?} ({response_name})"
+        )))
         .map_err(Error::context("getting response variant item"))?;
 
     let response_ident = make_ident(response_name);
@@ -202,15 +200,18 @@ pub(crate) fn impl_into_response(
 ) -> Result<TokenStream, Error> {
     let item = model
         .resolve(*response_enum)
-        .ok_or_else(|| UnknownReference(format!("response reference: {response_enum:?}")))
         .map_err(Error::context("getting response item"))?;
 
     let response_name = &item.rust_name;
     let response_ident = make_ident(response_name);
 
     let Value::OneOfEnum(oo_enum) = &item.value else {
-        let err = Error::new(format!("response reference: {response_enum:?} ({response_name})"));
-        return Err(Error::context("expected response variant to be OneOfEnum")(err));
+        let err = Error::new(format!(
+            "response reference: {response_enum:?} ({response_name})"
+        ));
+        return Err(Error::context("expected response variant to be OneOfEnum")(
+            err,
+        ));
     };
 
     let mut branches = Vec::new();
