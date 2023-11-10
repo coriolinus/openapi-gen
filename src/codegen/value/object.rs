@@ -76,15 +76,15 @@ impl ObjectMember {
 
         let serde_as = item
             .and_then(|item| item.use_display_from_str(model))
-            .map(|dfs| {
-                let dfs = if self.inline_option {
-                    quote!(Option<#dfs>)
+            .map(|annotation| {
+                let annotation = if self.inline_option {
+                    quote!(Option<#annotation>)
                 } else {
-                    dfs
+                    annotation
                 };
 
-                let dfs = dfs.to_string();
-                quote!(#[serde_as(as = #dfs)])
+                let annotation = annotation.to_string().replace(' ', "");
+                quote!(#[serde_as(as = #annotation)])
             });
 
         let mut serde_attributes = Vec::new();

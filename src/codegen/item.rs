@@ -410,7 +410,7 @@ impl Item {
         let serde_as = self
             .value
             .use_serde_as_annotation(model)
-            .then(|| quote!(#[openapi_gen::reexport::serde_with::serde_as]));
+            .then(|| quote!(#[openapi_gen::reexport::serde_with::serde_as(crate = "openapi_gen::reexport::serde_with")]));
 
         let derives = (!self.is_typedef())
             .then(|| self.derives(model))
