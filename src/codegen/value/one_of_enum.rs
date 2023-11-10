@@ -1,4 +1,4 @@
-use std::cell::OnceCell;
+use std::{cell::OnceCell, fmt};
 
 use crate::{
     codegen::{
@@ -125,10 +125,10 @@ impl<R> Default for OneOfEnum<R> {
 impl<R> OneOfEnum<R> {
     pub(crate) fn use_serde_as_annotation(&self, model: &ApiModel<R>) -> bool
     where
-        R: AsBackref,
+        R: AsBackref + fmt::Debug,
     {
         self.variants.iter().any(|variant| {
-            let Some(item) = model.resolve_as_backref(&variant.definition) else {
+            let Ok(item) = model.resolve(&variant.definition) else {
                 return false;
             };
             item.value.use_display_from_str(model)

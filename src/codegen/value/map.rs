@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::{
     codegen::api_model::{AsBackref, Ref, Reference, UnknownReference},
     ApiModel,
@@ -18,12 +20,12 @@ pub struct Map<Ref = Reference> {
 impl<R> Map<R> {
     pub(crate) fn use_serde_as_annotation(&self, model: &ApiModel<R>) -> bool
     where
-        R: AsBackref,
+        R: AsBackref + fmt::Debug,
     {
         self.value_type
             .as_ref()
             .map(|value_type_ref| {
-                let Some(item) = model.resolve_as_backref(value_type_ref) else {
+                let Ok(item) = model.resolve(value_type_ref) else {
                     return false;
                 };
                 item.value.use_display_from_str(model)

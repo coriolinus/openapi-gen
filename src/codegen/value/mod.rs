@@ -315,7 +315,7 @@ impl<R> Value<R> {
 
     pub(crate) fn use_serde_as_annotation(&self, model: &ApiModel<R>) -> bool
     where
-        R: AsBackref,
+        R: AsBackref + fmt::Debug,
     {
         match self {
             Value::StringEnum(_) | Value::Scalar(_) => false,
@@ -325,7 +325,7 @@ impl<R> Value<R> {
             Value::Object(object) => object.use_serde_as_annotation(model),
             Value::Map(map) => map.use_serde_as_annotation(model),
             Value::Ref(ref_) | Value::PropertyOverride(PropertyOverride { ref_, .. }) => {
-                let Some(item) = model.resolve_as_backref(ref_) else {
+                let Ok(item) = model.resolve(ref_) else {
                     return false;
                 };
                 item.value.use_display_from_str(model)

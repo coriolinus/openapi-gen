@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::{
     codegen::api_model::{AsBackref, Ref, Reference, UnknownReference},
     ApiModel,
@@ -14,9 +16,9 @@ pub struct List<Ref = Reference> {
 impl<R> List<R> {
     pub(crate) fn use_serde_as_annotation(&self, model: &ApiModel<R>) -> bool
     where
-        R: AsBackref,
+        R: AsBackref + fmt::Debug,
     {
-        let Some(item) = model.resolve_as_backref(&self.item) else {
+        let Ok(item) = model.resolve(&self.item) else {
             return false;
         };
         item.value.use_display_from_str(model)
