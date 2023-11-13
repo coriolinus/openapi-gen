@@ -122,6 +122,20 @@ components:
         string_uuid:
           type: string
           format: uuid
+        string_mime:
+          type: string
+          format: mime
+        nullable_string_mime:
+          type: string
+          format: mime
+          nullable: true
+        optional_string_mime:
+          type: string
+          format: mime
+        optional_nullable_string_mime:
+          type: string
+          format: mime
+          nullable: true
         string_unrecognized:
           type: string
           format: unrecognized
@@ -157,4 +171,6 @@ components:
         - string_ipv4
         - string_ipv6
         - string_uuid
+        - string_mime
+        - nullable_string_mime
         - string_unrecognized

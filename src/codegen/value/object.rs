@@ -1,5 +1,7 @@
+use std::fmt;
+
 use crate::codegen::{
-    api_model::{Ref, Reference, UnknownReference},
+    api_model::{AsBackref, Ref, Reference, UnknownReference},
     make_ident, ApiModel, PropertyOverride,
 };
 
@@ -72,6 +74,19 @@ impl ObjectMember {
         let read_only = self.read_only || get_property_override(&|prop| prop.read_only);
         let write_only = self.write_only || get_property_override(&|prop| prop.write_only);
 
+        let serde_as = item
+            .and_then(|item| item.use_display_from_str(model))
+            .map(|annotation| {
+                let annotation = if self.inline_option {
+                    quote!(Option<#annotation>)
+                } else {
+                    annotation
+                };
+
+                let annotation = annotation.to_string().replace(' ', "");
+                quote!(#[serde_as(as = #annotation)])
+            });
+
         let mut serde_attributes = Vec::new();
 
         if read_only {
@@ -105,6 +120,7 @@ impl ObjectMember {
 
         Ok(quote! {
             #docs
+            #serde_as
             #serde_attributes
             pub #snake_member_name: #item_ref,
         })
@@ -133,6 +149,20 @@ impl<R> Default for Object<R> {
             members: Default::default(),
             is_generated_body_and_headers: Default::default(),
         }
+    }
+}
+
+impl<R> Object<R> {
+    pub(crate) fn use_serde_as_annotation(&self, model: &ApiModel<R>) -> bool
+    where
+        R: AsBackref + fmt::Debug,
+    {
+        self.members.values().any(|member| {
+            let Ok(item) = model.resolve(&member.definition) else {
+                return false;
+            };
+            item.use_display_from_str(model).is_some()
+        })
     }
 }
 

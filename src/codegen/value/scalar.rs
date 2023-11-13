@@ -140,6 +140,48 @@ impl Scalar {
         }
     }
 
+    /// Should we use `serde_as::DisplayFromStr` for serialization for this type?
+    ///
+    /// Most primitives implement `serde::Serialize` and `serde::Deserialize`. However, that is not universally true:
+    /// some require this helper for serialization. For that, they just need to implement `Display` and `FromStr`.
+    pub fn use_display_from_str(self) -> Option<TokenStream> {
+        match self {
+            Scalar::Mime | Scalar::AcceptHeader => {
+                Some(quote!(openapi_gen::reexport::serde_with::DisplayFromStr))
+            }
+            Scalar::Unit
+            | Scalar::F64
+            | Scalar::F32
+            | Scalar::I64
+            | Scalar::I32
+            | Scalar::U64
+            | Scalar::U32
+            | Scalar::String
+            | Scalar::Binary
+            | Scalar::Date
+            | Scalar::DateTime
+            | Scalar::IpAddr
+            | Scalar::Ipv4Addr
+            | Scalar::Ipv6Addr
+            | Scalar::Bool
+            | Scalar::Any => None,
+            #[cfg(feature = "bytes")]
+            Scalar::Bytes => None,
+            #[cfg(feature = "uuid")]
+            Scalar::Uuid => None,
+            #[cfg(feature = "integer-restrictions")]
+            Scalar::BoundedI32(_, _) => None,
+            #[cfg(feature = "integer-restrictions")]
+            Scalar::BoundedI64(_, _) => None,
+            #[cfg(feature = "integer-restrictions")]
+            Scalar::BoundedU32(_, _) => None,
+            #[cfg(feature = "integer-restrictions")]
+            Scalar::BoundedU64(_, _) => None,
+            #[cfg(feature = "api-problem")]
+            Scalar::ApiProblem => None,
+        }
+    }
+
     pub fn emit_type(self) -> TokenStream {
         match self {
             Scalar::Unit => quote!(()),

@@ -1,4 +1,7 @@
 #![allow(non_camel_case_types)]
+#[openapi_gen::reexport::serde_with::serde_as(
+    crate = "openapi_gen::reexport::serde_with"
+)]
 #[derive(
     Debug,
     Clone,
@@ -76,6 +79,16 @@ pub struct Container {
     pub string_ipv4: std::net::Ipv4Addr,
     pub string_ipv6: std::net::Ipv6Addr,
     pub string_uuid: openapi_gen::reexport::uuid::Uuid,
+    #[serde_as(as = "openapi_gen::reexport::serde_with::DisplayFromStr")]
+    pub string_mime: openapi_gen::reexport::mime::Mime,
+    #[serde_as(as = "Option<openapi_gen::reexport::serde_with::DisplayFromStr>")]
+    pub nullable_string_mime: Option<openapi_gen::reexport::mime::Mime>,
+    #[serde_as(as = "Option<openapi_gen::reexport::serde_with::DisplayFromStr>")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optional_string_mime: Option<openapi_gen::reexport::mime::Mime>,
+    #[serde_as(as = "Option<Option<openapi_gen::reexport::serde_with::DisplayFromStr>>")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optional_nullable_string_mime: Option<Option<openapi_gen::reexport::mime::Mime>>,
     pub string_unrecognized: String,
 }
 #[openapi_gen::reexport::async_trait::async_trait]

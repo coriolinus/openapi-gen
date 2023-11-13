@@ -1,8 +1,8 @@
-use std::cell::OnceCell;
+use std::{cell::OnceCell, fmt};
 
 use crate::{
     codegen::{
-        api_model::{Ref, Reference, UnknownReference},
+        api_model::{AsBackref, Ref, Reference, UnknownReference},
         make_ident,
     },
     ApiModel,
@@ -119,6 +119,20 @@ impl<R> Default for OneOfEnum<R> {
             discriminant: Default::default(),
             variants: Default::default(),
         }
+    }
+}
+
+impl<R> OneOfEnum<R> {
+    pub(crate) fn use_serde_as_annotation(&self, model: &ApiModel<R>) -> bool
+    where
+        R: AsBackref + fmt::Debug,
+    {
+        self.variants.iter().any(|variant| {
+            let Ok(item) = model.resolve(&variant.definition) else {
+                return false;
+            };
+            item.use_display_from_str(model).is_some()
+        })
     }
 }
 
