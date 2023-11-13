@@ -328,28 +328,28 @@ impl<R> Value<R> {
                 let Ok(item) = model.resolve(ref_) else {
                     return false;
                 };
-                item.use_display_from_str(model).is_some()
+                item.serde_as_item_annotation(model).is_some()
             }
         }
     }
 
-    pub(crate) fn use_display_from_str(&self, model: &ApiModel<R>) -> Option<TokenStream>
+    pub(crate) fn serde_as_item_annotation(&self, model: &ApiModel<R>) -> Option<TokenStream>
     where
         R: AsBackref + fmt::Debug,
     {
         match self {
             // scalars might require this annotation natively
-            Value::Scalar(scalar) => scalar.use_display_from_str(),
+            Value::Scalar(scalar) => scalar.serde_as_item_annotation(),
             // types which contain multiple inner value types, or just strings,
             // can impl `DisplayFromStr` in their own interior
             Value::StringEnum(_) | Value::OneOfEnum(_) | Value::Object(_) => None,
             // types with a single receiver can recursively produce a `DisplayFromStr` requirement
-            Value::List(list) => list.use_display_from_str(model),
-            Value::Map(map) => map.use_display_from_str(model),
-            Value::Set(set_) => set_.use_display_from_str(model),
+            Value::List(list) => list.serde_as_item_annotation(model),
+            Value::Map(map) => map.serde_as_item_annotation(model),
+            Value::Set(set_) => set_.serde_as_item_annotation(model),
             Value::Ref(ref_) | Value::PropertyOverride(PropertyOverride { ref_, .. }) => {
                 let item = model.resolve(ref_).ok()?;
-                item.use_display_from_str(model)
+                item.serde_as_item_annotation(model)
             }
         }
     }

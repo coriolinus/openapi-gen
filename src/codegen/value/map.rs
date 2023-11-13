@@ -28,14 +28,14 @@ where
                 let Ok(item) = model.resolve(value_type_ref) else {
                     return false;
                 };
-                item.use_display_from_str(model).is_some()
+                item.serde_as_item_annotation(model).is_some()
             })
             .unwrap_or_default()
     }
 
-    pub(crate) fn use_display_from_str(&self, model: &ApiModel<R>) -> Option<TokenStream> {
+    pub(crate) fn serde_as_item_annotation(&self, model: &ApiModel<R>) -> Option<TokenStream> {
         let item = model.resolve(self.value_type.as_ref()?).ok()?;
-        let inner = item.use_display_from_str(model)?;
+        let inner = item.serde_as_item_annotation(model)?;
         Some(quote!(std::collections::HashMap<String, #inner>))
     }
 }

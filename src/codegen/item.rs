@@ -168,8 +168,8 @@ impl<R> Item<R>
 where
     R: AsBackref + fmt::Debug,
 {
-    pub(crate) fn use_display_from_str(&self, model: &ApiModel<R>) -> Option<TokenStream> {
-        let mut vd = self.value.use_display_from_str(model)?;
+    pub(crate) fn serde_as_item_annotation(&self, model: &ApiModel<R>) -> Option<TokenStream> {
+        let mut vd = self.value.serde_as_item_annotation(model)?;
         if self.nullable {
             vd = quote!(Option<#vd>);
         }

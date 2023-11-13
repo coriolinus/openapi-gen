@@ -21,12 +21,12 @@ where
         let Ok(item) = model.resolve(&self.item) else {
             return false;
         };
-        item.use_display_from_str(model).is_some()
+        item.serde_as_item_annotation(model).is_some()
     }
 
-    pub(crate) fn use_display_from_str(&self, model: &ApiModel<R>) -> Option<TokenStream> {
+    pub(crate) fn serde_as_item_annotation(&self, model: &ApiModel<R>) -> Option<TokenStream> {
         let item = model.resolve(&self.item).ok()?;
-        let inner = item.use_display_from_str(model)?;
+        let inner = item.serde_as_item_annotation(model)?;
         Some(quote!(Vec<#inner>))
     }
 }
