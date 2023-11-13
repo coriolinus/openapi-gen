@@ -75,7 +75,7 @@ impl ObjectMember {
         let write_only = self.write_only || get_property_override(&|prop| prop.write_only);
 
         let serde_as = item
-            .and_then(|item| item.use_display_from_str(model))
+            .and_then(|item| item.serde_as_item_annotation(model))
             .map(|annotation| {
                 let annotation = if self.inline_option {
                     quote!(Option<#annotation>)
@@ -161,7 +161,7 @@ impl<R> Object<R> {
             let Ok(item) = model.resolve(&member.definition) else {
                 return false;
             };
-            item.use_display_from_str(model).is_some()
+            item.serde_as_item_annotation(model).is_some()
         })
     }
 }

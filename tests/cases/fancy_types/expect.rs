@@ -73,7 +73,11 @@ pub struct Container {
     pub string_binary: Vec<u8>,
     pub string_byte: openapi_gen::Bytes,
     pub string_base64: openapi_gen::Bytes,
+    #[serde_as(as = "openapi_gen::serialization_helpers::date_as_string::Ymd")]
     pub string_date: openapi_gen::reexport::time::Date,
+    #[serde_as(
+        as = "openapi_gen::reexport::time::format_description::well_known::Rfc3339"
+    )]
     pub string_datetime: openapi_gen::reexport::time::OffsetDateTime,
     pub string_ip: std::net::IpAddr,
     pub string_ipv4: std::net::Ipv4Addr,

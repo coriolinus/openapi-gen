@@ -140,15 +140,23 @@ impl Scalar {
         }
     }
 
-    /// Should we use `serde_as::DisplayFromStr` for serialization for this type?
+    /// Should we use `serde_as::DisplayFromStr` or similar for serialization for this type?
     ///
     /// Most primitives implement `serde::Serialize` and `serde::Deserialize`. However, that is not universally true:
     /// some require this helper for serialization. For that, they just need to implement `Display` and `FromStr`.
-    pub fn use_display_from_str(self) -> Option<TokenStream> {
+    ///
+    /// Time and date types also produce a non-`None` value here, as we need to explicitly specify which format to use.
+    pub fn serde_as_item_annotation(self) -> Option<TokenStream> {
         match self {
             Scalar::Mime | Scalar::AcceptHeader => {
                 Some(quote!(openapi_gen::reexport::serde_with::DisplayFromStr))
             }
+            Scalar::Date => Some(quote!(
+                openapi_gen::serialization_helpers::date_as_string::Ymd
+            )),
+            Scalar::DateTime => Some(quote!(
+                openapi_gen::reexport::time::format_description::well_known::Rfc3339
+            )),
             Scalar::Unit
             | Scalar::F64
             | Scalar::F32
@@ -158,8 +166,6 @@ impl Scalar {
             | Scalar::U32
             | Scalar::String
             | Scalar::Binary
-            | Scalar::Date
-            | Scalar::DateTime
             | Scalar::IpAddr
             | Scalar::Ipv4Addr
             | Scalar::Ipv6Addr
