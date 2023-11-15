@@ -39,7 +39,6 @@ time = { version = "0.3.21", features = ["formatting", "parsing", "macros", "ser
 uuid = { version = "1.3.2", features = ["fast-rng", "serde", "v4"], optional = true }
 
 [dev-dependencies]
-atty = "0.2.14"
 serde_yaml = { version = "0.9.21", optional = false }
 similar = "2.2.1"
 syn = { version = "2.0.15", features = ["extra-traits"] }

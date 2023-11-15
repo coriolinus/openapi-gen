@@ -17,7 +17,7 @@
 use std::{
     any::Any,
     fmt,
-    io::Write,
+    io::{IsTerminal, Write},
     path::{Path, PathBuf},
 };
 
@@ -235,7 +235,7 @@ fn env_is_set(name: impl AsRef<std::ffi::OsStr>) -> bool {
     ignore = "required features are not enabled"
 )]
 fn cases() {
-    let choice = if atty::is(atty::Stream::Stdout) {
+    let choice = if std::io::stdout().is_terminal() {
         termcolor::ColorChoice::Auto
     } else {
         termcolor::ColorChoice::Never
