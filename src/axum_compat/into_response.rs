@@ -3,6 +3,7 @@ use axum::{
     Json,
 };
 use heck::{ToShoutySnakeCase, ToSnakeCase};
+use http::header;
 use proc_macro2::TokenStream;
 use quote::quote;
 use serde::Serialize;
@@ -20,7 +21,12 @@ where
     D: AsStatusCode + Serialize,
 {
     let status = default.as_status_code();
-    (status, Json(default)).into_response()
+    (
+        status,
+        [(header::CONTENT_TYPE, "application/problem+json")],
+        Json(default),
+    )
+        .into_response()
 }
 
 #[macro_export]
