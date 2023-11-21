@@ -49,10 +49,14 @@ where
             openapi_gen::reexport::axum::routing::post({
                 let instance = instance.clone();
                 move |
-                    openapi_gen::reexport::axum::extract::Json(
-                        request_body,
-                    ): openapi_gen::reexport::axum::extract::Json<
-                        PostWellKnownTypesRequest,
+                    openapi_gen::reexport::axum_extra::extract::WithRejection(
+                        openapi_gen::reexport::axum::extract::Json(request_body),
+                        _,
+                    ): openapi_gen::reexport::axum_extra::extract::WithRejection<
+                        openapi_gen::reexport::axum::extract::Json<
+                            PostWellKnownTypesRequest,
+                        >,
+                        openapi_gen::axum_compat::ApiProblemRejection,
                     >|
                 async move { instance.post_well_known_types(request_body).await }
             }),

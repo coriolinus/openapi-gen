@@ -123,9 +123,13 @@ where
             openapi_gen::reexport::axum::routing::post({
                 let instance = instance.clone();
                 move |
-                    openapi_gen::reexport::axum::extract::Json(
-                        request_body,
-                    ): openapi_gen::reexport::axum::extract::Json<MultiRequestsRequest>|
+                    openapi_gen::reexport::axum_extra::extract::WithRejection(
+                        openapi_gen::reexport::axum::extract::Json(request_body),
+                        _,
+                    ): openapi_gen::reexport::axum_extra::extract::WithRejection<
+                        openapi_gen::reexport::axum::extract::Json<MultiRequestsRequest>,
+                        openapi_gen::axum_compat::ApiProblemRejection,
+                    >|
                 async move { instance.multi_requests(request_body).await }
             }),
         )
@@ -134,10 +138,14 @@ where
             openapi_gen::reexport::axum::routing::post({
                 let instance = instance.clone();
                 move |
-                    openapi_gen::reexport::axum::extract::Json(
-                        request_body,
-                    ): openapi_gen::reexport::axum::extract::Json<
-                        OptionalRequestBodyRequest,
+                    openapi_gen::reexport::axum_extra::extract::WithRejection(
+                        openapi_gen::reexport::axum::extract::Json(request_body),
+                        _,
+                    ): openapi_gen::reexport::axum_extra::extract::WithRejection<
+                        openapi_gen::reexport::axum::extract::Json<
+                            OptionalRequestBodyRequest,
+                        >,
+                        openapi_gen::axum_compat::ApiProblemRejection,
                     >|
                 async move { instance.optional_request_body(request_body).await }
             }),
@@ -147,9 +155,13 @@ where
             openapi_gen::reexport::axum::routing::post({
                 let instance = instance.clone();
                 move |
-                    openapi_gen::reexport::axum::extract::Json(
-                        request_body,
-                    ): openapi_gen::reexport::axum::extract::Json<SameRequestRequest>|
+                    openapi_gen::reexport::axum_extra::extract::WithRejection(
+                        openapi_gen::reexport::axum::extract::Json(request_body),
+                        _,
+                    ): openapi_gen::reexport::axum_extra::extract::WithRejection<
+                        openapi_gen::reexport::axum::extract::Json<SameRequestRequest>,
+                        openapi_gen::axum_compat::ApiProblemRejection,
+                    >|
                 async move { instance.same_request(request_body).await }
             }),
         )

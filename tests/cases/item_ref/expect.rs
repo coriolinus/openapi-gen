@@ -155,9 +155,13 @@ where
                     ): openapi_gen::reexport::axum::extract::Path<
                         PutThingPathParameters,
                     >,
-                    openapi_gen::reexport::axum::extract::Json(
-                        request_body,
-                    ): openapi_gen::reexport::axum::extract::Json<PutThingRequest>|
+                    openapi_gen::reexport::axum_extra::extract::WithRejection(
+                        openapi_gen::reexport::axum::extract::Json(request_body),
+                        _,
+                    ): openapi_gen::reexport::axum_extra::extract::WithRejection<
+                        openapi_gen::reexport::axum::extract::Json<PutThingRequest>,
+                        openapi_gen::axum_compat::ApiProblemRejection,
+                    >|
                 async move { instance.put_thing(id, request_body).await }
             }),
         )
