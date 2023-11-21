@@ -180,10 +180,14 @@ where
             openapi_gen::reexport::axum::routing::post({
                 let instance = instance.clone();
                 move |
-                    openapi_gen::reexport::axum::extract::Json(
-                        request_body,
-                    ): openapi_gen::reexport::axum::extract::Json<
-                        CreateNaturalPersonIdentificationRequest,
+                    openapi_gen::reexport::axum_extra::extract::WithRejection(
+                        openapi_gen::reexport::axum::extract::Json(request_body),
+                        _,
+                    ): openapi_gen::reexport::axum_extra::extract::WithRejection<
+                        openapi_gen::reexport::axum::extract::Json<
+                            CreateNaturalPersonIdentificationRequest,
+                        >,
+                        openapi_gen::axum_compat::ApiProblemRejection,
                     >|
                 async move {
                     instance.create_natural_person_identification(request_body).await

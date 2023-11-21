@@ -309,10 +309,14 @@ where
                     x_request_id: Option<
                         openapi_gen::reexport::axum::extract::TypedHeader<XRequestId>,
                     >,
-                    openapi_gen::reexport::axum::extract::Json(
-                        request_body,
-                    ): openapi_gen::reexport::axum::extract::Json<
-                        CreateNaturalPersonIdentificationRequest,
+                    openapi_gen::reexport::axum_extra::extract::WithRejection(
+                        openapi_gen::reexport::axum::extract::Json(request_body),
+                        _,
+                    ): openapi_gen::reexport::axum_extra::extract::WithRejection<
+                        openapi_gen::reexport::axum::extract::Json<
+                            CreateNaturalPersonIdentificationRequest,
+                        >,
+                        openapi_gen::axum_compat::ApiProblemRejection,
                     >|
                 async move {
                     let x_flow_id = x_flow_id.map(|x_flow_id| x_flow_id.0);

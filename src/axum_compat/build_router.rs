@@ -172,8 +172,24 @@ fn build_route<'a>(
         let variable_ident = make_ident("request_body");
 
         if item.is_json() {
+            // mutability here may or may not be unused depending on the set of feature flags enabled;
+            // either way, it is no error
+            #[allow(unused_mut)]
+            let mut binding = quote!(#prefix::Json(#variable_ident));
+            #[allow(unused_mut)]
+            let mut type_ = quote!(#prefix::Json<#type_ident>);
+
+            #[cfg(feature = "api-problem")]
+            {
+                let with_rejection =
+                    quote!(openapi_gen::reexport::axum_extra::extract::WithRejection);
+                let problem_rejection = quote!(openapi_gen::axum_compat::ApiProblemRejection);
+                binding = quote!(#with_rejection(#binding, _));
+                type_ = quote!(#with_rejection<#type_, #problem_rejection>);
+            }
+
             parameters.push(quote! {
-                #prefix::Json(#variable_ident): #prefix::Json<#type_ident>
+                #binding: #type_
             });
         } else {
             parameters.push(quote! {
