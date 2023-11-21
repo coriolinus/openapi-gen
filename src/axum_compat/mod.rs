@@ -21,6 +21,11 @@ mod build_router;
 mod header;
 mod into_response;
 
+#[cfg(feature = "api-problem")]
+mod api_problem_rejection;
+#[cfg(feature = "api-problem")]
+pub use api_problem_rejection::ApiProblemRejection;
+
 pub use into_response::default_response;
 
 pub(crate) fn axum_items<'a>(
