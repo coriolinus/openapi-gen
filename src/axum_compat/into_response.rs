@@ -79,7 +79,7 @@ fn impl_into_response_for_response_type(
     if variant_name == "Default" {
         return Ok(quote! {
             #response_ident::#variant_ident(#variant_binding) => {
-                #variant_binding
+                #variant_binding.into_response()
             }
         });
     }

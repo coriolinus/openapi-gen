@@ -56,9 +56,7 @@ impl openapi_gen::reexport::axum::response::IntoResponse for RenderPdfResponse {
                 )
                     .into_response()
             }
-            RenderPdfResponse::Default(default) => {
-                openapi_gen::axum_compat::default_response(default)
-            }
+            RenderPdfResponse::Default(default) => default.into_response(),
         }
     }
 }

@@ -30,9 +30,7 @@ impl openapi_gen::reexport::axum::response::IntoResponse for PostKudosResponse {
                 (openapi_gen::reexport::http::status::StatusCode::CREATED, created)
                     .into_response()
             }
-            PostKudosResponse::Default(default) => {
-                openapi_gen::axum_compat::default_response(default)
-            }
+            PostKudosResponse::Default(default) => default.into_response(),
         }
     }
 }

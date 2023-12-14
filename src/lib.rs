@@ -27,7 +27,7 @@ pub mod reexport {
     pub use async_trait;
     #[cfg(feature = "axum-support")]
     pub use axum;
-    #[cfg(all(feature = "axum-support", feature = "api-problem"))]
+    #[cfg(feature = "axum-support")]
     pub use axum_extra;
     #[cfg(feature = "integer-restrictions")]
     pub use bounded_integer;

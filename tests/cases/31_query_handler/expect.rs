@@ -62,9 +62,7 @@ impl openapi_gen::reexport::axum::response::IntoResponse for GetRootResponse {
                 (openapi_gen::reexport::http::status::StatusCode::OK, header_map, ok)
                     .into_response()
             }
-            GetRootResponse::Default(default) => {
-                openapi_gen::axum_compat::default_response(default)
-            }
+            GetRootResponse::Default(default) => default.into_response(),
         }
     }
 }
