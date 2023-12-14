@@ -52,7 +52,7 @@ vergen = { version = "8.2.6", features = ["git", "gitcl"] }
 [features]
 default = []
 api-problem = ["axum-extra", "http-api-problem"]
-axum-support = ["axum", "headers"]
+axum-support = ["axum", "headers", "axum-extra"]
 cli = ["clap", "serde_yaml"]
 bytes = ["base64"]
 integer-restrictions = ["bounded-integer"]
