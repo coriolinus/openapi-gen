@@ -26,8 +26,6 @@ mod api_problem_rejection;
 #[cfg(feature = "api-problem")]
 pub use api_problem_rejection::ApiProblemRejection;
 
-pub use into_response::default_response;
-
 pub(crate) fn axum_items<'a>(
     model: &ApiModel,
     name_resolver: impl Fn(Reference) -> Result<&'a str, UnknownReference>,

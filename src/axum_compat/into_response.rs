@@ -1,33 +1,12 @@
-use axum::{
-    response::{IntoResponse, Response},
-    Json,
-};
 use heck::{ToShoutySnakeCase, ToSnakeCase};
-use http::header;
 use proc_macro2::TokenStream;
 use quote::quote;
-use serde::Serialize;
 
 use crate::{
     axum_compat::Error,
     codegen::{make_ident, value::object::BODY_IDENT, Object, Reference, Value},
-    ApiModel, AsStatusCode,
+    ApiModel,
 };
-
-/// Construct a [`Response`][axum::response::Response] from the the default response type for an endpoint.
-#[inline]
-pub fn default_response<D>(default: D) -> Response
-where
-    D: AsStatusCode + Serialize,
-{
-    let status = default.as_status_code();
-    (
-        status,
-        [(header::CONTENT_TYPE, "application/problem+json")],
-        Json(default),
-    )
-        .into_response()
-}
 
 #[macro_export]
 macro_rules! or_ice {
@@ -96,12 +75,11 @@ fn impl_into_response_for_response_type(
         None => quote!(openapi_gen::AsStatusCode::as_status_code(&#item_ident)),
     };
 
-    // if the item is a default item, then we delegate to the `default_response` handler and trust that the
-    // user has properly implemented the necessary traits
+    // if the item is a default item, assume it implements `IntoResponse`
     if variant_name == "Default" {
         return Ok(quote! {
             #response_ident::#variant_ident(#variant_binding) => {
-                openapi_gen::axum_compat::default_response(#variant_binding)
+                #variant_binding
             }
         });
     }
