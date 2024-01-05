@@ -756,7 +756,8 @@ dependencies = [
 [[package]]
 name = "http-api-problem"
 version = "0.58.0"
-source = "git+https://github.com/coriolinus/http-api-problem?branch=upgrade-http-and-axum#c62edf29d9ae3626ff1408d5f78fcd8e4e77f6ed"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bfa6ba9e2d8cf5299faf4721520ff7997989431d2c8fdf702eb8b1a4313b625"
 dependencies = [
  "axum-core",
  "http 1.0.0",
