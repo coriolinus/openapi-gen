@@ -1,11 +1,8 @@
-pub(crate) mod as_status_code;
 pub(crate) mod canonical_form;
 pub(crate) mod codegen;
 pub(crate) mod openapi_compat;
 pub(crate) mod resolve_trait;
 pub(crate) mod well_known_types;
-
-pub use as_status_code::AsStatusCode;
 
 pub mod fix_block_comments;
 pub mod serialization_helpers;
@@ -30,7 +27,7 @@ pub mod reexport {
     pub use async_trait;
     #[cfg(feature = "axum-support")]
     pub use axum;
-    #[cfg(all(feature = "axum-support", feature = "api-problem"))]
+    #[cfg(feature = "axum-support")]
     pub use axum_extra;
     #[cfg(feature = "integer-restrictions")]
     pub use bounded_integer;

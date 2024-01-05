@@ -85,9 +85,7 @@ pub trait Api {
 impl openapi_gen::reexport::axum::response::IntoResponse for MultiRequestsResponse {
     fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
         match self {
-            MultiRequestsResponse::Default(default) => {
-                openapi_gen::axum_compat::default_response(default)
-            }
+            MultiRequestsResponse::Default(default) => default.into_response(),
         }
     }
 }
@@ -95,18 +93,14 @@ impl openapi_gen::reexport::axum::response::IntoResponse
 for OptionalRequestBodyResponse {
     fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
         match self {
-            OptionalRequestBodyResponse::Default(default) => {
-                openapi_gen::axum_compat::default_response(default)
-            }
+            OptionalRequestBodyResponse::Default(default) => default.into_response(),
         }
     }
 }
 impl openapi_gen::reexport::axum::response::IntoResponse for SameRequestResponse {
     fn into_response(self) -> openapi_gen::reexport::axum::response::Response {
         match self {
-            SameRequestResponse::Default(default) => {
-                openapi_gen::axum_compat::default_response(default)
-            }
+            SameRequestResponse::Default(default) => default.into_response(),
         }
     }
 }

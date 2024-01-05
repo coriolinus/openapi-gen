@@ -162,7 +162,7 @@ for CreateNaturalPersonIdentificationResponse {
                     .into_response()
             }
             CreateNaturalPersonIdentificationResponse::Default(default) => {
-                openapi_gen::axum_compat::default_response(default)
+                default.into_response()
             }
         }
     }

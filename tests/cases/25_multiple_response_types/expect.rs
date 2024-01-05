@@ -159,7 +159,7 @@ for GetNpIdentityDocumentDataResponse {
                     .into_response()
             }
             GetNpIdentityDocumentDataResponse::Default(default) => {
-                openapi_gen::axum_compat::default_response(default)
+                default.into_response()
             }
         }
     }
@@ -186,7 +186,7 @@ where
                         GetNpIdentityDocumentDataPathParameters,
                     >,
                     accept: Option<
-                        openapi_gen::reexport::axum::extract::TypedHeader<
+                        openapi_gen::reexport::axum_extra::TypedHeader<
                             openapi_gen::reexport::accept_header::Accept,
                         >,
                     >|

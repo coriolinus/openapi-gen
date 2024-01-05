@@ -30,9 +30,7 @@ impl openapi_gen::reexport::axum::response::IntoResponse for PostWellKnownTypesR
                 (openapi_gen::reexport::http::status::StatusCode::NO_CONTENT, no_content)
                     .into_response()
             }
-            PostWellKnownTypesResponse::Default(default) => {
-                openapi_gen::axum_compat::default_response(default)
-            }
+            PostWellKnownTypesResponse::Default(default) => default.into_response(),
         }
     }
 }
