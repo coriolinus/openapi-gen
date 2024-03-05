@@ -141,7 +141,7 @@ fn build_route<'a>(
                 )))?;
         let variable_ident = make_ident(&item.rust_name.to_snake_case());
 
-        let extractor = quote!(#prefix::TypedHeader);
+        let extractor = quote!(openapi_gen::reexport::axum_extra::TypedHeader);
 
         let (binding, bind_type) = if param.required {
             (

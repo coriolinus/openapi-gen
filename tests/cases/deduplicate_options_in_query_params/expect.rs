@@ -181,9 +181,7 @@ impl openapi_gen::reexport::axum::response::IntoResponse for GetListResponse {
                 )
                     .into_response()
             }
-            GetListResponse::Default(default) => {
-                openapi_gen::axum_compat::default_response(default)
-            }
+            GetListResponse::Default(default) => default.into_response(),
         }
     }
 }
@@ -206,7 +204,7 @@ where
                         GetListQueryParameters,
                     >,
                     x_request_id: Option<
-                        openapi_gen::reexport::axum::extract::TypedHeader<XRequestId>,
+                        openapi_gen::reexport::axum_extra::TypedHeader<XRequestId>,
                     >|
                 async move {
                     let x_request_id = x_request_id.map(|x_request_id| x_request_id.0);

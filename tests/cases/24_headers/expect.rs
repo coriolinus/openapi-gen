@@ -285,7 +285,7 @@ for CreateNaturalPersonIdentificationResponse {
                     .into_response()
             }
             CreateNaturalPersonIdentificationResponse::Default(default) => {
-                openapi_gen::axum_compat::default_response(default)
+                default.into_response()
             }
         }
     }
@@ -304,10 +304,10 @@ where
                 let instance = instance.clone();
                 move |
                     x_flow_id: Option<
-                        openapi_gen::reexport::axum::extract::TypedHeader<XFlowId>,
+                        openapi_gen::reexport::axum_extra::TypedHeader<XFlowId>,
                     >,
                     x_request_id: Option<
-                        openapi_gen::reexport::axum::extract::TypedHeader<XRequestId>,
+                        openapi_gen::reexport::axum_extra::TypedHeader<XRequestId>,
                     >,
                     openapi_gen::reexport::axum_extra::extract::WithRejection(
                         openapi_gen::reexport::axum::extract::Json(request_body),

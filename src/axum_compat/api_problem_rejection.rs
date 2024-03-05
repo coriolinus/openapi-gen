@@ -1,6 +1,5 @@
 use axum::{extract::rejection::JsonRejection, response::IntoResponse};
-use http::StatusCode;
-use http_api_problem::HttpApiProblem;
+use http_api_problem::{HttpApiProblem, StatusCode};
 
 #[derive(Debug)]
 pub struct ApiProblemRejection(pub HttpApiProblem);
@@ -28,14 +27,6 @@ impl From<JsonRejection> for ApiProblemRejection {
 
 impl IntoResponse for ApiProblemRejection {
     fn into_response(self) -> axum::response::Response {
-        // we always set the status, but just in case...
-        let status = self.0.status.unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-
-        (
-            status,
-            [(http::header::CONTENT_TYPE, "application/problem+json")],
-            axum::Json(self.0),
-        )
-            .into_response()
+        self.0.into_response()
     }
 }
