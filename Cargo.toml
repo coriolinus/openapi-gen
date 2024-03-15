@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 default-run = "openapi-gen"
 build = "build.rs"
+license = "GPL-3.0"
 
 [dependencies]
 accept-header = { version = "0.1.0", git = "https://github.com/coriolinus/accept-header.git" }
