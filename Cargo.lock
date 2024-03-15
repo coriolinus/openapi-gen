@@ -5,7 +5,8 @@ version = 3
 [[package]]
 name = "accept-header"
 version = "0.1.0"
-source = "git+https://github.com/coriolinus/accept-header.git#3f3a278edbeb4a8548e272a79b7380f66b68f8a3"
+source = "registry+https://dl.cloudsmith.io/public/finvia/accept-header/cargo/index.git"
+checksum = "67b4b079b5571161678a5dbe09890606727580d47d604781fb7951735b936fb1"
 dependencies = [
  "bstr",
  "headers-core",
