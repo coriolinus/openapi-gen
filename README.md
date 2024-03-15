@@ -18,6 +18,41 @@ What this _does_ provide is:
 This README is a declaration of intent; while this code is being actively developed, it is not yet ready to go, and features may be absent without explanation.
 Treat everything you read here with a declaration of salt; read the code to know its state.
 
+## Including this in your Rust project
+
+Because this project depends on [`accept-header`](https://github.com/coriolinus/accept-header) which is not hosted on `crates.io`, this is also not published on `crates.io`. It is likely to confuse people if a simple `cargo install` or `cargo add` fails on a project there without additional configuration, so for courtesy, I am not publishing this there.
+
+### Git Dependency
+
+```toml
+openapi-gen = { version = "0.1.0", git = "https://github.com/coriolinus/openapi-gen.git" }
+```
+
+### Cloudsmith Package Repository
+
+[![Hosted By: Cloudsmith](https://img.shields.io/badge/OSS%20hosting%20by-cloudsmith-blue?logo=cloudsmith&style=for-the-badge)](https://cloudsmith.com)
+
+Add the following lines to [a relevant `.cargo/config.toml`](https://doc.rust-lang.org/cargo/reference/config.html):
+
+```toml
+[registries.finvia-accept-header]
+index = "sparse+https://cargo.cloudsmith.io/finvia/accept-header/"
+
+[registries.finvia-openapi-gen]
+index = "sparse+https://cargo.cloudsmith.io/finvia/openapi-gen/"
+```
+
+Then depend on it as
+
+```toml
+openapi-gen = { version = "0.1.0", registry = "finvia-openapi-gen" }
+```
+
+Package repository hosting is graciously provided by  [Cloudsmith](https://cloudsmith.com).
+Cloudsmith is the only fully hosted, cloud-native, universal package management solution, that
+enables your organization to create, store and share packages in any format, to any place, with total
+confidence.
+
 ## Crate Features
 
 This crate defines a number of features, none of which are enabled by default. These enable downstream users to limit their dependencies according to what features they need.
