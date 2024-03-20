@@ -7,7 +7,7 @@ build = "build.rs"
 license = "GPL-3.0"
 
 [dependencies]
-accept-header = { version = "0.1.0", registry = "finvia-accept-header" }
+accept-header = { version = "0.1.0", git = "https://github.com/coriolinus/accept-header.git" }
 anyhow = { version = "1.0.75" }
 async-trait = "0.1.74"
 axum = { version = "0.7.2", optional = true }
