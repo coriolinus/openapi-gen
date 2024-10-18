@@ -8,46 +8,46 @@ license = "GPL-3.0"
 
 [dependencies]
 accept-header = { version = "0.1.0", git = "https://github.com/coriolinus/accept-header.git" }
-anyhow = { version = "1.0.75" }
-async-trait = "0.1.74"
-axum = { version = "0.7.2", optional = true }
-axum-extra = { version = "0.9.0", optional = true, features = ["typed-header"] }
-base64 = { version = "0.21.5", optional = true }
+anyhow = { version = "1.0.89" }
+async-trait = "0.1.83"
+axum = { version = "0.7.7", optional = true }
+axum-extra = { version = "0.9.4", optional = true, features = ["typed-header"] }
+base64 = { version = "0.21.7", optional = true }
 bounded-integer = { version = "0.5.7", features = ["std", "types", "serde1", "num-traits02"], optional = true }
-clap = { version = "4.4.11", features = ["derive"], optional = true }
-derive_more = "0.99.17"
+clap = { version = "4.5.20", features = ["derive"], optional = true }
+derive_more = "0.99.18"
 headers = { version = "0.4.0", optional = true }
 heck = "0.4.1"
-http = "1.0.0"
+http = "1.1.0"
 http-api-problem = { version = "0.58.0", optional = true }
 indexmap = "1.9.3"
 md-5 = "0.10.6"
 mime = "0.3.17"
 openapiv3 = { version = "2.2.1", package = "openapiv3-extended" }
-prettyplease = "0.2.15"
-proc-macro2 = "1.0.70"
-quote = "1.0.33"
+prettyplease = "0.2.22"
+proc-macro2 = "1.0.87"
+quote = "1.0.37"
 regress = { version = "0.7.1", optional = true }
-reqwest = { version = "0.11.22", features = ["blocking"] }
-serde = { version = "1.0.193", features = ["derive"] }
+reqwest = { version = "0.12.8", features = ["blocking"] }
+serde = { version = "1.0.210", features = ["derive"] }
 serde-enum-str = "0.4.0"
-serde_json = "1.0.108"
-serde_with = { version = "3.4.0", features = ["macros", "time_0_3"] }
-serde_yaml = { version = "0.9.27", optional = true }
+serde_json = "1.0.128"
+serde_with = { version = "3.11.0", features = ["macros", "time_0_3"] }
+serde_yaml = { version = "0.9.34", optional = true }
 strum = { version = "0.25.0", features = ["derive"] }
-syn = "2.0.41"
-thiserror = "1.0.50"
-time = { version = "0.3.30", features = ["formatting", "parsing", "macros", "serde"] }
-uuid = { version = "1.6.1", features = ["fast-rng", "serde", "v4"], optional = true }
+syn = "2.0.79"
+thiserror = "1.0.64"
+time = { version = "0.3.36", features = ["formatting", "parsing", "macros", "serde"] }
+uuid = { version = "1.10.0", features = ["fast-rng", "serde", "v4"], optional = true }
 
 [dev-dependencies]
-serde_yaml = { version = "0.9.27", optional = false }
-similar = "2.3.0"
-syn = { version = "2.0.41", features = ["extra-traits"] }
-termcolor = "1.4.0"
+serde_yaml = { version = "0.9.34", optional = false }
+similar = "2.6.0"
+syn = { version = "2.0.79", features = ["extra-traits"] }
+termcolor = "1.4.1"
 
 [build-dependencies]
-vergen = { version = "8.2.6", features = ["git", "gitcl"] }
+vergen = { version = "8.3.2", features = ["git", "gitcl"] }
 
 [features]
 default = []
