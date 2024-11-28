@@ -13,6 +13,10 @@ What this _does_ provide is:
 - A build script library interface (in the `openapi-gen-build` crate)
 - A macro (`include_openapi_defs`) for including the generated code
 
+## ARCHIVE NOTICE
+
+Archiving on 28 November 2024. I no longer have a practical need for this tool, and am uninterested in maintaining it. I recommend forking. 
+
 ## WARNING
 
 This README is a declaration of intent; while this code is being actively developed, it is not yet ready to go, and features may be absent without explanation.
